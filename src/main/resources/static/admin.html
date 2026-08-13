@@ -2414,10 +2414,75 @@ async function closeQuotation() {
 
 async function confirmCloseQuotation() {
   if (!confirm('Confirmar o fechamento definitivo? Depois disso não dá mais pra editar os itens, e o PDF do resultado fica disponível.')) return;
-  await safeCall(() => api('POST', `/quotations/${currentQuotationId}/confirm-close`));
+  await attemptConfirmClose();
+}
+
+async function attemptConfirmClose() {
+  const result = await safeCall(() => api('POST', `/quotations/${currentQuotationId}/confirm-close`, {
+    acceptedViolationSupplierIds: closeState.acceptedViolationSupplierIds
+  }));
+
+  if (!result.closed) {
+    renderConfirmCloseViolations(result.pendingViolations);
+    return;
+  }
+
   toast('Cotação fechada definitivamente.');
+  closeState = { tieBreakWinners: {}, excludedSupplierIds: [], acceptedViolationSupplierIds: [] };
   loadQuotations();
   abrirDetalheCotacao(currentQuotationId);
+}
+
+// Revalidação de pedido mínimo no momento de confirmar — pode acontecer se um ajuste em
+// "Revisar Cotações Enviadas" (depois do close() já calculado) derrubou algum fornecedor
+// pra baixo do mínimo de novo. Sem "Excluir fornecedor" aqui — os vencedores já estão
+// definidos; pra reatribuir um item pra outro representante, é pelo "Adicionar produto a
+// esse representante" na revisão, não por aqui.
+function renderConfirmCloseViolations(violations) {
+  let html = '<div class="card" style="margin-top:16px"><h2>Fornecedor abaixo do pedido mínimo!</h2>';
+  html += '<div class="subtitle" style="margin-bottom:10px">Isso mudou depois do cálculo original — provavelmente um ajuste em "Revisar Cotações Enviadas". Ajuste de novo, ou aceite mesmo assim pra confirmar o fechamento.</div>';
+  violations.forEach(v => {
+    const itemsHtml = v.wonItems.map(i => {
+      const alt = i.secondBestSupplierName
+        ? `o segundo menor preço será da ${escapeHtml(i.secondBestSupplierName)} — R$ ${formatCurrencyFromNumber(i.secondBestValue)}`
+        : 'sem outra oferta pra esse item';
+      return `<div>${escapeHtml(i.productName)} - R$ ${formatCurrencyFromNumber(i.winningValue)} - Quantidade: ${i.quantity}
+        <span style="color:var(--danger)">→ se reatribuir: ${alt}</span></div>`;
+    }).join('');
+    html += `<div class="violation-box"><h4>${v.supplierName}</h4>
+      <div>Total ganho: R$ ${formatCurrencyFromNumber(v.total)} — Pedido mínimo: R$ ${formatCurrencyFromNumber(v.minimumOrderValue)}</div>
+      <div style="margin:8px 0; font-size:12.5px; color:var(--text-dim); display:flex; flex-direction:column; gap:2px">${itemsHtml}</div>
+      <div class="btn-row">
+        <button onclick="reviewViolatedSupplier(${v.supplierId})">Revisar esta cotação</button>
+        <button class="secondary small" onclick="acceptConfirmCloseViolation(${v.supplierId})">Aceitar mesmo assim</button>
+      </div>
+    </div>`;
+  });
+  html += '</div>';
+  document.getElementById('close-flow').innerHTML = html;
+}
+
+// Vai direto pro representante desse fornecedor dentro de "Revisar Lances Enviados" —
+// evita o admin ter que fechar esse card e procurar o botão "Revisar Cotações Enviadas"
+// em outro canto da tela pra corrigir a mesma violação que acabou de ver aqui.
+async function reviewViolatedSupplier(supplierId) {
+  const suppliers = await safeCall(() => api('GET', '/suppliers'));
+  const supplier = suppliers.find(s => s.id === supplierId);
+  if (!supplier || !supplier.representativeId) {
+    toast('Não encontrei o representante desse fornecedor.', true);
+    return;
+  }
+  await openReviewBidsModal();
+  const select = document.getElementById('review-bids-rep-select');
+  if (select) {
+    select.value = supplier.representativeId;
+    onReviewRepChange();
+  }
+}
+
+function acceptConfirmCloseViolation(id) {
+  if (!closeState.acceptedViolationSupplierIds.includes(id)) closeState.acceptedViolationSupplierIds.push(id);
+  attemptConfirmClose();
 }
 
 function renderCloseFlow(result) {

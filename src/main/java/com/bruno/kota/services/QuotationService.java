@@ -17,6 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.bruno.kota.dtos.AddItemWithWinnerRequest;
 import com.bruno.kota.dtos.BidResponse;
+import com.bruno.kota.dtos.ConfirmCloseRequest;
 import com.bruno.kota.dtos.ManualWinnerAssignRequest;
 import com.bruno.kota.dtos.MinimumOrderViolation;
 import com.bruno.kota.dtos.MinimumOrderViolationItem;
@@ -226,6 +227,33 @@ public class QuotationService {
             return new QuotationCloseResult(false, toResponse(quotation), pendingTies, List.of());
         }
 
+        List<MinimumOrderViolation> violations = buildMinimumOrderViolations(
+                items, itemWinners, itemRunnersUp, acceptedViolationSupplierIds);
+
+        if (!violations.isEmpty()) {
+            return new QuotationCloseResult(false, toResponse(quotation), List.of(), violations);
+        }
+
+        for (QuotationItem item : items) {
+            item.setWinningBid(itemWinners.get(item.getId()));
+            quotationItemRepository.save(item);
+        }
+
+        quotation.setStatus(QuotationStatus.REVIEWING);
+        quotationRepository.save(quotation);
+
+        return new QuotationCloseResult(true, toResponse(quotation), List.of(), List.of());
+    }
+
+    // Compartilhado entre close() (vencedores recém-calculados) e confirmClose() (vencedores
+    // já definidos, revalidados no estado atual). Junta o total ganho por fornecedor e
+    // compara com o pedido mínimo; ignora quem já está em acceptedViolationSupplierIds.
+    private List<MinimumOrderViolation> buildMinimumOrderViolations(
+            List<QuotationItem> items,
+            Map<Long, Bid> itemWinners,
+            Map<Long, Bid> itemRunnersUp,
+            Set<Long> acceptedViolationSupplierIds) {
+
         Map<Long, BigDecimal> supplierTotals = new HashMap<>();
         Map<Long, Supplier> suppliersById = new HashMap<>();
         Map<Long, List<QuotationItem>> supplierItemsById = new HashMap<>();
@@ -266,40 +294,68 @@ public class QuotationService {
                         })
                         .toList();
                 violations.add(new MinimumOrderViolation(
-                        supplierId,
-                        supplier.getName(),
-                        total,
-                        supplier.getMinimumOrderValue(),
-                        violationItems
+                        supplierId, supplier.getName(), total, supplier.getMinimumOrderValue(), violationItems
                 ));
             }
         }
 
-        if (!violations.isEmpty()) {
-            return new QuotationCloseResult(false, toResponse(quotation), List.of(), violations);
-        }
-
-        for (QuotationItem item : items) {
-            item.setWinningBid(itemWinners.get(item.getId()));
-            quotationItemRepository.save(item);
-        }
-
-        quotation.setStatus(QuotationStatus.REVIEWING);
-        quotationRepository.save(quotation);
-
-        return new QuotationCloseResult(true, toResponse(quotation), List.of(), List.of());
+        return violations;
     }
 
+    // Revalida o pedido mínimo por fornecedor no estado ATUAL dos itens — não só bloqueia
+    // no valor errado. O close() só checa isso na hora de calcular os vencedores; depois
+    // disso, ajustes individuais por representante (mudar quantidade/preço, excluir um
+    // lance) não invalidam mais o resto da revisão (de propósito, ver
+    // applyReviewBatchUpdate), então também não voltam a passar por essa checagem. Sem
+    // isso aqui, dava pra reduzir o pedido de um fornecedor pra baixo do mínimo depois do
+    // close() e confirmar o fechamento assim mesmo, gerando PDF com pedido que nunca
+    // deveria ter sido aceito.
+    //
+    // "aceitar mesmo assim" do close() não fica guardado em lugar nenhum (é só um
+    // parâmetro daquela chamada) — se essa violação for detectada de novo aqui, o admin
+    // precisa aceitar de novo, mesmo que já tenha aceitado no close(). Reconfirmar antes
+    // de virar CLOSED de vez (não dá mais pra editar depois) é intencional, não sobra de
+    // implementação.
     @Transactional
-    public QuotationResponse confirmClose(Long id) {
+    public QuotationCloseResult confirmClose(Long id, ConfirmCloseRequest request) {
         Quotation quotation = findEntityById(id);
 
         if (quotation.getStatus() != QuotationStatus.REVIEWING) {
             throw new BusinessRuleException("Só é possível confirmar o fechamento de uma cotação em revisão.");
         }
 
+        Set<Long> acceptedViolationSupplierIds = request != null && request.acceptedViolationSupplierIds() != null
+                ? new HashSet<>(request.acceptedViolationSupplierIds()) : Set.of();
+
+        List<QuotationItem> items = quotationItemRepository.findByQuotationId(id);
+
+        Map<Long, Bid> itemWinners = new HashMap<>();
+        Map<Long, Bid> itemRunnersUp = new HashMap<>();
+
+        for (QuotationItem item : items) {
+            Bid winner = item.getWinningBid();
+            itemWinners.put(item.getId(), winner);
+            if (winner == null) {
+                continue;
+            }
+            // "Segunda opção" aqui não é recalculada do zero (os vencedores já estão
+            // definidos, não tem empate/exclusão rolando) — é só o melhor lance elegível
+            // que não é o vencedor atual, pra sugerir uma alternativa no card.
+            bidRepository.findByQuotationItemId(item.getId()).stream()
+                    .filter(bid -> !bid.getId().equals(winner.getId()))
+                    .min(Comparator.comparing(Bid::getValue))
+                    .ifPresent(runnerUp -> itemRunnersUp.put(item.getId(), runnerUp));
+        }
+
+        List<MinimumOrderViolation> violations = buildMinimumOrderViolations(
+                items, itemWinners, itemRunnersUp, acceptedViolationSupplierIds);
+
+        if (!violations.isEmpty()) {
+            return new QuotationCloseResult(false, toResponse(quotation), List.of(), violations);
+        }
+
         quotation.setStatus(QuotationStatus.CLOSED);
-        return toResponse(quotationRepository.save(quotation));
+        return new QuotationCloseResult(true, toResponse(quotationRepository.save(quotation)), List.of(), List.of());
     }
 
     @Transactional

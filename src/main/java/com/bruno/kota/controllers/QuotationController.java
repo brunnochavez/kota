@@ -18,6 +18,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
 import com.bruno.kota.dtos.AddItemWithWinnerRequest;
+import com.bruno.kota.dtos.ConfirmCloseRequest;
 import com.bruno.kota.dtos.ManualWinnerAssignRequest;
 import com.bruno.kota.dtos.QuotationCloseRequest;
 import com.bruno.kota.dtos.QuotationCloseResult;
@@ -90,8 +91,8 @@ public class QuotationController {
     }
 
     @PostMapping("/{id}/confirm-close")
-    public QuotationResponse confirmClose(@PathVariable Long id) {
-        return quotationService.confirmClose(id);
+    public QuotationCloseResult confirmClose(@PathVariable Long id, @RequestBody(required = false) ConfirmCloseRequest request) {
+        return quotationService.confirmClose(id, request);
     }
 
     @GetMapping("/{id}/result-pdf")
