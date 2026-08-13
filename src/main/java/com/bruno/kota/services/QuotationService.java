@@ -12,25 +12,10 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import com.bruno.kota.dtos.*;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.bruno.kota.dtos.AddItemWithWinnerRequest;
-import com.bruno.kota.dtos.BidResponse;
-import com.bruno.kota.dtos.ConfirmCloseRequest;
-import com.bruno.kota.dtos.ManualWinnerAssignRequest;
-import com.bruno.kota.dtos.MinimumOrderViolation;
-import com.bruno.kota.dtos.MinimumOrderViolationItem;
-import com.bruno.kota.dtos.QuotationCloseRequest;
-import com.bruno.kota.dtos.QuotationCloseResult;
-import com.bruno.kota.dtos.QuotationCreateRequest;
-import com.bruno.kota.dtos.QuotationFillRate;
-import com.bruno.kota.dtos.QuotationItemCreateRequest;
-import com.bruno.kota.dtos.QuotationItemResponse;
-import com.bruno.kota.dtos.QuotationResponse;
-import com.bruno.kota.dtos.QuotationUpdateRequest;
-import com.bruno.kota.dtos.ReviewBatchUpdateRequest;
-import com.bruno.kota.dtos.TieBreakNeeded;
 import com.bruno.kota.entities.Bid;
 import com.bruno.kota.entities.Product;
 import com.bruno.kota.entities.Quotation;
@@ -578,6 +563,51 @@ public class QuotationService {
         }
 
         return rates;
+    }
+
+    // Cotações fechadas onde esse fornecedor ganhou pelo menos um item — usado na tela do
+    // representante ("O que eu ganhei"). Só entra cotação CLOSED (Em Revisão ainda pode
+    // mudar, não faz sentido mostrar como resultado definitivo ainda). Cada representante
+    // só vê os PRÓPRIOS itens ganhos, nunca os de outro fornecedor — diferente do PDF
+    // (que é do admin e mostra todo mundo), essa lista aqui é sempre por fornecedor.
+    @Transactional(readOnly = true)
+    public List<WonQuotationSummary> findWonQuotations(Long supplierId) {
+        List<Quotation> closedQuotations = quotationRepository.findByStatus(QuotationStatus.CLOSED);
+        List<WonQuotationSummary> result = new ArrayList<>();
+
+        for (Quotation quotation : closedQuotations) {
+            List<QuotationItem> items = quotationItemRepository.findByQuotationId(quotation.getId());
+            List<WonQuotationItem> wonItems = new ArrayList<>();
+            BigDecimal total = BigDecimal.ZERO;
+
+            for (QuotationItem item : items) {
+                Bid winner = item.getWinningBid();
+                if (winner == null || !winner.getSupplier().getId().equals(supplierId)) {
+                    continue;
+                }
+                BigDecimal subtotal = winner.getValue().multiply(item.getQuantity());
+                total = total.add(subtotal);
+                wonItems.add(new WonQuotationItem(
+                        item.getId(),
+                        item.getProduct().getName(),
+                        item.getProduct().getBarcode(),
+                        item.getQuantity(),
+                        winner.getValue(),
+                        subtotal
+                ));
+            }
+
+            if (!wonItems.isEmpty()) {
+                result.add(new WonQuotationSummary(quotation.getId(), quotation.getName(), quotation.getUpdatedAt(), wonItems, total));
+            }
+        }
+
+        result.sort((a, b) -> {
+            if (a.closedAt() == null || b.closedAt() == null) return 0;
+            return b.closedAt().compareTo(a.closedAt());
+        });
+
+        return result;
     }
 
     private SupplierGroup resolveSupplierGroup(Long supplierGroupId) {

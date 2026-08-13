@@ -31,6 +31,7 @@ import com.bruno.kota.dtos.QuotationResponse;
 import com.bruno.kota.dtos.QuotationUpdateRequest;
 import com.bruno.kota.dtos.QuotationFillRate;
 import com.bruno.kota.dtos.ReviewBatchUpdateRequest;
+import com.bruno.kota.dtos.WonQuotationSummary;
 import com.bruno.kota.services.QuotationImportService;
 import com.bruno.kota.services.QuotationPdfService;
 import com.bruno.kota.services.QuotationService;
@@ -57,6 +58,11 @@ public class QuotationController {
     @GetMapping("/representative-fill-rate")
     public List<QuotationFillRate> getRepresentativeFillRate() {
         return quotationService.getRepresentativeFillRate();
+    }
+
+    @GetMapping("/won")
+    public List<WonQuotationSummary> findWonQuotations(@RequestParam Long supplierId) {
+        return quotationService.findWonQuotations(supplierId);
     }
 
     @GetMapping("/{id}")
