@@ -28,6 +28,7 @@ import com.bruno.kota.dtos.QuotationItemResponse;
 import com.bruno.kota.dtos.QuotationItemUpdateRequest;
 import com.bruno.kota.dtos.QuotationResponse;
 import com.bruno.kota.dtos.QuotationUpdateRequest;
+import com.bruno.kota.dtos.QuotationFillRate;
 import com.bruno.kota.dtos.ReviewBatchUpdateRequest;
 import com.bruno.kota.services.QuotationImportService;
 import com.bruno.kota.services.QuotationPdfService;
@@ -48,6 +49,13 @@ public class QuotationController {
     @GetMapping
     public List<QuotationResponse> findAll() {
         return quotationService.findAll();
+    }
+
+    // Path literal ("representative-fill-rate") sempre vence sobre /{id} no roteamento do
+    // Spring, mesmo declarado depois — mas deixei antes por clareza pra quem for ler.
+    @GetMapping("/representative-fill-rate")
+    public List<QuotationFillRate> getRepresentativeFillRate() {
+        return quotationService.getRepresentativeFillRate();
     }
 
     @GetMapping("/{id}")

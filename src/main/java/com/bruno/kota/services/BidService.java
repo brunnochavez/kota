@@ -99,12 +99,15 @@ public class BidService {
         Quotation quotation = item.getQuotation();
         ensureBidEditable(quotation);
 
+        // Se esse lance era o vencedor do item, o item fica sem vencedor — só ele, não a
+        // cotação inteira. O admin resolve depois, ainda dentro da revisão, atribuindo um
+        // vencedor pra esse item em "Adicionar produto a esse representante" (funciona pra
+        // reatribuir, não só pra produto novo — reaproveita o item existente via assign-winner).
         if (item.getWinningBid() != null && item.getWinningBid().getId().equals(bidId)) {
             item.setWinningBid(null);
             quotationItemRepository.save(item);
         }
 
-        invalidateReviewIfNeeded(quotation);
         bidRepository.delete(bid);
     }
 

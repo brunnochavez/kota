@@ -8,7 +8,9 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -17,9 +19,11 @@ import com.bruno.kota.dtos.AddItemWithWinnerRequest;
 import com.bruno.kota.dtos.BidResponse;
 import com.bruno.kota.dtos.ManualWinnerAssignRequest;
 import com.bruno.kota.dtos.MinimumOrderViolation;
+import com.bruno.kota.dtos.MinimumOrderViolationItem;
 import com.bruno.kota.dtos.QuotationCloseRequest;
 import com.bruno.kota.dtos.QuotationCloseResult;
 import com.bruno.kota.dtos.QuotationCreateRequest;
+import com.bruno.kota.dtos.QuotationFillRate;
 import com.bruno.kota.dtos.QuotationItemCreateRequest;
 import com.bruno.kota.dtos.QuotationItemResponse;
 import com.bruno.kota.dtos.QuotationResponse;
@@ -166,6 +170,7 @@ public class QuotationService {
         List<QuotationItem> items = quotationItemRepository.findByQuotationId(id);
 
         Map<Long, Bid> itemWinners = new HashMap<>();
+        Map<Long, Bid> itemRunnersUp = new HashMap<>();
         List<TieBreakNeeded> pendingTies = new ArrayList<>();
 
         for (QuotationItem item : items) {
@@ -182,6 +187,14 @@ public class QuotationService {
                     .map(Bid::getValue)
                     .min(Comparator.naturalOrder())
                     .orElseThrow();
+
+            // Segunda melhor oferta (valor distinto acima do menor) — guardada aqui, e não
+            // recalculada depois, pra usar como sugestão no card de pedido mínimo abaixo:
+            // "se excluir esse fornecedor, esse aqui assume o item, por esse preço".
+            eligibleBids.stream()
+                    .filter(bid -> bid.getValue().compareTo(minValue) > 0)
+                    .min(Comparator.comparing(Bid::getValue))
+                    .ifPresent(runnerUp -> itemRunnersUp.put(item.getId(), runnerUp));
 
             List<Bid> tiedBids = eligibleBids.stream()
                     .filter(bid -> bid.getValue().compareTo(minValue) == 0)
@@ -238,12 +251,26 @@ public class QuotationService {
             if (supplier.getMinimumOrderValue() != null
                     && total.compareTo(supplier.getMinimumOrderValue()) < 0
                     && !acceptedViolationSupplierIds.contains(supplierId)) {
+                List<MinimumOrderViolationItem> violationItems = supplierItemsById.get(supplierId).stream()
+                        .map(item -> {
+                            Bid winner = itemWinners.get(item.getId());
+                            Bid runnerUp = itemRunnersUp.get(item.getId());
+                            return new MinimumOrderViolationItem(
+                                    item.getId(),
+                                    item.getProduct().getName(),
+                                    item.getQuantity(),
+                                    winner.getValue(),
+                                    runnerUp != null ? runnerUp.getValue() : null,
+                                    runnerUp != null ? runnerUp.getSupplier().getName() : null
+                            );
+                        })
+                        .toList();
                 violations.add(new MinimumOrderViolation(
                         supplierId,
                         supplier.getName(),
                         total,
                         supplier.getMinimumOrderValue(),
-                        supplierItemsById.get(supplierId).stream().map(this::toItemResponse).toList()
+                        violationItems
                 ));
             }
         }
@@ -346,9 +373,17 @@ public class QuotationService {
         return toItemResponse(item);
     }
 
-    // Salva um lote de mudanças (preço de lances + quantidade de itens) numa transação
-    // única, e só desfaz a revisão UMA VEZ, no final — evita a corrida em que a primeira
-    // edição de um lote muda o status no meio do caminho e derruba as edições seguintes.
+    // Salva um lote de mudanças (preço de lances + quantidade de itens) numa transação única.
+    //
+    // Não invalida mais a revisão no final. No frontend, a tabela geral de itens (DRAFT)
+    // e o ajuste fino por representante (REVIEWING) usam esse mesmo endpoint, mas depois
+    // que a tabela geral virou somente-leitura durante REVIEWING, esse método só roda com
+    // a cotação em REVIEWING quando vem do ajuste fino por representante — mexendo só na
+    // quantidade/preço do vencedor JÁ calculado daquele item, sem trocar quem venceu. Por
+    // isso não precisa (e não deve) desfazer o cálculo dos OUTROS itens: é uma correção
+    // pontual, no mesmo espírito de assignManualWinner/addItemWithWinner, que também não
+    // invalidam. Pra DRAFT isso não muda nada — invalidateReviewIfNeeded já não fazia nada
+    // fora de REVIEWING.
     @Transactional
     public void applyReviewBatchUpdate(Long quotationId, ReviewBatchUpdateRequest request) {
         Quotation quotation = findEntityById(quotationId);
@@ -382,8 +417,6 @@ public class QuotationService {
                         quotationItemRepository.save(item);
                     });
         }
-
-        invalidateReviewIfNeeded(quotation);
     }
 
     @Transactional
@@ -453,6 +486,42 @@ public class QuotationService {
         }
         quotation.setStatus(QuotationStatus.AVAILABLE);
         quotationRepository.save(quotation);
+    }
+
+    // Só considera cotações AVAILABLE — é a janela em que representantes ainda podem
+    // responder. "Elegível" = representante dono de um fornecedor que pertence ao grupo
+    // daquela cotação. Cotações sem grupo definido ou sem nenhum representante elegível
+    // ficam fora da lista — não tem barra pra mostrar.
+    @Transactional(readOnly = true)
+    public List<QuotationFillRate> getRepresentativeFillRate() {
+        List<Quotation> available = quotationRepository.findByStatus(QuotationStatus.AVAILABLE);
+        List<QuotationFillRate> rates = new ArrayList<>();
+
+        for (Quotation quotation : available) {
+            SupplierGroup group = quotation.getSupplierGroup();
+            if (group == null) {
+                continue;
+            }
+
+            Set<Long> eligibleRepIds = supplierRepository.findByGroup(group).stream()
+                    .map(Supplier::getRepresentative)
+                    .filter(Objects::nonNull)
+                    .map(Representative::getId)
+                    .collect(Collectors.toSet());
+
+            if (eligibleRepIds.isEmpty()) {
+                continue;
+            }
+
+            Set<Long> submittedRepIds = bidRepository.findByQuotationItem_QuotationId(quotation.getId()).stream()
+                    .map(bid -> bid.getSubmittedBy().getId())
+                    .collect(Collectors.toSet());
+
+            int filled = (int) eligibleRepIds.stream().filter(submittedRepIds::contains).count();
+            rates.add(new QuotationFillRate(quotation.getId(), eligibleRepIds.size(), filled));
+        }
+
+        return rates;
     }
 
     private SupplierGroup resolveSupplierGroup(Long supplierGroupId) {

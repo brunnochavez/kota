@@ -75,10 +75,15 @@
   .kpi-label { font-size: 12px; color: var(--text-dim); margin-top: 4px; }
   .dash-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-bottom: 18px; align-items: start; }
   @media (max-width: 900px) { .dash-grid { grid-template-columns: 1fr; } }
+  .fill-rate-track {
+    width: 100%; height: 10px; border-radius: 999px; background: var(--surface-3); overflow: hidden;
+  }
+  .fill-rate-fill { height: 100%; border-radius: 999px; transition: width 0.3s ease; }
   .expiring-item { display: flex; justify-content: space-between; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--surface-2); font-size: 13px; }
   .expiring-item:last-child { border-bottom: none; }
-  .expiring-row { display: flex; justify-content: space-between; align-items: center; gap: 14px; padding: 12px 4px; border-bottom: 1px solid var(--surface-2); cursor: pointer; }
-  .expiring-row:last-child { border-bottom: none; }
+  .expiring-item { border-bottom: 1px solid var(--surface-2); }
+  .expiring-item:last-child { border-bottom: none; }
+  .expiring-row { display: flex; justify-content: space-between; align-items: center; gap: 14px; padding: 12px 4px; cursor: pointer; }
   .expiring-row:hover { background: var(--surface-2); }
   .expiring-row-name { font-weight: 600; font-size: 13.5px; }
   .expiring-row-group { font-size: 12px; color: var(--text-dim); margin-top: 2px; }
@@ -206,6 +211,11 @@
   .icon-btn:hover { background: var(--surface-3); color: var(--text); }
   .icon-btn.danger { color: var(--danger); border-color: var(--danger-border); background: var(--danger-bg); }
   .icon-btn.danger:hover { background: var(--danger-border); }
+  .confirm-popover {
+    position: fixed; z-index: 1150; background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); box-shadow: var(--shadow); padding: 12px 14px; min-width: 240px; max-width: 320px;
+  }
+  .confirm-popover-msg { font-size: 13px; line-height: 1.4; }
   .qd-items-table td, .qd-items-table th { padding: 2px 10px; font-size: 12px; }
   .qd-items-table input[type="number"] { padding: 4px 8px; }
   .rep-bid-group { margin-bottom: 14px; }
@@ -458,7 +468,12 @@
       <div class="inline-form">
         <div><label>Nome da cotação</label><input id="import-name" placeholder="Ex: Cotação de Limpeza"></div>
         <div><label>Grupo (opcional)</label><select id="import-group"><option value="">— definir depois —</option></select></div>
-        <div><label>Prazo de expiração (opcional)</label><input type="datetime-local" id="import-expiration"></div>
+        <div><label>Prazo de expiração (opcional)</label>
+          <div style="display:flex; gap:6px">
+            <input type="datetime-local" id="import-expiration" style="flex:1" onchange="confirmExpirationField('import-expiration')">
+            <button type="button" class="secondary small" onclick="confirmExpirationField('import-expiration')">OK</button>
+          </div>
+        </div>
       </div>
       <input type="file" id="import-file" accept=".csv" style="margin-top:14px">
       <div class="btn-row" style="margin-top:12px">
@@ -477,7 +492,12 @@
       <div class="inline-form">
         <div><label>Nome da cotação</label><input id="mq-name" placeholder="Ex: Cotação de Bebidas"></div>
         <div><label>Grupo (opcional)</label><select id="mq-group"><option value="">— definir depois —</option></select></div>
-        <div><label>Prazo de expiração (opcional)</label><input type="datetime-local" id="mq-expiration"></div>
+        <div><label>Prazo de expiração (opcional)</label>
+          <div style="display:flex; gap:6px">
+            <input type="datetime-local" id="mq-expiration" style="flex:1" onchange="confirmExpirationField('mq-expiration')">
+            <button type="button" class="secondary small" onclick="confirmExpirationField('mq-expiration')">OK</button>
+          </div>
+        </div>
       </div>
       <h3 style="margin-top:14px">Itens</h3>
       <div id="mq-items"></div>
@@ -727,6 +747,15 @@ function toDatetimeLocal(iso) {
   return iso.substring(0, 16);
 }
 
+// O calendário nativo do navegador (datetime-local) não tem um "OK" próprio — some sozinho
+// ao clicar fora, sem confirmação visual. Esse botão só formaliza isso: fecha o campo e
+// mostra o valor escolhido, pra não ficar na dúvida se "pegou" ou não.
+function confirmExpirationField(inputId) {
+  const input = document.getElementById(inputId);
+  input.blur();
+  toast(input.value ? `Prazo definido: ${fmtDate(input.value)}` : 'Prazo de expiração limpo.');
+}
+
 // ---------- navigation ----------
 document.querySelectorAll('.nav-item').forEach(item => {
   item.addEventListener('click', () => {
@@ -779,15 +808,17 @@ function goToQuotationsFiltered(status) {
 // DASHBOARD
 // ============================================================
 async function loadDashboard() {
-  const [quotations, products, reps, suppliers, groups] = await Promise.all([
+  const [quotations, products, reps, suppliers, groups, fillRates] = await Promise.all([
     safeCall(() => api('GET', '/quotations')),
     safeCall(() => api('GET', '/products')),
     safeCall(() => api('GET', '/representatives')),
     safeCall(() => api('GET', '/suppliers')),
-    safeCall(() => api('GET', '/supplier-groups'))
+    safeCall(() => api('GET', '/supplier-groups')),
+    safeCall(() => api('GET', '/quotations/representative-fill-rate'))
   ]);
 
   quotationsCache = quotations;
+  quotationFillRates = new Map(fillRates.map(f => [f.quotationId, f]));
 
   const counts = { DRAFT: 0, AVAILABLE: 0, CLOSED: 0, EXPIRED: 0 };
   quotations.forEach(q => { counts[q.status] = (counts[q.status] || 0) + 1; });
@@ -891,15 +922,18 @@ function renderExpiringSoon(quotations) {
 
   const visible = expiring.slice(0, 4);
   let html = visible.map(q => `
-    <div class="expiring-row" onclick="abrirDetalheCotacao(${q.id})">
-      <div>
-        <div class="expiring-row-name">${escapeHtml(q.name)}</div>
-        <div class="expiring-row-group">${q.supplierGroupName || 'sem grupo'}</div>
+    <div class="expiring-item">
+      <div class="expiring-row" onclick="abrirDetalheCotacao(${q.id})">
+        <div>
+          <div class="expiring-row-name">${escapeHtml(q.name)}</div>
+          <div class="expiring-row-group">${q.supplierGroupName || 'sem grupo'}</div>
+        </div>
+        <div class="expiring-row-date">
+          <span class="expiring-row-countdown">${countdownLabel(q.expirationDate)}</span>
+          <span class="expiring-row-exact">${fmtDate(q.expirationDate)}</span>
+        </div>
       </div>
-      <div class="expiring-row-date">
-        <span class="expiring-row-countdown">${countdownLabel(q.expirationDate)}</span>
-        <span class="expiring-row-exact">${fmtDate(q.expirationDate)}</span>
-      </div>
+      ${fillRateBarHtml(q.id)}
     </div>`).join('');
 
   const remaining = expiring.length - visible.length;
@@ -1603,9 +1637,39 @@ function statusBadge(status) {
   return `<span class="badge badge-${STATUS_CLASSES[status] || 'draft'}">${STATUS_LABELS[status] || status}</span>`;
 }
 
+let quotationFillRates = new Map();
+
 async function loadQuotations() {
-  quotationsCache = await safeCall(() => api('GET', '/quotations'));
+  const [quotations, fillRates] = await Promise.all([
+    safeCall(() => api('GET', '/quotations')),
+    safeCall(() => api('GET', '/quotations/representative-fill-rate'))
+  ]);
+  quotationsCache = quotations;
+  quotationFillRates = new Map(fillRates.map(f => [f.quotationId, f]));
   renderQuotationsList();
+}
+
+// Vermelho (0%) → laranja (50%) → verde (100%), interpolado em RGB — não dá pra fazer
+// isso com var(--cor) direto (são strings, não números pra interpolar), por isso as
+// cores fixas aqui em vez de reaproveitar as variáveis de tema.
+function fillRateColor(pct) {
+  const red = [192, 54, 44], orange = [217, 119, 6], green = [22, 129, 79];
+  const [a, b, t] = pct <= 50 ? [red, orange, pct / 50] : [orange, green, (pct - 50) / 50];
+  const mix = (i) => Math.round(a[i] + (b[i] - a[i]) * t);
+  return `rgb(${mix(0)},${mix(1)},${mix(2)})`;
+}
+
+// HTML da barra pra uma cotação específica, ou '' se não tiver dado de preenchimento
+// (sem grupo definido, ou grupo sem nenhum representante elegível). Reaproveitada na
+// lista de Cotações e no card "Expirando nos próximos 3 dias" do Dashboard.
+function fillRateBarHtml(quotationId) {
+  const fr = quotationFillRates.get(quotationId);
+  if (!fr || !fr.eligibleCount) return '';
+  const pct = Math.round((fr.filledCount / fr.eligibleCount) * 100);
+  return `<div style="padding:0 4px 10px; text-align:center">
+    <div style="font-size:11.5px; color:var(--text-dim); margin-bottom:5px">${fr.filledCount}/${fr.eligibleCount} representantes — ${pct}%</div>
+    <div class="fill-rate-track" style="max-width:240px; margin:0 auto"><div class="fill-rate-fill" style="width:${pct}%; background:${fillRateColor(pct)}"></div></div>
+  </div>`;
 }
 
 function renderQuotationsList() {
@@ -1619,6 +1683,15 @@ function renderQuotationsList() {
       <td>${q.supplierGroupName || '—'}</td><td>${fmtDate(q.expirationDate)}</td>
       <td class="btn-row"><button class="secondary small" onclick="abrirDetalheCotacao(${q.id})">Ver Detalhe</button></td>`;
     tbody.appendChild(tr);
+
+    if (q.status === 'AVAILABLE') {
+      const bar = fillRateBarHtml(q.id);
+      if (bar) {
+        const barTr = document.createElement('tr');
+        barTr.innerHTML = `<td colspan="6" style="padding-top:0; padding-bottom:0">${bar}</td>`;
+        tbody.appendChild(barTr);
+      }
+    }
   });
 }
 
@@ -1712,8 +1785,10 @@ async function abrirDetalheCotacao(id) {
 
 // Fora de Rascunho, nome/grupo/prazo/publicar/gerenciar grupo ficam travados. "Fechar"
 // funciona em Disponível ou Expirada. Em Revisão (depois de calcular vencedores, antes
-// de confirmar), some "Fechar" e aparece "Confirmar Fechamento" — itens continuam
-// editáveis nesse meio-tempo (ver qdCurrentItemsIsDraft mais abaixo).
+// de confirmar), some "Fechar" e aparece "Confirmar Fechamento" — a tabela geral de itens
+// fica travada nesse meio-tempo (ver qdCurrentItemsIsDraft mais abaixo); os ajustes finos
+// de quantidade/preço/item de cada representante passam a ser feitos exclusivamente pelo
+// modal "Revisar Lances Enviados", de forma individual por vencedor.
 function applyQdEditLock(status) {
   const isDraft = status === 'DRAFT';
   const isReviewing = status === 'REVIEWING';
@@ -1739,9 +1814,11 @@ const QD_ITEMS_PAGE_SIZE = 10;
 async function loadQuotationItemsDetail(id, status) {
   const items = await safeCall(() => api('GET', `/quotations/${id}/items`));
   qdCurrentItems = items;
-  // "IsDraft" aqui significa "editável" — vale tanto pra Rascunho quanto pra Revisão
-  // (depois de calcular vencedores, antes de confirmar o fechamento definitivo).
-  qdCurrentItemsIsDraft = status === 'DRAFT' || status === 'REVIEWING';
+  // Editável só em Rascunho. Em Revisão, a tabela geral vira somente leitura — editar
+  // quantidade, adicionar ou excluir item aqui derrubaria TODOS os vencedores já calculados
+  // (não só o item mexido). Ajustes durante a revisão são feitos por representante, no modal
+  // "Revisar Lances Enviados", que mexe só no item daquele vencedor sem invalidar o resto.
+  qdCurrentItemsIsDraft = status === 'DRAFT';
   qdItemsPage = 0;
   qdPendingQuantityEdits = {};
 
@@ -1893,7 +1970,7 @@ function renderSelectedRepBids() {
         <td style="text-align:center"><input type="number" step="0.001" id="rebid-qty-${item.id}" value="${item.quantity}" oninput="updateRebidSubtotal(${bid.id}, ${item.id})" style="width:70px; text-align:center"></td>
         <td style="text-align:center"><input type="text" inputmode="decimal" id="rebid-value-${bid.id}" value="${formatCurrencyFromNumber(bid.value)}" oninput="this.value = maskCurrencyInput(this.value); updateRebidSubtotal(${bid.id}, ${item.id})" style="width:75px; text-align:center"></td>
         <td style="text-align:center" id="rebid-subtotal-${bid.id}">R$ ${formatCurrencyFromNumber(bid.value * item.quantity)}</td>
-        <td style="text-align:center"><button class="icon-btn danger" onclick="deleteBidAsAdmin(${bid.id})" title="Excluir lance">${QD_TRASH_ICON}</button></td>
+        <td style="text-align:center"><button class="icon-btn danger" onclick="deleteBidAsAdmin(${bid.id}, this, '${escapeHtml(item.productName).replace(/'/g, "\\'")}')" title="Excluir lance">${QD_TRASH_ICON}</button></td>
       </tr>`).join('');
 
   pag.style.display = 'flex';
@@ -1957,7 +2034,7 @@ async function renderAddProductPanel(repId) {
       </div>
       <div style="width:90px"><label>Quantidade</label><input type="number" step="0.001" id="review-add-product-qty" placeholder="se novo"></div>
       <div style="width:100px"><label>Preço (R$)</label><input type="text" inputmode="decimal" id="review-add-product-price" placeholder="0,00" oninput="this.value = maskCurrencyInput(this.value)"></div>
-      <button class="secondary small" onclick="addProductToRep(${repId})">+ Adicionar</button>
+      <button class="secondary small" id="review-add-product-btn" onclick="addProductToRep(${repId})">+ Adicionar</button>
     </div>
     <div id="review-add-product-hint" style="margin-top:6px; font-size:12px; color:var(--text-dim)"></div>
     <div id="review-add-product-search-results"></div>`;
@@ -1969,21 +2046,36 @@ function searchReviewAddProduct() {
   const term = document.getElementById('review-add-product-search').value.trim().toLowerCase();
   document.getElementById('review-add-product-id').value = '';
   document.getElementById('review-add-product-hint').textContent = '';
+  resetReviewAddProductFields();
   const wrap = document.getElementById('review-add-product-search-results');
   if (!term) { wrap.innerHTML = ''; return; }
   const matches = qdProductsCache.filter(p =>
     p.name.toLowerCase().includes(term) || (p.barcode || '').includes(term)
   ).slice(0, 8);
   wrap.innerHTML = matches.length
-    ? matches.map(p => `<div class="search-result-item" onclick="selectReviewAddProduct(${p.id})">
-        <strong>${escapeHtml(p.name)}</strong> <span class="mono" style="color:var(--text-dim); font-size:12px">(${escapeHtml(p.barcode)})</span>
-      </div>`).join('')
+    ? matches.map(p => {
+        const alreadyIn = qdCurrentItems.some(item => item.productId === p.id);
+        return `<div class="search-result-item" onclick="selectReviewAddProduct(${p.id})">
+          <strong>${escapeHtml(p.name)}</strong> <span class="mono" style="color:var(--text-dim); font-size:12px">(${escapeHtml(p.barcode)})</span>${
+            alreadyIn ? ' <span style="color:var(--success); font-weight:600; font-size:12px">Este produto já está na cotação!</span>' : ''
+          }
+        </div>`;
+      }).join('')
     : '<div class="empty">Nenhum resultado.</div>';
 }
 
-// Deixa explícito quando o produto escolhido já faz parte da cotação — em vez de só
-// travar o campo silenciosamente, explica por quê (evita confusão tipo "por que não
-// consigo digitar a quantidade?").
+function resetReviewAddProductFields() {
+  const qtyInput = document.getElementById('review-add-product-qty');
+  const priceInput = document.getElementById('review-add-product-price');
+  const addBtn = document.getElementById('review-add-product-btn');
+  if (qtyInput) { qtyInput.value = ''; qtyInput.disabled = false; }
+  if (priceInput) { priceInput.value = ''; priceInput.disabled = false; }
+  if (addBtn) addBtn.disabled = false;
+}
+
+// Produto já cadastrado na cotação (de qualquer representante) não pode ser "adicionado"
+// de novo por aqui — bloqueia quantidade, preço e o próprio botão, e mostra só o aviso.
+// Esse painel serve exclusivamente pra produto novo na cotação.
 function selectReviewAddProduct(productId) {
   const p = qdProductsCache.find(x => x.id === productId);
   if (!p) return;
@@ -1992,27 +2084,28 @@ function selectReviewAddProduct(productId) {
   document.getElementById('review-add-product-search-results').innerHTML = '';
 
   const existing = qdCurrentItems.find(item => item.productId === p.id);
-  const qtyInput = document.getElementById('review-add-product-qty');
   const hint = document.getElementById('review-add-product-hint');
+  resetReviewAddProductFields();
   if (existing) {
-    qtyInput.value = existing.quantity;
-    qtyInput.disabled = true;
-    hint.textContent = `Esse produto já está na cotação (quantidade atual: ${existing.quantity}) — o vencedor será atribuído a esse item, sem alterar a quantidade por aqui.`;
+    document.getElementById('review-add-product-qty').disabled = true;
+    document.getElementById('review-add-product-price').disabled = true;
+    document.getElementById('review-add-product-btn').disabled = true;
+    hint.innerHTML = '<span style="color:var(--success); font-weight:600">Esse produto já está na cotação!</span>';
   } else {
-    qtyInput.value = '';
-    qtyInput.disabled = false;
-    hint.textContent = 'Produto novo pra essa cotação — informe a quantidade do pedido.';
+    hint.textContent = 'Produto novo pra essa cotação — informe a quantidade e o preço.';
   }
 }
 
-// Se o produto já é item da cotação (só que outro venceu, ou ninguém ainda), reaproveita
-// esse item e só atribui o vencedor. Se é produto novo pra essa cotação, cria o item e já
-// define o vencedor no mesmo passo. Reconfere os itens direto do backend antes de decidir,
-// pra nunca errar o caminho por causa de dado desatualizado na tela.
+// Painel serve só pra produto NOVO na cotação (produto já existente fica travado em
+// selectReviewAddProduct). Reconfere direto do backend antes de enviar, com a mesma
+// checagem — evita adicionar um produto que virou item da cotação depois da busca
+// (outra aba, outro admin mexendo ao mesmo tempo).
 async function addProductToRep(repId) {
   const productId = document.getElementById('review-add-product-id').value;
+  const qty = document.getElementById('review-add-product-qty').value;
   const price = unmaskCurrencyToNumber(document.getElementById('review-add-product-price').value);
   if (!productId) { toast('Busque e selecione um produto.', true); return; }
+  if (!qty) { toast('Informe a quantidade.', true); return; }
   if (!price) { toast('Informe o preço.', true); return; }
 
   const suppliers = await safeCall(() => api('GET', '/suppliers'));
@@ -2020,32 +2113,22 @@ async function addProductToRep(repId) {
   if (!supplier) { toast('Não encontrei o fornecedor desse representante.', true); return; }
 
   qdCurrentItems = await safeCall(() => api('GET', `/quotations/${currentQuotationId}/items`));
-  const existing = qdCurrentItems.find(item => item.productId === parseInt(productId));
+  if (qdCurrentItems.some(item => item.productId === parseInt(productId))) {
+    toast('Esse produto já está na cotação — não é possível adicionar de novo.', true);
+    return;
+  }
 
-  // Prazo não aparece mais nesse painel — reaproveita o prazo de outro lance desse mesmo
-  // representante nessa cotação, se existir; senão usa um padrão razoável.
   const group = qdReviewBidGroups.get(repId);
   const fallbackDeadline = group && group.entries.length ? group.entries[0].bid.deliveryDeadlineDays : 5;
 
-  if (existing) {
-    await safeCall(() => api('POST', `/quotations/${currentQuotationId}/items/${existing.id}/assign-winner`, {
-      supplierId: supplier.id,
-      representativeId: repId,
-      value: price,
-      deliveryDeadlineDays: fallbackDeadline
-    }));
-  } else {
-    const qty = document.getElementById('review-add-product-qty').value;
-    if (!qty) { toast('Informe a quantidade — esse produto ainda não está na cotação.', true); return; }
-    await safeCall(() => api('POST', `/quotations/${currentQuotationId}/items/add-with-winner`, {
-      productId: parseInt(productId),
-      quantity: parseFloat(qty),
-      supplierId: supplier.id,
-      representativeId: repId,
-      value: price,
-      deliveryDeadlineDays: fallbackDeadline
-    }));
-  }
+  await safeCall(() => api('POST', `/quotations/${currentQuotationId}/items/add-with-winner`, {
+    productId: parseInt(productId),
+    quantity: parseFloat(qty),
+    supplierId: supplier.id,
+    representativeId: repId,
+    value: price,
+    deliveryDeadlineDays: fallbackDeadline
+  }));
 
   toast('Produto adicionado ao pedido desse representante.');
   qdCurrentItems = await safeCall(() => api('GET', `/quotations/${currentQuotationId}/items`));
@@ -2085,19 +2168,38 @@ async function saveAllRepBidChanges() {
   });
 
   await safeCall(() => api('POST', `/quotations/${currentQuotationId}/review-batch-update`, { bidUpdates, itemUpdates }));
-  toast('Alterações salvas. Como isso afeta o cálculo, a cotação voltou pra Disponível — feche de novo pra recalcular.');
-  closeModal2();
+  toast('Alterações salvas.');
+
+  // abrirDetalheCotacao só mexe no modal1 (fica por trás) — modal2 (esse aqui) continua
+  // aberto. Ela também atualiza qdCurrentItems, que é de onde loadReviewBidsData tira as
+  // quantidades — sem isso, a tela continuaria mostrando o valor antigo até fechar e reabrir.
+  await abrirDetalheCotacao(currentQuotationId);
+  await loadReviewBidsData();
+  document.getElementById('review-bids-rep-select').value = repId;
+  reviewBidsPage = 0;
+  renderSelectedRepBids();
   loadQuotations();
-  abrirDetalheCotacao(currentQuotationId);
 }
 
-async function deleteBidAsAdmin(bidId) {
-  if (!confirm('Excluir esse lance? Se ele for o vencedor atual, o cálculo é desfeito e a cotação volta pra Disponível.')) return;
+function deleteBidAsAdmin(bidId, buttonEl, productName) {
+  showConfirmPopover(
+    buttonEl,
+    `Excluir o lance de <strong>${escapeHtml(productName)}</strong>? Se ele for o vencedor atual, esse item fica sem vencedor — dá pra reatribuir depois em "Adicionar produto a esse representante", sem afetar os outros itens já calculados.`,
+    () => confirmDeleteBidAsAdmin(bidId)
+  );
+}
+
+async function confirmDeleteBidAsAdmin(bidId) {
+  const repId = document.getElementById('review-bids-rep-select').value;
   await safeCall(() => api('DELETE', `/bids/${bidId}`));
   toast('Lance excluído.');
-  closeModal2();
+
+  await abrirDetalheCotacao(currentQuotationId);
+  await loadReviewBidsData();
+  document.getElementById('review-bids-rep-select').value = repId;
+  reviewBidsPage = 0;
+  renderSelectedRepBids();
   loadQuotations();
-  abrirDetalheCotacao(currentQuotationId);
 }
 
 function onQdItemQtyInput(itemId, value) {
@@ -2125,7 +2227,7 @@ function renderQdItemsRows(items) {
         <td style="text-align:center"><input type="number" step="0.001" value="${currentValue}" id="qd-item-qty-${it.id}"
           style="width:80px; text-align:center" oninput="onQdItemQtyInput(${it.id}, this.value)"></td>
         <td style="text-align:center">
-          <button class="icon-btn danger" onclick="removeQuotationItem(${it.id})" title="Remover item" aria-label="Remover item">${QD_TRASH_ICON}</button>
+          <button class="icon-btn danger" onclick="removeQuotationItem(${it.id}, this)" title="Remover item" aria-label="Remover item">${QD_TRASH_ICON}</button>
         </td>`;
     } else {
       tr.innerHTML = `<td class="mono">${it.productBarcode}</td><td>${it.productName}</td>
@@ -2207,9 +2309,10 @@ async function addQuotationItem() {
   await loadQuotationItemsDetail(currentQuotationId, 'DRAFT');
 }
 
-// Uma chamada só (/review-batch-update), não várias em paralelo — mesmo motivo do
-// "Salvar Alterações" da revisão por representante: evita a corrida entre requisições
-// onde a primeira desfaz a revisão e derruba as seguintes.
+// Uma chamada só (/review-batch-update), não várias em paralelo — evita a corrida entre
+// requisições concorrentes editando a mesma cotação. Só roda em Rascunho: em Revisão a
+// tabela geral vira somente leitura (ver qdCurrentItemsIsDraft), então esse botão nem
+// aparece nesse status.
 async function saveAllQuotationItemQuantities() {
   const entries = Object.entries(qdPendingQuantityEdits);
   if (!entries.length) { toast('Nenhuma alteração para salvar.', true); return; }
@@ -2221,8 +2324,65 @@ async function saveAllQuotationItemQuantities() {
   abrirDetalheCotacao(currentQuotationId);
 }
 
-async function removeQuotationItem(itemId) {
-  if (!confirm('Remover este item da cotação?')) return;
+// Popover pequeno, ancorado perto de quem clicou, em vez de modal centralizado — genérico
+// o bastante pra reaproveitar em qualquer outra confirmação pontual no futuro. Fecha ao
+// clicar fora, ao confirmar, ou ao cancelar.
+function showConfirmPopover(anchorEl, messageHtml, onConfirm) {
+  closeConfirmPopover();
+
+  const pop = document.createElement('div');
+  pop.className = 'confirm-popover';
+  pop.id = 'confirm-popover';
+  pop.innerHTML = `
+    <div class="confirm-popover-msg">${messageHtml}</div>
+    <div class="btn-row" style="justify-content:flex-end; margin-top:10px">
+      <button class="secondary small" type="button">Não</button>
+      <button class="danger small" type="button">Sim</button>
+    </div>`;
+  document.body.appendChild(pop);
+
+  const [noBtn, yesBtn] = pop.querySelectorAll('button');
+  noBtn.onclick = closeConfirmPopover;
+  yesBtn.onclick = () => { closeConfirmPopover(); onConfirm(); };
+
+  // Tenta abrir logo abaixo do botão, alinhado pela direita; se estourar a borda da tela
+  // (topo, base ou lateral), reposiciona pro lado que sobra espaço.
+  const anchor = anchorEl.getBoundingClientRect();
+  const popRect = pop.getBoundingClientRect();
+  let top = anchor.bottom + 6;
+  let left = anchor.right - popRect.width;
+  if (top + popRect.height > window.innerHeight - 8) top = anchor.top - popRect.height - 6;
+  if (left < 8) left = anchor.left;
+  if (left + popRect.width > window.innerWidth - 8) left = window.innerWidth - popRect.width - 8;
+  pop.style.top = Math.max(8, top) + 'px';
+  pop.style.left = Math.max(8, left) + 'px';
+
+  // setTimeout pra esse mesmo clique (o que abriu o popover) não ser lido como "clique fora"
+  setTimeout(() => document.addEventListener('mousedown', handleOutsideConfirmPopoverClick), 0);
+}
+
+function handleOutsideConfirmPopoverClick(e) {
+  const pop = document.getElementById('confirm-popover');
+  if (pop && !pop.contains(e.target)) closeConfirmPopover();
+}
+
+function closeConfirmPopover() {
+  const pop = document.getElementById('confirm-popover');
+  if (pop) pop.remove();
+  document.removeEventListener('mousedown', handleOutsideConfirmPopoverClick);
+}
+
+function removeQuotationItem(itemId, buttonEl) {
+  const item = qdCurrentItems.find(it => it.id === itemId);
+  const productName = item ? item.productName : 'este item';
+  showConfirmPopover(
+    buttonEl,
+    `Excluir o produto <strong>${escapeHtml(productName)}</strong> desta cotação?`,
+    () => confirmRemoveQuotationItem(itemId)
+  );
+}
+
+async function confirmRemoveQuotationItem(itemId) {
   await safeCall(() => api('DELETE', `/quotations/${currentQuotationId}/items/${itemId}`));
   toast('Item removido.');
   await loadQuotationItemsDetail(currentQuotationId, 'DRAFT');
@@ -2266,7 +2426,7 @@ function renderCloseFlow(result) {
   if (result.closed) {
     box.innerHTML = `<div class="card" style="border-color:var(--success-border); margin-top:16px">
       <h2 style="color:var(--success)">Vencedores calculados — revise antes de confirmar.</h2>
-      <div class="subtitle">Confira os itens abaixo. Pode ajustar quantidade ou remover algum item se precisar — qualquer alteração desfaz o cálculo e volta pra Disponível, aí é só clicar em "Fechar" de novo. Quando estiver certo, clique em "Confirmar Fechamento" pra gerar o PDF.</div>
+      <div class="subtitle">Confira os itens abaixo. Pra ajustar quantidade, preço ou incluir/excluir um item de algum representante, use "Revisar Cotações Enviadas" — o ajuste é individual e não derruba o cálculo dos demais. Quando estiver certo, clique em "Confirmar Fechamento" pra gerar o PDF.</div>
     </div>`;
     loadQuotations();
     abrirDetalheCotacao(currentQuotationId);
@@ -2282,7 +2442,7 @@ function renderCloseFlow(result) {
       tie.tiedBids.forEach(b => {
         html += `<label style="display:flex;align-items:center;gap:8px;margin-bottom:6px;cursor:pointer">
           <input type="radio" name="tie-${tie.quotationItemId}" style="width:auto" onclick="setTieWinner(${tie.quotationItemId}, ${b.id})">
-          ${b.supplierName} — R$ ${b.value} (${b.deliveryDeadlineDays} dias)
+          ${b.supplierName} — R$ ${formatCurrencyFromNumber(b.value)}
         </label>`;
       });
       html += '</div>';
@@ -2291,11 +2451,18 @@ function renderCloseFlow(result) {
   }
 
   if (result.pendingViolations && result.pendingViolations.length) {
-    html += '<div class="card" style="margin-top:16px"><h2>Fornecedores abaixo do pedido mínimo</h2>';
+    html += '<div class="card" style="margin-top:16px"><h2>Fornecedor abaixo do pedido mínimo!</h2>';
     result.pendingViolations.forEach(v => {
+      const itemsHtml = v.wonItems.map(i => {
+        const alt = i.secondBestSupplierName
+          ? `o segundo menor preço será da ${escapeHtml(i.secondBestSupplierName)} — R$ ${formatCurrencyFromNumber(i.secondBestValue)}`
+          : 'sem outra oferta pra esse item';
+        return `<div>${escapeHtml(i.productName)} - R$ ${formatCurrencyFromNumber(i.winningValue)} - Quantidade: ${i.quantity}
+          <span style="color:var(--danger)">→ se excluir: ${alt}</span></div>`;
+      }).join('');
       html += `<div class="violation-box"><h4>${v.supplierName}</h4>
-        <div>Total ganho: R$ ${v.total} — Pedido mínimo: R$ ${v.minimumOrderValue}</div>
-        <div style="margin:8px 0; font-size:12.5px; color:var(--text-dim)">Produtos: ${v.wonItems.map(i => i.productName).join(', ')}</div>
+        <div>Total ganho: R$ ${formatCurrencyFromNumber(v.total)} — Pedido mínimo: R$ ${formatCurrencyFromNumber(v.minimumOrderValue)}</div>
+        <div style="margin:8px 0; font-size:12.5px; color:var(--text-dim); display:flex; flex-direction:column; gap:2px">${itemsHtml}</div>
         <div class="btn-row">
           <button class="danger small" onclick="excludeSupplier(${v.supplierId})">Excluir fornecedor</button>
           <button class="secondary small" onclick="acceptViolation(${v.supplierId})">Aceitar mesmo assim</button>

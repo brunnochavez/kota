@@ -10,4 +10,6 @@ import com.bruno.kota.entities.QuotationStatus;
 
 public interface QuotationRepository extends JpaRepository<Quotation, Long> {
     List<Quotation> findByStatusAndExpirationDateBefore(QuotationStatus status, LocalDateTime dateTime);
+
+    List<Quotation> findByStatus(QuotationStatus status);
 }

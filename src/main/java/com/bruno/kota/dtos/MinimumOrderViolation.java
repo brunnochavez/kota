@@ -7,5 +7,5 @@ public record MinimumOrderViolation(
         String supplierName,
         BigDecimal total,
         BigDecimal minimumOrderValue,
-        List<QuotationItemResponse> wonItems
+        List<MinimumOrderViolationItem> wonItems
 ) {}

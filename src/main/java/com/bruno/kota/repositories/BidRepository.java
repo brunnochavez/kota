@@ -11,4 +11,6 @@ public interface BidRepository extends JpaRepository<Bid, Long> {
     List<Bid> findByQuotationItemId(Long quotationItemId);
 
     Optional<Bid> findByQuotationItemIdAndSupplierId(Long quotationItemId, Long supplierId);
+
+    List<Bid> findByQuotationItem_QuotationId(Long quotationId);
 }
