@@ -17,6 +17,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.bruno.kota.entities.Bid;
+import com.bruno.kota.entities.OrderFulfillmentConfirmation;
 import com.bruno.kota.entities.Product;
 import com.bruno.kota.entities.Quotation;
 import com.bruno.kota.entities.QuotationItem;
@@ -27,6 +28,7 @@ import com.bruno.kota.entities.SupplierGroup;
 import com.bruno.kota.exceptions.BusinessRuleException;
 import com.bruno.kota.exceptions.ResourceNotFoundException;
 import com.bruno.kota.repositories.BidRepository;
+import com.bruno.kota.repositories.OrderFulfillmentConfirmationRepository;
 import com.bruno.kota.repositories.ProductRepository;
 import com.bruno.kota.repositories.QuotationItemRepository;
 import com.bruno.kota.repositories.QuotationRepository;
@@ -47,6 +49,7 @@ public class QuotationService {
     private final SupplierRepository supplierRepository;
     private final RepresentativeRepository representativeRepository;
     private final BidRepository bidRepository;
+    private final OrderFulfillmentConfirmationRepository orderFulfillmentConfirmationRepository;
 
     @Transactional(readOnly = true)
     public List<QuotationResponse> findAll() {
@@ -570,19 +573,40 @@ public class QuotationService {
     // mudar, não faz sentido mostrar como resultado definitivo ainda). Cada representante
     // só vê os PRÓPRIOS itens ganhos, nunca os de outro fornecedor — diferente do PDF
     // (que é do admin e mostra todo mundo), essa lista aqui é sempre por fornecedor.
+    //
+    // Só mostra depois de finalizado (ver finalizeFulfillment) — antes disso, os mesmos
+    // itens aparecem em findPendingFulfillmentResults, não aqui.
     @Transactional(readOnly = true)
     public List<WonQuotationSummary> findWonQuotations(Long supplierId) {
+        return findFulfillmentSummaries(supplierId, true);
+    }
+
+    // Espelho de findWonQuotations, mas pro que ainda NÃO foi finalizado — é o que
+    // alimenta "Resultados de Cotações" na tela do representante, onde ele confirma ou
+    // corta cada item antes de finalizar o pedido.
+    @Transactional(readOnly = true)
+    public List<WonQuotationSummary> findPendingFulfillmentResults(Long supplierId) {
+        return findFulfillmentSummaries(supplierId, false);
+    }
+
+    private List<WonQuotationSummary> findFulfillmentSummaries(Long supplierId, boolean finalized) {
         List<Quotation> closedQuotations = quotationRepository.findByStatus(QuotationStatus.CLOSED);
         List<WonQuotationSummary> result = new ArrayList<>();
 
         for (Quotation quotation : closedQuotations) {
+            boolean isFinalized = orderFulfillmentConfirmationRepository
+                    .existsByQuotationIdAndSupplierId(quotation.getId(), supplierId);
+            if (isFinalized != finalized) {
+                continue;
+            }
+
             List<QuotationItem> items = quotationItemRepository.findByQuotationId(quotation.getId());
             List<WonQuotationItem> wonItems = new ArrayList<>();
             BigDecimal total = BigDecimal.ZERO;
 
             for (QuotationItem item : items) {
                 Bid winner = item.getWinningBid();
-                if (winner == null || !winner.getSupplier().getId().equals(supplierId)) {
+                if (winner == null || !winner.getSupplier().getId().equals(supplierId) || item.isFulfillmentCut()) {
                     continue;
                 }
                 BigDecimal subtotal = winner.getValue().multiply(item.getQuantity());
@@ -608,6 +632,56 @@ public class QuotationService {
         });
 
         return result;
+    }
+
+    // Marca "não tenho isso em estoque" — some da relação pro representante (não conta
+    // mais em findFulfillmentSummaries, nem pendente nem finalizado) e fica registrado
+    // pro admin ver o que foi cortado. Só antes de finalizar: depois disso o pedido tá
+    // fechado de vez, igual não dá pra editar quantidade de cotação já CLOSED.
+    @Transactional
+    public void cutFulfillmentItem(Long quotationId, Long itemId) {
+        QuotationItem item = quotationItemRepository.findById(itemId)
+                .orElseThrow(() -> new ResourceNotFoundException("Item não encontrado: id " + itemId));
+
+        if (!item.getQuotation().getId().equals(quotationId)) {
+            throw new BusinessRuleException("Esse item não pertence a essa cotação.");
+        }
+        if (item.getQuotation().getStatus() != QuotationStatus.CLOSED) {
+            throw new BusinessRuleException("Só é possível registrar corte de estoque em itens de cotação já fechada.");
+        }
+        if (item.getWinningBid() == null) {
+            throw new BusinessRuleException("Esse item não tem vencedor definido.");
+        }
+
+        Long supplierId = item.getWinningBid().getSupplier().getId();
+        if (orderFulfillmentConfirmationRepository.existsByQuotationIdAndSupplierId(item.getQuotation().getId(), supplierId)) {
+            throw new BusinessRuleException("Esse pedido já foi finalizado — não é mais possível cortar itens.");
+        }
+
+        item.setFulfillmentCut(true);
+        quotationItemRepository.save(item);
+    }
+
+    // Idempotente de propósito — clicar em "Finalizar Pedido" duas vezes (duplo toque,
+    // rede lenta) não deve dar erro, só não faz nada na segunda vez.
+    @Transactional
+    public void finalizeFulfillment(Long quotationId, Long supplierId) {
+        Quotation quotation = findEntityById(quotationId);
+
+        if (quotation.getStatus() != QuotationStatus.CLOSED) {
+            throw new BusinessRuleException("Só é possível finalizar o pedido de uma cotação já fechada.");
+        }
+
+        if (orderFulfillmentConfirmationRepository.existsByQuotationIdAndSupplierId(quotationId, supplierId)) {
+            return;
+        }
+
+        Supplier supplier = supplierRepository.findById(supplierId)
+                .orElseThrow(() -> new ResourceNotFoundException("Fornecedor não encontrado: id " + supplierId));
+
+        orderFulfillmentConfirmationRepository.save(
+                OrderFulfillmentConfirmation.builder().quotation(quotation).supplier(supplier).build()
+        );
     }
 
     private SupplierGroup resolveSupplierGroup(Long supplierGroupId) {
@@ -646,7 +720,8 @@ public class QuotationService {
                 item.getProduct().getName(),
                 item.getProduct().getBarcode(),
                 item.getQuantity(),
-                item.getWinningBid() != null ? item.getWinningBid().getId() : null
+                item.getWinningBid() != null ? item.getWinningBid().getId() : null,
+                item.isFulfillmentCut()
         );
     }
 

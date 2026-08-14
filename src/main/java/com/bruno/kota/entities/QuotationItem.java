@@ -43,4 +43,13 @@ public class QuotationItem {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "winning_bid_id")
     private Bid winningBid;
+
+    // Marcado true quando o representante confirma que não tem esse item em estoque, na
+    // tela de "Resultados de Cotações". Só existe pra itens de cotação já FECHADA — não
+    // significa "excluído da cotação" (isso é outra coisa, feito ainda em Rascunho/Revisão
+    // via delete de verdade); aqui o item continua existindo, só marcado como não
+    // entregável por esse fornecedor.
+    @Column(nullable = false)
+    @Builder.Default
+    private boolean fulfillmentCut = false;
 }

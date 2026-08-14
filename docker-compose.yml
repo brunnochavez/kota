@@ -1,0 +1,21 @@
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: kota-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: kota123
+      MYSQL_DATABASE: kota
+      TZ: America/Sao_Paulo
+    ports:
+      - "3306:3306"
+    volumes:
+      - kota-mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-pkota123"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  kota-mysql-data:

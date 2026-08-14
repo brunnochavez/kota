@@ -65,6 +65,23 @@ public class QuotationController {
         return quotationService.findWonQuotations(supplierId);
     }
 
+    @GetMapping("/pending-fulfillment")
+    public List<WonQuotationSummary> findPendingFulfillmentResults(@RequestParam Long supplierId) {
+        return quotationService.findPendingFulfillmentResults(supplierId);
+    }
+
+    @PostMapping("/{id}/items/{itemId}/cut")
+    public ResponseEntity<Void> cutFulfillmentItem(@PathVariable Long id, @PathVariable Long itemId) {
+        quotationService.cutFulfillmentItem(id, itemId);
+        return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/{id}/finalize-fulfillment")
+    public ResponseEntity<Void> finalizeFulfillment(@PathVariable Long id, @RequestParam Long supplierId) {
+        quotationService.finalizeFulfillment(id, supplierId);
+        return ResponseEntity.noContent().build();
+    }
+
     @GetMapping("/{id}")
     public QuotationResponse findById(@PathVariable Long id) {
         return quotationService.findById(id);

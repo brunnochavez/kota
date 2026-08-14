@@ -9,5 +9,6 @@ public record QuotationItemResponse(
         String productName,
         String productBarcode,
         BigDecimal quantity,
-        Long winningBidId
+        Long winningBidId,
+        boolean fulfillmentCut
 ) {}

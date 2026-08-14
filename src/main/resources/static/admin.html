@@ -1717,6 +1717,7 @@ async function abrirDetalheCotacao(id) {
     <div class="btn-row" style="margin-top:16px">
       <button id="qd-publish-btn" class="success" onclick="publishQuotation()">Publicar (Rascunho → Disponível)</button>
       <button id="qd-close-btn" class="secondary" onclick="closeQuotation()">Fechar (calcular vencedores)</button>
+      <button id="qd-whatsapp-btn" class="secondary" onclick="copyPublishMessage(this)" style="display:none">Copiar mensagem para WhatsApp</button>
       <button id="qd-review-bids-btn" class="secondary" onclick="openReviewBidsModal()" style="display:none">Revisar Cotações Enviadas</button>
       <button id="qd-confirm-close-btn" class="success" onclick="confirmCloseQuotation()" style="display:none">Confirmar Fechamento (gerar PDF)</button>
       <a id="qd-pdf-link" href="#" target="_blank" style="display:none"><button class="secondary">Baixar PDF do resultado</button></a>
@@ -1801,6 +1802,7 @@ function applyQdEditLock(status) {
   document.getElementById('qd-group-suppliers-btn').disabled = !isDraft;
   document.getElementById('qd-publish-btn').disabled = !isDraft;
   document.getElementById('qd-close-btn').style.display = canClose ? 'inline-block' : 'none';
+  document.getElementById('qd-whatsapp-btn').style.display = status === 'AVAILABLE' ? 'inline-block' : 'none';
   document.getElementById('qd-review-bids-btn').style.display = isReviewing ? 'inline-block' : 'none';
   document.getElementById('qd-confirm-close-btn').style.display = isReviewing ? 'inline-block' : 'none';
 }
@@ -2230,7 +2232,10 @@ function renderQdItemsRows(items) {
           <button class="icon-btn danger" onclick="removeQuotationItem(${it.id}, this)" title="Remover item" aria-label="Remover item">${QD_TRASH_ICON}</button>
         </td>`;
     } else {
-      tr.innerHTML = `<td class="mono">${it.productBarcode}</td><td>${it.productName}</td>
+      const cutBadge = it.fulfillmentCut
+        ? ' <span style="color:var(--danger); background:var(--danger-bg); border:1px solid var(--danger-border); font-size:10.5px; font-weight:700; padding:2px 7px; border-radius:20px; margin-left:6px; white-space:nowrap">Cortado — sem estoque</span>'
+        : '';
+      tr.innerHTML = `<td class="mono">${it.productBarcode}</td><td>${it.productName}${cutBadge}</td>
         <td style="text-align:center">${it.quantity}</td>`;
     }
     tbody.appendChild(tr);
@@ -2370,6 +2375,49 @@ function closeConfirmPopover() {
   const pop = document.getElementById('confirm-popover');
   if (pop) pop.remove();
   document.removeEventListener('mousedown', handleOutsideConfirmPopoverClick);
+}
+
+// Mensagem pronta pra colar no WhatsApp de cada fornecedor, com link direto pra essa
+// cotação em representante.html (abre já na tela de lançamento, sem precisar procurar
+// na lista — ver o parâmetro ?cotacao= tratado lá). Mesma lógica de cópia com fallback
+// do representante.html: navigator.clipboard só funciona em contexto seguro (HTTPS ou
+// localhost), então cai pra document.execCommand('copy') se não estiver disponível.
+async function copyPublishMessage(buttonEl) {
+  const q = await safeCall(() => api('GET', `/quotations/${currentQuotationId}`));
+  const link = `${window.location.origin}/representante.html?cotacao=${currentQuotationId}`;
+  const message = `Olá! A cotação "${q.name}" já está disponível para envio de preços.\n`
+      + `Prazo: ${fmtDate(q.expirationDate)}\n`
+      + `Acesse e informe seus preços: ${link}`;
+
+  const onSuccess = () => {
+    const original = buttonEl.textContent;
+    buttonEl.textContent = 'Copiado!';
+    toast('Mensagem copiada — já pode colar no WhatsApp.');
+    setTimeout(() => { buttonEl.textContent = original; }, 1800);
+  };
+  const onFailure = () => toast('Não foi possível copiar a mensagem.', true);
+
+  if (window.isSecureContext && navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(message).then(onSuccess).catch(() => copyTextFallback(message, onSuccess, onFailure));
+  } else {
+    copyTextFallback(message, onSuccess, onFailure);
+  }
+}
+
+function copyTextFallback(text, onSuccess, onFailure) {
+  const el = document.createElement('textarea');
+  el.value = text;
+  el.style.position = 'fixed';
+  el.style.left = '-9999px';
+  document.body.appendChild(el);
+  el.focus();
+  el.select();
+  try {
+    document.execCommand('copy') ? onSuccess() : onFailure();
+  } catch (e) {
+    onFailure();
+  }
+  document.body.removeChild(el);
 }
 
 function removeQuotationItem(itemId, buttonEl) {

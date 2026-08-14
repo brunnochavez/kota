@@ -58,9 +58,7 @@ public class Bid {
     @Column(name = "bid_value", nullable = false, precision = 12, scale = 2)
     private BigDecimal value;
 
-    @NotNull(message = "Prazo de entrega é obrigatório")
-    @Positive(message = "Prazo de entrega deve ser maior que zero")
-    @Column(name = "delivery_deadline_days", nullable = false)
+    @Column(name = "delivery_deadline_days")
     private Integer deliveryDeadlineDays;
 
     private String notes;

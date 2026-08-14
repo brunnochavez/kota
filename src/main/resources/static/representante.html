@@ -68,9 +68,15 @@
   button { background: var(--accent); color: #fff; border: none; padding: 9px 16px; border-radius: 7px; font-size: 13.5px; font-weight: 600; cursor: pointer; font-family: var(--sans); }
   button:hover { background: var(--accent-hover); }
   button.secondary { background: var(--surface-2); color: var(--text); border: 1px solid var(--border); }
+  button.danger { background: var(--danger-bg); color: var(--danger); border: 1px solid var(--danger-border); }
   button.small { padding: 5px 10px; font-size: 12px; }
   button.ghost { background: transparent; color: var(--text-dim); padding: 6px 8px; }
   button.ghost:hover { background: var(--surface-2); color: var(--text); }
+  .confirm-popover {
+    position: fixed; z-index: 1150; background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); box-shadow: var(--shadow); padding: 12px 14px; min-width: 220px; max-width: 300px;
+  }
+  .confirm-popover-msg { font-size: 13px; line-height: 1.4; }
 
   /* ---------- navegação por abas no rodapé (padrão mobile) ---------- */
   .tab-bar {
@@ -138,15 +144,30 @@
   .deadline-countdown { font-size: 13px; font-weight: 700; color: var(--warning); background: var(--warning-bg); border: 1px solid var(--warning-border); padding: 8px 12px; border-radius: 8px; margin-bottom: 12px; }
   .deadline-expired { font-size: 12.5px; color: var(--danger); margin-bottom: 12px; }
   .item-row-sent { font-size: 11px; color: var(--success); font-weight: 700; white-space: nowrap; flex-shrink: 0; }
+  .ok-badge {
+    display: inline-flex; align-items: center; gap: 4px; background: var(--success-bg); color: var(--success);
+    border: 1px solid var(--success-border); border-radius: 20px; padding: 5px 12px; font-size: 11.5px; font-weight: 700;
+    cursor: pointer; flex-shrink: 0; white-space: nowrap; font-family: var(--sans);
+  }
+  .ok-badge:hover { filter: brightness(0.96); }
+  .ok-badge svg { width: 12px; height: 12px; }
 
   .item-row {
-    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
-    padding: 10px 12px; border: 1px solid var(--border); border-radius: 9px; margin-bottom: 8px;
+    display: flex; flex-direction: column; gap: 7px;
+    padding: 11px 12px; border: 1px solid var(--border); border-radius: 9px; margin-bottom: 8px;
   }
+  .item-row-name { font-weight: 600; font-size: 13.5px; line-height: 1.3; }
+  .item-row-meta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
   .item-row-barcode { font-family: var(--mono); font-size: 11px; color: var(--text-dim); flex-shrink: 0; }
-  .item-row-name { font-weight: 600; font-size: 13px; flex: 1; min-width: 130px; }
+  .copy-barcode-btn {
+    background: transparent; border: none; padding: 3px; color: var(--text-faint); cursor: pointer;
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0; border-radius: 5px;
+  }
+  .copy-barcode-btn:hover { background: var(--surface-2); color: var(--text-dim); }
+  .copy-barcode-btn.copied { color: var(--success); }
+  .copy-barcode-btn svg { width: 13px; height: 13px; }
   .item-row-qty { font-size: 11.5px; color: var(--text-dim); white-space: nowrap; flex-shrink: 0; }
-  .item-row-price { width: 100px; flex-shrink: 0; padding: 7px 9px; font-size: 13px; margin: 0; }
+  .item-row-price { width: 100px; flex-shrink: 0; padding: 7px 9px; font-size: 13px; margin: 0; margin-left: auto; }
   .mono { font-family: var(--mono); }
   .empty { color: var(--text-faint); text-align: center; padding: 26px 10px; font-size: 13px; }
 
@@ -212,6 +233,11 @@
     <div class="subtitle" id="quote-list-summary">Toque numa cotação pra enviar seus preços.</div>
     <div class="quote-list" id="quote-list"></div>
     <div class="empty" id="quote-list-empty" style="display:none">Nenhuma cotação disponível no momento.</div>
+
+    <h1 style="margin-top:26px">Resultados de Cotações</h1>
+    <div class="subtitle">Cotações fechadas com produtos seus — confirme o pedido pra fechar.</div>
+    <div class="quote-list" id="fulfillment-pending-list"></div>
+    <div class="empty" id="fulfillment-pending-empty" style="display:none">Nenhum resultado pendente de confirmação.</div>
   </div>
 
   <!-- ---------- histórico: cotações fechadas/expiradas ---------- -->
@@ -250,6 +276,21 @@
       </div>
 
       <div id="items-list"></div>
+    </div>
+  </div>
+
+  <!-- ---------- revisão de resultado: confirmar ou cortar item por falta de estoque ---------- -->
+  <div class="view" id="view-fulfillment">
+    <div class="entry-topbar">
+      <button class="ghost" onclick="closeFulfillmentView()" title="Voltar" aria-label="Voltar">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>
+      </button>
+      <h1 id="fulfillment-title">Resultado da cotação</h1>
+    </div>
+
+    <div class="card">
+      <div class="subtitle" style="margin-bottom:14px">Confira os itens que você ganhou. Toque no <strong>OK</strong> de um item se ele não estiver mais em estoque.</div>
+      <div id="fulfillment-items-list"></div>
     </div>
   </div>
 
@@ -355,6 +396,49 @@ function statusBadge(status) {
 
 const QUOTE_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 3h9l5 5v13a1 1 0 01-1 1H6a1 1 0 01-1-1V4a1 1 0 011-1z"/><path d="M9 12h6M9 16h6M9 8h2"/></svg>';
 const CHEVRON_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 6l6 6-6 6"/></svg>';
+const TROPHY_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M8 21h8M12 17v4M7 4h10v4a5 5 0 01-10 0V4z"/><path d="M7 5H4a1 1 0 00-1 1 5 5 0 004 4.9M17 5h3a1 1 0 011 1 5 5 0 01-4 4.9"/></svg>';
+const CHECK_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 12l4 4L19 7"/></svg>';
+const COPY_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a1 1 0 01-1-1V4a1 1 0 011-1h10a1 1 0 011 1v1"/></svg>';
+
+// navigator.clipboard só funciona em contexto seguro (HTTPS ou localhost) — acessando
+// pelo IP da rede local em HTTP (como no celular), essa API fica indisponível sem nem
+// lançar erro visível, só falha calada. document.execCommand('copy') é mais velho e tá
+// sendo descontinuado, mas ainda funciona em HTTP, então serve de rede de segurança.
+function copyBarcode(buttonEl, barcode) {
+  const onSuccess = () => {
+    buttonEl.innerHTML = CHECK_ICON;
+    buttonEl.classList.add('copied');
+    toast('Código copiado!');
+    setTimeout(() => {
+      buttonEl.innerHTML = COPY_ICON;
+      buttonEl.classList.remove('copied');
+    }, 1500);
+  };
+  const onFailure = () => toast('Não foi possível copiar.', true);
+
+  if (window.isSecureContext && navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(barcode).then(onSuccess).catch(() => copyBarcodeFallback(barcode, onSuccess, onFailure));
+  } else {
+    copyBarcodeFallback(barcode, onSuccess, onFailure);
+  }
+}
+
+function copyBarcodeFallback(text, onSuccess, onFailure) {
+  const el = document.createElement('textarea');
+  el.value = text;
+  el.style.position = 'fixed';
+  el.style.left = '-9999px';
+  el.style.top = '0';
+  document.body.appendChild(el);
+  el.focus();
+  el.select();
+  try {
+    document.execCommand('copy') ? onSuccess() : onFailure();
+  } catch (e) {
+    onFailure();
+  }
+  document.body.removeChild(el);
+}
 
 let representativesCache = [];
 let suppliersCache = [];
@@ -369,14 +453,207 @@ async function init() {
   sel.innerHTML = representativesCache.map(r => `<option value="${r.id}">${escapeHtml(r.name)}</option>`).join('');
 
   await loadQuotations();
+  await loadPendingFulfillmentResults();
+
+  openQuotationFromLink();
+}
+
+// Link de WhatsApp copiado no admin (botão "Copiar mensagem para WhatsApp") vem com
+// ?cotacao=ID — abre direto na tela de lançamento dessa cotação, sem o representante
+// precisar procurar na lista. Se a cotação já não estiver mais disponível (fechada,
+// expirada, ou o representante abriu o link depois de já ter passado o prazo), só avisa
+// e deixa na tela inicial normal.
+function openQuotationFromLink() {
+  const params = new URLSearchParams(window.location.search);
+  const linkedId = parseInt(params.get('cotacao'));
+  if (!linkedId) return;
+
+  const found = quotationsCache.find(q => q.id === linkedId);
+  if (found) {
+    openItemsView(linkedId);
+  } else {
+    toast('Essa cotação não está mais disponível.', true);
+  }
 }
 
 // Trocar de representante muda quem "é" quem — refaz tudo do zero, pro contexto
 // (fornecedor resolvido, lances já enviados, itens ganhos) do novo representante.
 function onRepresentativeChange() {
   if (currentQuotationId) loadItemsForCurrentQuotation();
+  if (currentTab === 'available') loadPendingFulfillmentResults();
   if (currentTab === 'history') loadHistory();
   if (currentTab === 'won') loadWonQuotations();
+}
+
+// Popover pequeno, ancorado perto de quem clicou — mesmo padrão usado no admin.html, pra
+// confirmar o corte de um item sem um confirm() nativo do navegador.
+function showConfirmPopover(anchorEl, messageHtml, onConfirm) {
+  closeConfirmPopover();
+
+  const pop = document.createElement('div');
+  pop.className = 'confirm-popover';
+  pop.id = 'confirm-popover';
+  pop.innerHTML = `
+    <div class="confirm-popover-msg">${messageHtml}</div>
+    <div class="btn-row" style="justify-content:flex-end; margin-top:10px; display:flex; gap:8px">
+      <button class="secondary small" type="button">Não</button>
+      <button class="danger small" type="button">Sim</button>
+    </div>`;
+  document.body.appendChild(pop);
+
+  const [noBtn, yesBtn] = pop.querySelectorAll('button');
+  noBtn.onclick = closeConfirmPopover;
+  yesBtn.onclick = () => { closeConfirmPopover(); onConfirm(); };
+
+  const anchor = anchorEl.getBoundingClientRect();
+  const popRect = pop.getBoundingClientRect();
+  let top = anchor.bottom + 6;
+  let left = anchor.right - popRect.width;
+  if (top + popRect.height > window.innerHeight - 8) top = anchor.top - popRect.height - 6;
+  if (left < 8) left = anchor.left;
+  if (left + popRect.width > window.innerWidth - 8) left = window.innerWidth - popRect.width - 8;
+  pop.style.top = Math.max(8, top) + 'px';
+  pop.style.left = Math.max(8, left) + 'px';
+
+  setTimeout(() => document.addEventListener('mousedown', handleOutsideConfirmPopoverClick), 0);
+}
+
+function handleOutsideConfirmPopoverClick(e) {
+  const pop = document.getElementById('confirm-popover');
+  if (pop && !pop.contains(e.target)) closeConfirmPopover();
+}
+
+function closeConfirmPopover() {
+  const pop = document.getElementById('confirm-popover');
+  if (pop) pop.remove();
+  document.removeEventListener('mousedown', handleOutsideConfirmPopoverClick);
+}
+
+// ---------- resultados de cotações: confirmar ou cortar item, e finalizar pedido ----------
+let currentFulfillmentQuotationId = null;
+let currentFulfillmentSupplierId = null;
+
+// Mesma lógica de "Ganhei": junta os pendentes de TODOS os fornecedores desse
+// representante numa lista só, em vez de pedir pra escolher — a tela inicial não é lugar
+// pra mais um seletor. Guarda de qual fornecedor é cada resultado pra usar depois.
+async function loadPendingFulfillmentResults() {
+  const mySuppliers = getMySuppliers();
+  const list = document.getElementById('fulfillment-pending-list');
+  const emptyEl = document.getElementById('fulfillment-pending-empty');
+
+  if (!mySuppliers.length) {
+    list.innerHTML = '';
+    emptyEl.style.display = 'block';
+    return;
+  }
+
+  const perSupplier = await Promise.all(mySuppliers.map(async s => {
+    const pending = await safeCall(() => api('GET', `/quotations/pending-fulfillment?supplierId=${s.id}`));
+    return pending.map(q => ({ ...q, supplierId: s.id, supplierName: s.name }));
+  }));
+  const merged = perSupplier.flat();
+
+  list.innerHTML = '';
+  emptyEl.style.display = merged.length ? 'none' : 'block';
+  merged.forEach(q => {
+    const div = document.createElement('div');
+    div.className = 'quote-item';
+    div.innerHTML = `
+      <div class="quote-item-icon gold">${TROPHY_ICON}</div>
+      <div class="quote-item-main">
+        <div class="quote-item-name">${escapeHtml(q.quotationName)}</div>
+        <div class="quote-item-meta">${q.items.length} produto${q.items.length > 1 ? 's' : ''}${mySuppliers.length > 1 ? ' · ' + escapeHtml(q.supplierName) : ''}</div>
+      </div>
+      <div class="quote-item-chevron">${CHEVRON_ICON}</div>
+    `;
+    div.onclick = () => openFulfillmentView(q.quotationId, q.supplierId);
+    list.appendChild(div);
+  });
+}
+
+async function openFulfillmentView(quotationId, supplierId) {
+  currentFulfillmentQuotationId = quotationId;
+  currentFulfillmentSupplierId = supplierId;
+
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.getElementById('view-fulfillment').classList.add('active');
+  document.getElementById('tab-bar').style.display = 'none';
+
+  const btn = document.querySelector('#sticky-submit-bar button');
+  btn.textContent = 'Finalizar Pedido';
+  btn.onclick = finalizeCurrentFulfillment;
+  document.getElementById('sticky-submit-bar').style.display = 'flex';
+
+  await renderFulfillmentItems();
+}
+
+async function renderFulfillmentItems() {
+  const pending = await safeCall(() => api('GET', `/quotations/pending-fulfillment?supplierId=${currentFulfillmentSupplierId}`));
+  const summary = pending.find(q => q.quotationId === currentFulfillmentQuotationId);
+
+  document.getElementById('fulfillment-title').textContent = summary ? summary.quotationName : 'Resultado da cotação';
+
+  const wrap = document.getElementById('fulfillment-items-list');
+  if (!summary || !summary.items.length) {
+    wrap.innerHTML = '<div class="empty">Nenhum item pendente — tudo já foi confirmado ou cortado.</div>';
+    return;
+  }
+
+  wrap.innerHTML = '';
+  summary.items.forEach(item => {
+    const row = document.createElement('div');
+    row.className = 'item-row';
+    row.id = `fulfillment-row-${item.quotationItemId}`;
+    row.innerHTML = `
+      <div class="item-row-name">${escapeHtml(item.productName)}</div>
+      <div class="item-row-meta">
+        <span class="item-row-barcode">${item.productBarcode}</span>
+        <button class="copy-barcode-btn" type="button" title="Copiar código de barras" aria-label="Copiar código de barras" onclick="copyBarcode(this, '${item.productBarcode}')">${COPY_ICON}</button>
+        <span class="item-row-qty">Qtd: ${item.quantity}</span>
+        <button class="ok-badge" type="button">${CHECK_ICON}OK</button>
+      </div>
+    `;
+    const okBtn = row.querySelector('.ok-badge');
+    okBtn.onclick = () => confirmCutFulfillmentItem(okBtn, item.quotationItemId, item.productName);
+    wrap.appendChild(row);
+  });
+}
+
+// O selo "OK" é o próprio gatilho do corte — não precisa de um botão separado de
+// "excluir": por padrão o item já está OK, e só interage se precisar mudar isso.
+function confirmCutFulfillmentItem(buttonEl, itemId, productName) {
+  showConfirmPopover(
+    buttonEl,
+    `Deseja excluir o produto <strong>${escapeHtml(productName)}</strong> do pedido?`,
+    () => cutFulfillmentItem(itemId)
+  );
+}
+
+async function cutFulfillmentItem(itemId) {
+  await safeCall(() => api('POST', `/quotations/${currentFulfillmentQuotationId}/items/${itemId}/cut`));
+  toast('Item removido do pedido.');
+  const row = document.getElementById(`fulfillment-row-${itemId}`);
+  if (row) row.remove();
+  if (!document.querySelectorAll('#fulfillment-items-list .item-row').length) {
+    document.getElementById('fulfillment-items-list').innerHTML = '<div class="empty">Nenhum item pendente — tudo já foi confirmado ou cortado.</div>';
+  }
+}
+
+async function finalizeCurrentFulfillment() {
+  if (!confirm('Finalizar esse pedido? Depois disso não dá mais pra cortar itens, e ele passa a aparecer em "Ganhei".')) return;
+  await safeCall(() => api('POST', `/quotations/${currentFulfillmentQuotationId}/finalize-fulfillment?supplierId=${currentFulfillmentSupplierId}`));
+  toast('Pedido finalizado.');
+  closeFulfillmentView();
+  loadPendingFulfillmentResults();
+}
+
+function closeFulfillmentView() {
+  document.getElementById('sticky-submit-bar').style.display = 'none';
+  currentFulfillmentQuotationId = null;
+  currentFulfillmentSupplierId = null;
+  document.getElementById('view-fulfillment').classList.remove('active');
+  document.getElementById('tab-bar').style.display = 'flex';
+  document.getElementById('view-' + currentTab).classList.add('active');
 }
 
 // ---------- navegação por abas ----------
@@ -388,7 +665,7 @@ function switchTab(tab) {
   document.getElementById('view-' + tab).classList.add('active');
   document.getElementById('tab-bar').style.display = 'flex';
 
-  if (tab === 'available') loadQuotations();
+  if (tab === 'available') { loadQuotations(); loadPendingFulfillmentResults(); }
   if (tab === 'history') loadHistory();
   if (tab === 'won') loadWonQuotations();
 }
@@ -617,11 +894,14 @@ async function loadItemsForCurrentQuotation() {
     row.className = 'item-row';
     const prefill = existingBid ? formatCurrencyFromNumber(existingBid.value) : '';
     row.innerHTML = `
-      <span class="item-row-barcode">${item.productBarcode}</span>
-      <span class="item-row-name">${escapeHtml(item.productName)}</span>
-      <span class="item-row-qty">Qtd: ${item.quantity}</span>
-      ${existingBid ? '<span class="item-row-sent">✓ Enviado</span>' : ''}
-      <input type="text" inputmode="decimal" class="item-row-price" id="bid-price-${item.id}" placeholder="0,00" value="${prefill}" oninput="this.value = maskCurrencyInput(this.value)">
+      <div class="item-row-name">${escapeHtml(item.productName)}</div>
+      <div class="item-row-meta">
+        <span class="item-row-barcode">${item.productBarcode}</span>
+        <button class="copy-barcode-btn" type="button" title="Copiar código de barras" aria-label="Copiar código de barras" onclick="copyBarcode(this, '${item.productBarcode}')">${COPY_ICON}</button>
+        <span class="item-row-qty">Qtd: ${item.quantity}</span>
+        ${existingBid ? '<span class="item-row-sent">✓ Enviado</span>' : ''}
+        <input type="text" inputmode="decimal" class="item-row-price" id="bid-price-${item.id}" placeholder="0,00" value="${prefill}" oninput="this.value = maskCurrencyInput(this.value)">
+      </div>
     `;
     wrap.appendChild(row);
   });
@@ -641,6 +921,10 @@ async function openItemsView(id) {
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
   document.getElementById('view-entry').classList.add('active');
   document.getElementById('tab-bar').style.display = 'none';
+
+  const btn = document.querySelector('#sticky-submit-bar button');
+  btn.textContent = 'Salvar Cotação';
+  btn.onclick = submitAllBids;
   document.getElementById('sticky-submit-bar').style.display = 'flex';
 
   renderSupplierResolution();
