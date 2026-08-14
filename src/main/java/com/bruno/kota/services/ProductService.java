@@ -14,10 +14,12 @@ import com.bruno.kota.dtos.ProductRequest;
 import com.bruno.kota.dtos.ProductResponse;
 import com.bruno.kota.entities.Bid;
 import com.bruno.kota.entities.Product;
+import com.bruno.kota.entities.ProductGroup;
 import com.bruno.kota.entities.QuotationItem;
 import com.bruno.kota.exceptions.DuplicateResourceException;
 import com.bruno.kota.exceptions.InactiveResourceException;
 import com.bruno.kota.exceptions.ResourceNotFoundException;
+import com.bruno.kota.repositories.ProductGroupRepository;
 import com.bruno.kota.repositories.ProductRepository;
 import com.bruno.kota.repositories.QuotationItemRepository;
 import lombok.RequiredArgsConstructor;
@@ -28,6 +30,7 @@ public class ProductService {
 
     private final ProductRepository productRepository;
     private final QuotationItemRepository quotationItemRepository;
+    private final ProductGroupRepository productGroupRepository;
 
     @Transactional(readOnly = true)
     public List<ProductResponse> findAll() {
@@ -118,6 +121,31 @@ public class ProductService {
     @Transactional
     public void delete(Long id) {
         productRepository.delete(findEntityById(id));
+    }
+
+    @Transactional(readOnly = true)
+    public List<ProductResponse> findByGroupId(Long groupId) {
+        ProductGroup group = productGroupRepository.findById(groupId)
+                .orElseThrow(() -> new ResourceNotFoundException("Grupo não encontrado: id " + groupId));
+        return productRepository.findByGroup(group).stream()
+                .map(this::toResponseWithoutPricing)
+                .toList();
+    }
+
+    @Transactional
+    public ProductResponse addToGroup(Long productId, Long groupId) {
+        Product product = findEntityById(productId);
+        ProductGroup group = productGroupRepository.findById(groupId)
+                .orElseThrow(() -> new ResourceNotFoundException("Grupo não encontrado: id " + groupId));
+        product.getGroups().add(group);
+        return toResponseWithoutPricing(productRepository.save(product));
+    }
+
+    @Transactional
+    public ProductResponse removeFromGroup(Long productId, Long groupId) {
+        Product product = findEntityById(productId);
+        product.getGroups().removeIf(group -> group.getId().equals(groupId));
+        return toResponseWithoutPricing(productRepository.save(product));
     }
 
     private Map<Long, QuotationItem> loadLastWonBatch(List<Product> products) {

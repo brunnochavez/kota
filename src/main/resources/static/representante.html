@@ -54,6 +54,28 @@
   main { max-width: 640px; margin: 0 auto; padding: 18px 16px calc(var(--tab-bar-h) + 24px); }
   #view-entry { padding-bottom: calc(78px + env(safe-area-inset-bottom, 0px)); }
   h1 { font-size: 19px; margin: 0 0 3px; font-weight: 700; }
+  .greeting-banner {
+    display: flex; align-items: center; gap: 14px; padding: 18px 20px; border-radius: 16px;
+    background: linear-gradient(135deg, var(--accent), var(--accent-hover)); color: #fff; margin-bottom: 20px;
+  }
+  .greeting-banner-icon { width: 38px; height: 38px; flex-shrink: 0; opacity: 0.92; }
+  .greeting-banner-icon svg { width: 100%; height: 100%; }
+  .greeting-banner-text { font-size: 15.5px; font-weight: 700; }
+  .greeting-banner-sub { font-size: 11.5px; opacity: 0.85; margin-top: 2px; }
+  .supplier-tabs-wrap { margin-bottom: 20px; }
+  .supplier-tabs-label { font-size: 10.5px; color: var(--text-faint); font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 8px; padding-left: 2px; }
+  .supplier-tabs { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 2px; }
+  .supplier-tabs::-webkit-scrollbar { display: none; }
+  .supplier-tab {
+    flex-shrink: 0; display: inline-flex; align-items: center; gap: 6px;
+    padding: 9px 16px 9px 12px; border-radius: 24px; border: 1px solid var(--border); background: var(--surface);
+    color: var(--text-dim); font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap; font-family: var(--sans);
+    transition: background 0.15s, color 0.15s, border-color 0.15s, box-shadow 0.15s;
+  }
+  .supplier-tab svg { width: 15px; height: 15px; opacity: 0.65; flex-shrink: 0; }
+  .supplier-tab.active { background: var(--accent); color: #fff; border-color: var(--accent); box-shadow: 0 3px 10px rgba(47,111,237,0.28); }
+  .supplier-tab.active svg { opacity: 1; }
+  .supplier-tab:hover:not(.active) { border-color: var(--accent); color: var(--text); }
   .subtitle { color: var(--text-dim); font-size: 12.5px; margin-bottom: 16px; }
 
   .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; margin-bottom: 12px; box-shadow: var(--shadow); }
@@ -169,7 +191,11 @@
   .item-row-qty { font-size: 11.5px; color: var(--text-dim); white-space: nowrap; flex-shrink: 0; }
   .item-row-price { width: 100px; flex-shrink: 0; padding: 7px 9px; font-size: 13px; margin: 0; margin-left: auto; }
   .mono { font-family: var(--mono); }
-  .empty { color: var(--text-faint); text-align: center; padding: 26px 10px; font-size: 13px; }
+  .empty {
+    display: flex; flex-direction: column; align-items: center; gap: 10px;
+    color: var(--text-faint); text-align: center; padding: 34px 20px; font-size: 13px;
+  }
+  .empty svg { width: 32px; height: 32px; opacity: 0.5; }
 
   /* ---------- tela de lançamento em tela cheia (some com a tab bar, ganha topo próprio) ---------- */
   .entry-topbar { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
@@ -183,17 +209,27 @@
   #sticky-submit-bar button { width: 100%; max-width: 600px; padding: 12px 16px; font-size: 14px; }
 
   /* ---------- "o que eu ganhei" ---------- */
-  .won-card { border-left: 3px solid var(--success); }
-  .won-card-header { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; margin-bottom: 4px; }
+  .won-card { border-left: 3px solid var(--success); padding: 0; overflow: hidden; }
+  .won-card-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; padding: 16px; cursor: pointer; }
   .won-card-header h2 { margin: 0; }
-  .won-card-date { font-size: 11px; color: var(--text-faint); margin-bottom: 10px; }
-  .won-item-row { display: flex; justify-content: space-between; gap: 10px; font-size: 12.5px; padding: 6px 0; border-bottom: 1px solid var(--surface-2); }
-  .won-item-row:last-child { border-bottom: none; }
+  .won-card-date { font-size: 11px; color: var(--text-faint); margin-top: 2px; }
+  .won-card-header-right { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+  .won-card-header-right strong { color: var(--success); font-size: 13.5px; white-space: nowrap; }
+  .won-card-chevron { width: 18px; height: 18px; color: var(--text-faint); transition: transform 0.2s; flex-shrink: 0; }
+  .won-card-chevron.open { transform: rotate(180deg); }
+  .won-card-items { padding: 0 16px 16px; }
+  .won-item-row { display: flex; justify-content: space-between; gap: 10px; font-size: 12.5px; padding: 8px 0; border-top: 1px solid var(--surface-2); }
   .won-item-name { flex: 1; min-width: 0; }
   .won-item-name .barcode { display: block; font-family: var(--mono); font-size: 10.5px; color: var(--text-faint); }
   .won-item-nums { text-align: right; flex-shrink: 0; white-space: nowrap; color: var(--text-dim); }
-  .won-total { display: flex; justify-content: space-between; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); font-weight: 700; font-size: 13.5px; }
-  .won-total strong { color: var(--success); }
+
+  .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px; }
+  .stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: 13px; padding: 14px 15px; box-shadow: var(--shadow); }
+  .stat-card-value { font-size: 21px; font-weight: 800; line-height: 1.1; }
+  .stat-card-value.success { color: var(--success); }
+  .stat-card-value.warning { color: var(--warning); }
+  .stat-card-value.danger { color: var(--danger); }
+  .stat-card-label { font-size: 11px; color: var(--text-dim); margin-top: 4px; line-height: 1.35; }
 
   #toast-wrap { position: fixed; top: 18px; right: 18px; z-index: 999; display: flex; flex-direction: column; gap: 8px; max-width: calc(100vw - 36px); }
   .toast { padding: 12px 16px; border-radius: 9px; font-size: 13px; max-width: 380px; box-shadow: var(--shadow); }
@@ -227,17 +263,30 @@
 
 <main>
 
+  <div class="supplier-tabs-wrap" id="supplier-tabs-wrap" style="display:none">
+    <div class="supplier-tabs-label">Cotizando como</div>
+    <div class="supplier-tabs" id="supplier-tabs"></div>
+  </div>
+
   <!-- ---------- tela inicial: só cotações disponíveis, o mais simples possível ---------- -->
   <div class="view active" id="view-available">
+    <div class="greeting-banner" id="greeting-banner"></div>
+
     <h1>Cotações disponíveis</h1>
     <div class="subtitle" id="quote-list-summary">Toque numa cotação pra enviar seus preços.</div>
     <div class="quote-list" id="quote-list"></div>
-    <div class="empty" id="quote-list-empty" style="display:none">Nenhuma cotação disponível no momento.</div>
+    <div class="empty" id="quote-list-empty" style="display:none">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M9 12l2 2 4-4"/><circle cx="12" cy="12" r="9"/></svg>
+      <span>Nenhuma cotação disponível no momento.</span>
+    </div>
 
     <h1 style="margin-top:26px">Resultados de Cotações</h1>
     <div class="subtitle">Cotações fechadas com produtos seus — confirme o pedido pra fechar.</div>
     <div class="quote-list" id="fulfillment-pending-list"></div>
-    <div class="empty" id="fulfillment-pending-empty" style="display:none">Nenhum resultado pendente de confirmação.</div>
+    <div class="empty" id="fulfillment-pending-empty" style="display:none">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M9 12l2 2 4-4"/><circle cx="12" cy="12" r="9"/></svg>
+      <span>Nenhum resultado pendente de confirmação.</span>
+    </div>
   </div>
 
   <!-- ---------- histórico: cotações fechadas/expiradas ---------- -->
@@ -245,16 +294,32 @@
     <h1>Cotações anteriores</h1>
     <div class="subtitle">Cotações que já fecharam ou passaram do prazo.</div>
     <div class="quote-list" id="history-list"></div>
-    <div class="empty" id="history-list-empty" style="display:none">Nenhuma cotação anterior ainda.</div>
+    <div class="empty" id="history-list-empty" style="display:none">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/></svg>
+      <span>Nenhuma cotação anterior ainda.</span>
+    </div>
   </div>
 
   <!-- ---------- o que eu ganhei ---------- -->
   <div class="view" id="view-won">
     <h1>O que eu ganhei</h1>
     <div class="subtitle">Cotações fechadas em que você venceu pelo menos um produto.</div>
-    <div id="won-supplier-picker"></div>
     <div id="won-list"></div>
-    <div class="empty" id="won-list-empty" style="display:none">Você ainda não ganhou nenhum produto em cotações fechadas.</div>
+    <div class="empty" id="won-list-empty" style="display:none">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M8 21h8M12 17v4M7 4h10v4a5 5 0 01-10 0V4z"/><path d="M7 5H4a1 1 0 00-1 1 5 5 0 004 4.9M17 5h3a1 1 0 011 1 5 5 0 01-4 4.9"/></svg>
+      <span>Você ainda não ganhou nenhum produto em cotações fechadas.</span>
+    </div>
+  </div>
+
+  <!-- ---------- meu desempenho: indicadores calculados em cima dos lances já enviados ---------- -->
+  <div class="view" id="view-performance">
+    <h1>Meu Desempenho</h1>
+    <div class="subtitle">Calculado a partir dos seus próprios lances e resultados.</div>
+    <div id="performance-content"></div>
+    <div class="empty" id="performance-empty" style="display:none">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 20h18M6 20V10M12 20V4M18 20v-7"/></svg>
+      <span>Ainda não há lances decididos suficientes pra calcular seu desempenho.</span>
+    </div>
   </div>
 
   <!-- ---------- tela de lançamento (tela cheia, sem tab bar) ---------- -->
@@ -269,11 +334,6 @@
     <div class="card">
       <div id="quotation-deadline-info"></div>
       <div id="rep-supplier-info"></div>
-
-      <div style="max-width:200px; margin-bottom:14px">
-        <label>Prazo de entrega (dias)</label>
-        <input type="number" id="global-bid-deadline" placeholder="Ex: 5">
-      </div>
 
       <div id="items-list"></div>
     </div>
@@ -312,6 +372,10 @@
   <button data-tab="won" onclick="switchTab('won')">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M8 21h8M12 17v4M7 4h10v4a5 5 0 01-10 0V4z"/><path d="M7 5H4a1 1 0 00-1 1 5 5 0 004 4.9M17 5h3a1 1 0 011 1 5 5 0 01-4 4.9"/></svg>
     Ganhei
+  </button>
+  <button data-tab="performance" onclick="switchTab('performance')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 20h18M6 20V10M12 20V4M18 20v-7"/></svg>
+    Desempenho
   </button>
 </nav>
 
@@ -452,10 +516,38 @@ async function init() {
   const sel = document.getElementById('who-representative');
   sel.innerHTML = representativesCache.map(r => `<option value="${r.id}">${escapeHtml(r.name)}</option>`).join('');
 
+  renderGreeting();
+  renderSupplierTabs();
   await loadQuotations();
   await loadPendingFulfillmentResults();
 
   openQuotationFromLink();
+}
+
+const SUN_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="4.5"/><path d="M12 2.5v2.5M12 19v2.5M4.2 4.2l1.8 1.8M18 18l1.8 1.8M2.5 12H5M19 12h2.5M4.2 19.8L6 18M18 6l1.8-1.8"/></svg>';
+const MOON_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M20 14.5A8.5 8.5 0 119.5 4a7 7 0 0010.5 10.5z"/></svg>';
+
+// Saudação muda por horário e usa só o primeiro nome — "Bom dia, Bruno de Oliveira e
+// Silva!" fica formal demais pra um cumprimento; o nome completo já aparece no seletor
+// "logado como" logo ao lado, não precisa repetir.
+function renderGreeting() {
+  const hour = new Date().getHours();
+  const isNight = hour < 6 || hour >= 18;
+  const greeting = hour < 12 ? 'Bom dia' : hour < 18 ? 'Boa tarde' : 'Boa noite';
+
+  const sel = document.getElementById('who-representative');
+  const fullName = sel.options[sel.selectedIndex] ? sel.options[sel.selectedIndex].text : '';
+  const firstName = fullName.split(' ')[0] || '';
+
+  const today = new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' });
+
+  document.getElementById('greeting-banner').innerHTML = `
+    <div class="greeting-banner-icon">${isNight ? MOON_ICON : SUN_ICON}</div>
+    <div>
+      <div class="greeting-banner-text">${greeting}, ${escapeHtml(firstName)}!</div>
+      <div class="greeting-banner-sub">${today}</div>
+    </div>
+  `;
 }
 
 // Link de WhatsApp copiado no admin (botão "Copiar mensagem para WhatsApp") vem com
@@ -463,7 +555,7 @@ async function init() {
 // precisar procurar na lista. Se a cotação já não estiver mais disponível (fechada,
 // expirada, ou o representante abriu o link depois de já ter passado o prazo), só avisa
 // e deixa na tela inicial normal.
-function openQuotationFromLink() {
+async function openQuotationFromLink() {
   const params = new URLSearchParams(window.location.search);
   const linkedId = parseInt(params.get('cotacao'));
   if (!linkedId) return;
@@ -471,6 +563,15 @@ function openQuotationFromLink() {
   const found = quotationsCache.find(q => q.id === linkedId);
   if (found) {
     openItemsView(linkedId);
+    return;
+  }
+
+  // Já não está na lista filtrada — descobre o motivo certo pra avisar direito, em vez
+  // de um "não está disponível" genérico que esconde o caso real (removido do grupo).
+  const all = await safeCall(() => api('GET', '/quotations'));
+  const raw = all.find(q => q.id === linkedId);
+  if (raw && raw.status === 'AVAILABLE' && !isQuotationEligibleForMe(raw)) {
+    toast('Esse representante não faz parte do grupo autorizado a responder essa cotação.', true);
   } else {
     toast('Essa cotação não está mais disponível.', true);
   }
@@ -478,11 +579,23 @@ function openQuotationFromLink() {
 
 // Trocar de representante muda quem "é" quem — refaz tudo do zero, pro contexto
 // (fornecedor resolvido, lances já enviados, itens ganhos) do novo representante.
-function onRepresentativeChange() {
-  if (currentQuotationId) loadItemsForCurrentQuotation();
-  if (currentTab === 'available') loadPendingFulfillmentResults();
+// Fonte única de verdade pra "o que recarregar pra cada aba" — usada sempre que algo
+// que afeta o conteúdo da aba atual muda (trocar de representante, trocar de empresa,
+// ou trocar de aba em si). Antes essa lista tava duplicada em três funções diferentes, e
+// quando adicionei a aba Desempenho, atualizei duas delas e esqueci a terceira — por
+// isso o desempenho ficava preso na primeira empresa carregada, mesmo trocando de aba.
+function refreshCurrentTab() {
+  if (currentTab === 'available') { loadQuotations(); loadPendingFulfillmentResults(); }
   if (currentTab === 'history') loadHistory();
   if (currentTab === 'won') loadWonQuotations();
+  if (currentTab === 'performance') loadPerformance();
+}
+
+function onRepresentativeChange() {
+  renderGreeting();
+  renderSupplierTabs();
+  if (currentQuotationId) loadItemsForCurrentQuotation();
+  refreshCurrentTab();
 }
 
 // Popover pequeno, ancorado perto de quem clicou — mesmo padrão usado no admin.html, pra
@@ -533,40 +646,34 @@ function closeConfirmPopover() {
 let currentFulfillmentQuotationId = null;
 let currentFulfillmentSupplierId = null;
 
-// Mesma lógica de "Ganhei": junta os pendentes de TODOS os fornecedores desse
-// representante numa lista só, em vez de pedir pra escolher — a tela inicial não é lugar
-// pra mais um seletor. Guarda de qual fornecedor é cada resultado pra usar depois.
+// Usa a empresa selecionada nas abas da tela inicial — não mescla mais todas as empresas
+// do representante numa lista só (isso ficou responsabilidade das abas agora).
 async function loadPendingFulfillmentResults() {
-  const mySuppliers = getMySuppliers();
   const list = document.getElementById('fulfillment-pending-list');
   const emptyEl = document.getElementById('fulfillment-pending-empty');
 
-  if (!mySuppliers.length) {
+  if (!currentSupplierId) {
     list.innerHTML = '';
     emptyEl.style.display = 'block';
     return;
   }
 
-  const perSupplier = await Promise.all(mySuppliers.map(async s => {
-    const pending = await safeCall(() => api('GET', `/quotations/pending-fulfillment?supplierId=${s.id}`));
-    return pending.map(q => ({ ...q, supplierId: s.id, supplierName: s.name }));
-  }));
-  const merged = perSupplier.flat();
+  const pending = await safeCall(() => api('GET', `/quotations/pending-fulfillment?supplierId=${currentSupplierId}`));
 
   list.innerHTML = '';
-  emptyEl.style.display = merged.length ? 'none' : 'block';
-  merged.forEach(q => {
+  emptyEl.style.display = pending.length ? 'none' : 'block';
+  pending.forEach(q => {
     const div = document.createElement('div');
     div.className = 'quote-item';
     div.innerHTML = `
       <div class="quote-item-icon gold">${TROPHY_ICON}</div>
       <div class="quote-item-main">
         <div class="quote-item-name">${escapeHtml(q.quotationName)}</div>
-        <div class="quote-item-meta">${q.items.length} produto${q.items.length > 1 ? 's' : ''}${mySuppliers.length > 1 ? ' · ' + escapeHtml(q.supplierName) : ''}</div>
+        <div class="quote-item-meta">${q.items.length} produto${q.items.length > 1 ? 's' : ''}</div>
       </div>
       <div class="quote-item-chevron">${CHEVRON_ICON}</div>
     `;
-    div.onclick = () => openFulfillmentView(q.quotationId, q.supplierId);
+    div.onclick = () => openFulfillmentView(q.quotationId, currentSupplierId);
     list.appendChild(div);
   });
 }
@@ -577,7 +684,7 @@ async function openFulfillmentView(quotationId, supplierId) {
 
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
   document.getElementById('view-fulfillment').classList.add('active');
-  document.getElementById('tab-bar').style.display = 'none';
+  hideBottomChrome();
 
   const btn = document.querySelector('#sticky-submit-bar button');
   btn.textContent = 'Finalizar Pedido';
@@ -652,22 +759,35 @@ function closeFulfillmentView() {
   currentFulfillmentQuotationId = null;
   currentFulfillmentSupplierId = null;
   document.getElementById('view-fulfillment').classList.remove('active');
-  document.getElementById('tab-bar').style.display = 'flex';
+  showBottomChrome();
   document.getElementById('view-' + currentTab).classList.add('active');
 }
 
 // ---------- navegação por abas ----------
+// Tab-bar e abas de empresa aparecem/somem juntas — nas telas de tela cheia (lançamento
+// de preço, revisão de resultado) nenhuma das duas faz sentido, já que o contexto
+// (empresa, cotação) já ficou fixado ao entrar. renderSupplierTabs() decide sozinha se
+// mostra o wrapper ou não (só aparece com mais de uma empresa), então showBottomChrome
+// não força 'flex' nele diretamente.
+function hideBottomChrome() {
+  document.getElementById('tab-bar').style.display = 'none';
+  document.getElementById('supplier-tabs-wrap').style.display = 'none';
+}
+
+function showBottomChrome() {
+  document.getElementById('tab-bar').style.display = 'flex';
+  renderSupplierTabs();
+}
+
 function switchTab(tab) {
   currentTab = tab;
   closeItemsView(false);
   document.querySelectorAll('.tab-bar button').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
   document.getElementById('view-' + tab).classList.add('active');
-  document.getElementById('tab-bar').style.display = 'flex';
+  showBottomChrome();
 
-  if (tab === 'available') { loadQuotations(); loadPendingFulfillmentResults(); }
-  if (tab === 'history') loadHistory();
-  if (tab === 'won') loadWonQuotations();
+  refreshCurrentTab();
 }
 
 // ---------- aba: disponíveis (tela inicial) ----------
@@ -688,9 +808,19 @@ function relativeDeadlineLabel(expirationDate) {
   return { text: `Fecha em ${days} dia${days > 1 ? 's' : ''}`, level: 'plenty' };
 }
 
+// Elegível = o fornecedor desse representante está no grupo autorizado da cotação. Sem
+// isso, a tela mostrava qualquer cotação Disponível pra qualquer um — o backend já
+// bloqueava o ENVIO do lance (validateGroupAccess em BidService), mas a listagem em si
+// não filtrava, então dava pra ver e tentar preencher uma cotação de outro grupo.
+function isQuotationEligibleForMe(quotation) {
+  if (!quotation.supplierGroupId || !currentSupplierId) return false;
+  const supplier = suppliersCache.find(s => s.id === currentSupplierId);
+  return !!supplier && (supplier.groupIds || []).includes(quotation.supplierGroupId);
+}
+
 async function loadQuotations() {
   const all = await safeCall(() => api('GET', '/quotations'));
-  quotationsCache = all.filter(q => q.status === 'AVAILABLE');
+  quotationsCache = all.filter(q => q.status === 'AVAILABLE' && isQuotationEligibleForMe(q));
 
   const summary = document.getElementById('quote-list-summary');
   summary.textContent = quotationsCache.length
@@ -745,32 +875,8 @@ async function loadHistory() {
 }
 
 // ---------- aba: o que eu ganhei ----------
-function renderWonSupplierPicker() {
-  const mySuppliers = getMySuppliers();
-  const wrap = document.getElementById('won-supplier-picker');
-  if (mySuppliers.length > 1) {
-    wrap.innerHTML = `<div style="max-width:260px; margin-bottom:14px">
-      <label>Fornecedor</label>
-      <select id="won-supplier-select" onchange="loadWonQuotations()">${mySuppliers.map(s => `<option value="${s.id}">${escapeHtml(s.name)}</option>`).join('')}</select>
-    </div>`;
-  } else {
-    wrap.innerHTML = '';
-  }
-}
-
-function resolveWonSupplierId() {
-  const mySuppliers = getMySuppliers();
-  if (mySuppliers.length === 1) return mySuppliers[0].id;
-  if (mySuppliers.length > 1) {
-    const sel = document.getElementById('won-supplier-select');
-    return sel && sel.value ? parseInt(sel.value) : null;
-  }
-  return null;
-}
-
 async function loadWonQuotations() {
-  renderWonSupplierPicker();
-  const supplierId = resolveWonSupplierId();
+  const supplierId = currentSupplierId;
   const list = document.getElementById('won-list');
   const emptyEl = document.getElementById('won-list-empty');
 
@@ -785,52 +891,185 @@ async function loadWonQuotations() {
   emptyEl.textContent = 'Você ainda não ganhou nenhum produto em cotações fechadas.';
   emptyEl.style.display = won.length ? 'none' : 'block';
 
-  list.innerHTML = won.map(q => `
+  list.innerHTML = won.map((q, idx) => `
     <div class="card won-card">
-      <div class="won-card-header"><h2>${escapeHtml(q.quotationName)}</h2></div>
-      <div class="won-card-date">Fechada em ${fmtDateTime(q.closedAt)}</div>
-      ${q.items.map(i => `
-        <div class="won-item-row">
-          <div class="won-item-name">${escapeHtml(i.productName)}<span class="barcode">${i.productBarcode}</span></div>
-          <div class="won-item-nums">${i.quantity} × R$ ${formatCurrencyFromNumber(i.value)}</div>
+      <div class="won-card-header" onclick="toggleWonCard(${idx})">
+        <div>
+          <h2>${escapeHtml(q.quotationName)}</h2>
+          <div class="won-card-date">Fechada em ${fmtDateTime(q.closedAt)}</div>
         </div>
-      `).join('')}
-      <div class="won-total"><span>Total</span><strong>R$ ${formatCurrencyFromNumber(q.total)}</strong></div>
+        <div class="won-card-header-right">
+          <strong>R$ ${formatCurrencyFromNumber(q.total)}</strong>
+          <svg class="won-card-chevron" id="won-chevron-${idx}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+        </div>
+      </div>
+      <div class="won-card-items" id="won-items-${idx}" style="display:none">
+        ${q.items.map(i => `
+          <div class="won-item-row">
+            <div class="won-item-name">${escapeHtml(i.productName)}<span class="barcode">${i.productBarcode}</span></div>
+            <div class="won-item-nums">${i.quantity} × R$ ${formatCurrencyFromNumber(i.value)} = R$ ${formatCurrencyFromNumber(i.subtotal)}</div>
+          </div>
+        `).join('')}
+      </div>
     </div>
   `).join('');
 }
 
+// Fechado por padrão — com várias cotações ganhas, uma lista toda expandida vira uma
+// rolagem enorme antes mesmo de bater o olho em qual cotação é qual.
+function toggleWonCard(idx) {
+  const itemsEl = document.getElementById('won-items-' + idx);
+  const chevronEl = document.getElementById('won-chevron-' + idx);
+  const isOpen = itemsEl.style.display !== 'none';
+  itemsEl.style.display = isOpen ? 'none' : 'block';
+  chevronEl.classList.toggle('open', !isOpen);
+}
+
+// ---------- aba: meu desempenho ----------
+// Tudo aqui vem de um único endpoint agregado (GET /quotations/performance) — o backend
+// já calcula em cima dos lances, vencedores e cortes que o sistema grava por outro
+// motivo. Aqui é só formatação e cor por faixa (verde/laranja/vermelho).
+async function loadPerformance() {
+  const wrap = document.getElementById('performance-content');
+  const emptyEl = document.getElementById('performance-empty');
+
+  if (!currentSupplierId) {
+    wrap.innerHTML = '';
+    emptyEl.querySelector('span').textContent = 'Este representante não está associado a nenhum fornecedor.';
+    emptyEl.style.display = 'block';
+    return;
+  }
+
+  const perf = await safeCall(() => api('GET', `/quotations/performance?supplierId=${currentSupplierId}`));
+
+  if (!perf.decidedBids) {
+    wrap.innerHTML = '';
+    emptyEl.querySelector('span').textContent = 'Ainda não há lances decididos suficientes pra calcular seu desempenho — assim que uma cotação com seu lance fechar, isso aparece aqui.';
+    emptyEl.style.display = 'block';
+    return;
+  }
+  emptyEl.style.display = 'none';
+
+  const winRateLevel = perf.winRate >= 50 ? 'success' : perf.winRate >= 25 ? 'warning' : 'danger';
+  const reliabilityLevel = perf.fulfillmentReliability == null ? ''
+    : perf.fulfillmentReliability >= 90 ? 'success' : perf.fulfillmentReliability >= 70 ? 'warning' : 'danger';
+
+  let html = '<div class="stat-grid">';
+  html += `
+    <div class="stat-card">
+      <div class="stat-card-value ${winRateLevel}">${Math.round(perf.winRate)}%</div>
+      <div class="stat-card-label">Taxa de vitória — ${perf.wonBids} de ${perf.decidedBids} lances decididos</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-card-value">R$ ${formatCurrencyFromNumber(perf.totalWonValue)}</div>
+      <div class="stat-card-label">Total ganho em todo o histórico</div>
+    </div>`;
+  if (perf.averageWonQuotationValue != null) {
+    html += `
+    <div class="stat-card">
+      <div class="stat-card-value">R$ ${formatCurrencyFromNumber(perf.averageWonQuotationValue)}</div>
+      <div class="stat-card-label">Ticket médio por cotação ganha</div>
+    </div>`;
+  }
+  if (perf.fulfillmentReliability != null) {
+    html += `
+    <div class="stat-card">
+      <div class="stat-card-value ${reliabilityLevel}">${Math.round(perf.fulfillmentReliability)}%</div>
+      <div class="stat-card-label">Confirmado sem corte — ${perf.wonItemsConfirmed} de ${perf.wonItemsTotal} itens ganhos</div>
+    </div>`;
+  }
+  if (perf.participationRate != null) {
+    html += `
+    <div class="stat-card">
+      <div class="stat-card-value">${Math.round(perf.participationRate)}%</div>
+      <div class="stat-card-label">Participação — ${perf.respondedQuotationsCount} de ${perf.eligibleQuotationsCount} cotações do seu grupo</div>
+    </div>`;
+  }
+  html += '</div>';
+
+  if (perf.byProduct && perf.byProduct.length) {
+    html += `<div class="card">
+      <h2>Onde você é mais competitivo</h2>
+      ${perf.byProduct.slice(0, 8).map(p => `
+        <div class="won-item-row">
+          <div class="won-item-name">${escapeHtml(p.productName)}</div>
+          <div class="won-item-nums">${p.wins}/${p.bids} · ${Math.round(p.winRate)}%</div>
+        </div>
+      `).join('')}
+    </div>`;
+  }
+
+  if (perf.recentLosses && perf.recentLosses.length) {
+    html += `<div class="card">
+      <h2>Perdas recentes — quanto faltou</h2>
+      <div class="subtitle" style="margin-bottom:10px">Pra calibrar seu preço na próxima cotação parecida.</div>
+      ${perf.recentLosses.map(l => `
+        <div class="won-item-row">
+          <div class="won-item-name">${escapeHtml(l.productName)}<span class="barcode">${escapeHtml(l.quotationName)}</span></div>
+          <div class="won-item-nums" style="color:var(--danger)">+R$ ${formatCurrencyFromNumber(l.gap)}</div>
+        </div>
+      `).join('')}
+    </div>`;
+  }
+
+  wrap.innerHTML = html;
+}
+
 // ---------- resolução automática do fornecedor ----------
-// O representante logado já diz quem ele é — não faz sentido pedir pra escolher o
-// fornecedor de novo. Resolve automaticamente a partir de quem está em "Logado como".
+// O representante logado já diz quem ele é, mas ele pode representar mais de uma empresa
+// — nesse caso currentSupplierId guarda qual delas está "ativa" no momento, escolhida
+// pelas abas na tela inicial. Tudo mais (disponíveis, resultados, ganhei, lançamento de
+// preço) usa esse mesmo valor, sem pedir de novo em cada tela.
 function getMySuppliers() {
   const repId = parseInt(document.getElementById('who-representative').value);
   return suppliersCache.filter(s => s.representativeId === repId);
 }
 
-function resolveSupplierId() {
+let currentSupplierId = null;
+
+const STORE_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 9l1-5h14l1 5"/><path d="M4 9a2 2 0 004 0 2 2 0 004 0 2 2 0 004 0 2 2 0 004 0"/><path d="M5 9v10h14V9"/></svg>';
+
+function renderSupplierTabs() {
   const mySuppliers = getMySuppliers();
-  if (mySuppliers.length === 1) return mySuppliers[0].id;
-  if (mySuppliers.length > 1) {
-    const sel = document.getElementById('global-bid-supplier');
-    return sel && sel.value ? parseInt(sel.value) : null;
+  const wrap = document.getElementById('supplier-tabs');
+  const outerWrap = document.getElementById('supplier-tabs-wrap');
+
+  if (mySuppliers.length <= 1) {
+    wrap.innerHTML = '';
+    outerWrap.style.display = 'none';
+    currentSupplierId = mySuppliers.length === 1 ? mySuppliers[0].id : null;
+    return;
   }
-  return null;
+
+  // Se a empresa selecionada não pertence mais a esse representante (trocou no seletor
+  // "logado como"), volta pra primeira da lista nova em vez de ficar com um id órfão.
+  if (!currentSupplierId || !mySuppliers.some(s => s.id === currentSupplierId)) {
+    currentSupplierId = mySuppliers[0].id;
+  }
+
+  outerWrap.style.display = 'block';
+  wrap.innerHTML = mySuppliers.map(s => `
+    <button type="button" class="supplier-tab ${s.id === currentSupplierId ? 'active' : ''}" onclick="selectSupplierTab(${s.id})">${STORE_ICON}${escapeHtml(s.name)}</button>
+  `).join('');
+}
+
+function selectSupplierTab(supplierId) {
+  currentSupplierId = supplierId;
+  renderSupplierTabs();
+  refreshCurrentTab();
+}
+
+function resolveSupplierId() {
+  return currentSupplierId;
 }
 
 function renderSupplierResolution() {
-  const mySuppliers = getMySuppliers();
   const wrap = document.getElementById('rep-supplier-info');
-  if (mySuppliers.length === 0) {
+  const supplier = suppliersCache.find(s => s.id === currentSupplierId);
+  if (!supplier) {
     wrap.innerHTML = `<div class="supplier-warning">Este representante não está associado a nenhum fornecedor — fale com o administrador antes de enviar lances.</div>`;
-  } else if (mySuppliers.length === 1) {
-    wrap.innerHTML = `<div class="supplier-info-line">Enviando lances como <strong>${escapeHtml(mySuppliers[0].name)}</strong></div>`;
   } else {
-    wrap.innerHTML = `
-      <div style="max-width:260px; margin-bottom:12px">
-        <label>Fornecedor</label>
-        <select id="global-bid-supplier" onchange="loadItemsForCurrentQuotation()">${mySuppliers.map(s => `<option value="${s.id}">${escapeHtml(s.name)}</option>`).join('')}</select>
-      </div>`;
+    wrap.innerHTML = `<div class="supplier-info-line">Enviando lances como <strong>${escapeHtml(supplier.name)}</strong></div>`;
   }
 }
 
@@ -905,9 +1144,6 @@ async function loadItemsForCurrentQuotation() {
     `;
     wrap.appendChild(row);
   });
-
-  const firstExisting = rows.find(r => r.existingBid);
-  document.getElementById('global-bid-deadline').value = firstExisting ? firstExisting.existingBid.deliveryDeadlineDays : '';
 }
 
 // Abre a cotação em tela cheia, pronta pra digitar — some com a tab bar (foco total
@@ -920,7 +1156,7 @@ async function openItemsView(id) {
 
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
   document.getElementById('view-entry').classList.add('active');
-  document.getElementById('tab-bar').style.display = 'none';
+  hideBottomChrome();
 
   const btn = document.querySelector('#sticky-submit-bar button');
   btn.textContent = 'Salvar Cotação';
@@ -935,11 +1171,9 @@ async function openItemsView(id) {
 // preenchido uma vez, aplicados a todo item que tiver preço digitado.
 async function submitAllBids() {
   const supplierId = resolveSupplierId();
-  const deadline = document.getElementById('global-bid-deadline').value;
   const submittedById = document.getElementById('who-representative').value;
 
   if (!supplierId) { toast('Não foi possível identificar o fornecedor deste representante.', true); return; }
-  if (!deadline) { toast('Informe o prazo de entrega.', true); return; }
 
   const priceInputs = document.querySelectorAll('[id^="bid-price-"]');
   const toSubmit = [];
@@ -957,7 +1191,6 @@ async function submitAllBids() {
     supplierId,
     submittedById: parseInt(submittedById),
     value,
-    deliveryDeadlineDays: parseInt(deadline),
     notes: null
   }));
 
@@ -975,7 +1208,7 @@ function closeItemsView(reopenTab) {
   clearInterval(deadlineCountdownInterval);
   if (reopenTab !== false) {
     document.getElementById('view-entry').classList.remove('active');
-    document.getElementById('tab-bar').style.display = 'flex';
+    showBottomChrome();
     document.getElementById('view-' + currentTab).classList.add('active');
   }
 }

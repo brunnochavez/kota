@@ -18,6 +18,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
 import com.bruno.kota.dtos.AddItemWithWinnerRequest;
+import com.bruno.kota.dtos.AdminInsights;
 import com.bruno.kota.dtos.ConfirmCloseRequest;
 import com.bruno.kota.dtos.ManualWinnerAssignRequest;
 import com.bruno.kota.dtos.QuotationCloseRequest;
@@ -29,6 +30,7 @@ import com.bruno.kota.dtos.QuotationItemResponse;
 import com.bruno.kota.dtos.QuotationItemUpdateRequest;
 import com.bruno.kota.dtos.QuotationResponse;
 import com.bruno.kota.dtos.QuotationUpdateRequest;
+import com.bruno.kota.dtos.RepresentativePerformance;
 import com.bruno.kota.dtos.QuotationFillRate;
 import com.bruno.kota.dtos.ReviewBatchUpdateRequest;
 import com.bruno.kota.dtos.WonQuotationSummary;
@@ -68,6 +70,16 @@ public class QuotationController {
     @GetMapping("/pending-fulfillment")
     public List<WonQuotationSummary> findPendingFulfillmentResults(@RequestParam Long supplierId) {
         return quotationService.findPendingFulfillmentResults(supplierId);
+    }
+
+    @GetMapping("/performance")
+    public RepresentativePerformance getRepresentativePerformance(@RequestParam Long supplierId) {
+        return quotationService.getRepresentativePerformance(supplierId);
+    }
+
+    @GetMapping("/admin-insights")
+    public AdminInsights getAdminInsights() {
+        return quotationService.getAdminInsights();
     }
 
     @PostMapping("/{id}/items/{itemId}/cut")

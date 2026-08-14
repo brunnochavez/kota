@@ -19,8 +19,6 @@ public record BidRequest(
         @Positive(message = "Valor deve ser maior que zero")
         BigDecimal value,
 
-        @NotNull(message = "Prazo de entrega é obrigatório")
-        @Positive(message = "Prazo de entrega deve ser maior que zero")
         Integer deliveryDeadlineDays,
 
         String notes

@@ -60,4 +60,19 @@ public class ProductController {
     public List<ProductResponse> findAllInactive() {
         return productService.findAllInactive();
     }
+
+    @GetMapping("/by-group/{groupId}")
+    public List<ProductResponse> findByGroup(@PathVariable Long groupId) {
+        return productService.findByGroupId(groupId);
+    }
+
+    @PostMapping("/{id}/groups/{groupId}")
+    public ProductResponse addToGroup(@PathVariable Long id, @PathVariable Long groupId) {
+        return productService.addToGroup(id, groupId);
+    }
+
+    @DeleteMapping("/{id}/groups/{groupId}")
+    public ProductResponse removeFromGroup(@PathVariable Long id, @PathVariable Long groupId) {
+        return productService.removeFromGroup(id, groupId);
+    }
 }
