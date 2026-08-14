@@ -18,7 +18,6 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
 import com.bruno.kota.dtos.AddItemWithWinnerRequest;
-import com.bruno.kota.dtos.AdminInsights;
 import com.bruno.kota.dtos.ConfirmCloseRequest;
 import com.bruno.kota.dtos.ManualWinnerAssignRequest;
 import com.bruno.kota.dtos.QuotationCloseRequest;
@@ -75,11 +74,6 @@ public class QuotationController {
     @GetMapping("/performance")
     public RepresentativePerformance getRepresentativePerformance(@RequestParam Long supplierId) {
         return quotationService.getRepresentativePerformance(supplierId);
-    }
-
-    @GetMapping("/admin-insights")
-    public AdminInsights getAdminInsights() {
-        return quotationService.getAdminInsights();
     }
 
     @PostMapping("/{id}/items/{itemId}/cut")

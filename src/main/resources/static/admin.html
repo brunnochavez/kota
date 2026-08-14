@@ -75,15 +75,6 @@
   .kpi-label { font-size: 12px; color: var(--text-dim); margin-top: 4px; }
   .dash-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-bottom: 18px; align-items: start; }
   @media (max-width: 900px) { .dash-grid { grid-template-columns: 1fr; } }
-  .dash-zone-title { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-faint); margin: 30px 0 12px; }
-  .insight-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--surface-2); font-size: 13px; }
-  .insight-row:last-child { border-bottom: none; }
-  .insight-row-main { flex: 1; min-width: 0; }
-  .insight-row-sub { font-size: 11.5px; color: var(--text-dim); margin-top: 1px; }
-  .insight-badge { font-size: 11.5px; font-weight: 700; padding: 3px 9px; border-radius: 20px; flex-shrink: 0; white-space: nowrap; }
-  .insight-badge.success { background: var(--success-bg); color: var(--success); }
-  .insight-badge.warning { background: var(--warning-bg); color: var(--warning); }
-  .insight-badge.danger { background: var(--danger-bg); color: var(--danger); }
   .fill-rate-track {
     width: 100%; height: 10px; border-radius: 999px; background: var(--surface-3); overflow: hidden;
   }
@@ -113,6 +104,8 @@
   }
   .nav-item:hover { color: var(--text); background: var(--surface-2); }
   .nav-item.active { color: var(--accent); background: var(--accent-soft); border-left-color: var(--accent); }
+  .nav-item.nav-sub { padding-left: 40px; font-size: 12.5px; }
+  .nav-item.nav-sub .nav-icon { width: 15px; height: 15px; }
   .nav-icon { width: 17px; height: 17px; flex-shrink: 0; opacity: 0.85; }
   .nav-item.active .nav-icon { opacity: 1; }
   .nav-icon svg { width: 100%; height: 100%; }
@@ -269,7 +262,7 @@
     Dashboard
   </div>
 
-  <div class="nav-group-label">Gerenciar Cotações</div>
+  <div class="nav-group-label">Cotações</div>
   <div class="nav-item" data-section="quotation-start">
     <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 5v14M5 12h14"/></svg></span>
     Iniciar uma Cotação
@@ -279,26 +272,30 @@
     Cotações
   </div>
 
-  <div class="nav-group-label">Cadastros</div>
+  <div class="nav-group-label">Produtos</div>
   <div class="nav-item" data-section="products">
     <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M20 7L12 3 4 7v10l8 4 8-4V7z"/><path d="M4 7l8 4 8-4M12 11v10"/></svg></span>
     Produtos
   </div>
+  <div class="nav-item nav-sub" data-section="product-groups">
+    <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg></span>
+    Grupos de Produtos
+  </div>
+
+  <div class="nav-group-label">Representantes</div>
   <div class="nav-item" data-section="representatives">
     <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-8 8-8s8 3.6 8 8"/></svg></span>
     Representantes
   </div>
+
+  <div class="nav-group-label">Fornecedores</div>
   <div class="nav-item" data-section="suppliers">
     <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="7" width="18" height="14" rx="1.5"/><path d="M8 7V5a2 2 0 012-2h4a2 2 0 012 2v2"/></svg></span>
     Fornecedores
   </div>
-  <div class="nav-item" data-section="groups">
+  <div class="nav-item nav-sub" data-section="groups">
     <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="8" cy="9" r="3"/><circle cx="17" cy="9" r="3"/><path d="M2 20c0-3.3 2.7-6 6-6s6 2.7 6 6M12 20c0-3.3 2.7-6 6-6"/></svg></span>
-    Grupos
-  </div>
-  <div class="nav-item" data-section="product-groups">
-    <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg></span>
-    Grupos de Produtos
+    Grupos de Fornecedores
   </div>
 </nav>
 
@@ -329,72 +326,24 @@
       </div>
     </div>
 
-    <!-- Zona 1: o que precisa de ação agora — fica no topo de propósito -->
-    <div class="dash-zone-title">Precisa de atenção</div>
-    <div class="dash-grid">
-      <div class="card">
-        <h2>Expirando nos próximos 3 dias</h2>
-        <div id="dash-expiring"></div>
-      </div>
-      <div class="card">
-        <h2>Fornecedores que ainda não responderam</h2>
-        <div id="dash-pending-responses"></div>
-      </div>
-    </div>
-
-    <!-- Zona 2: indicadores — histórico, pra entender o processo, não pra agir hoje -->
-    <div class="dash-zone-title">Indicadores de compras</div>
-    <div class="kpi-grid">
-      <div class="kpi-card secondary">
-        <div class="kpi-value" id="kpi-savings">—</div>
-        <div class="kpi-label">Economia total (cotações fechadas)</div>
-      </div>
-      <div class="kpi-card secondary">
-        <div class="kpi-value" id="kpi-cycle">—</div>
-        <div class="kpi-label">Ciclo médio (publicar → fechar)</div>
-      </div>
-    </div>
-    <div class="dash-grid">
-      <div class="card">
-        <h2>Confiabilidade por fornecedor</h2>
-        <div class="subtitle" style="margin-bottom:10px">% de itens ganhos confirmados sem corte de estoque — pior primeiro.</div>
-        <div id="dash-reliability"></div>
-      </div>
-      <div class="card">
-        <h2>Concentração de fornecedor</h2>
-        <div class="subtitle" style="margin-bottom:10px">Fatia do valor total fechado, por fornecedor.</div>
-        <div id="dash-concentration"></div>
-      </div>
-    </div>
-    <div class="dash-grid">
-      <div class="card">
-        <h2>Produtos com baixa concorrência</h2>
-        <div class="subtitle" style="margin-bottom:10px">Só um fornecedor deu lance — preço nunca foi testado contra ninguém.</div>
-        <div id="dash-low-competition"></div>
-      </div>
-      <div class="card">
-        <h2>Maiores economias</h2>
-        <div class="subtitle" style="margin-bottom:10px">Cotações onde a concorrência entre fornecedores mais valeu a pena.</div>
-        <div id="dash-savings-list"></div>
-      </div>
-    </div>
-
-    <!-- Zona 3: panorama — visão ampla, menos urgente que as duas de cima -->
-    <div class="dash-zone-title">Panorama</div>
     <div class="dash-grid">
       <div class="card">
         <h2>Distribuição por status</h2>
         <div id="dash-chart"></div>
       </div>
       <div class="card">
-        <h2>Cotações recentes</h2>
-        <table><thead><tr><th>ID</th><th>Nome</th><th>Status</th></tr></thead>
-          <tbody id="dash-recent-tbody"></tbody></table>
+        <h2>Expirando nos próximos 3 dias</h2>
+        <div id="dash-expiring"></div>
       </div>
     </div>
 
-    <div class="dash-zone-title">Cadastros</div>
-    <div class="kpi-grid">
+    <div class="card">
+      <h2>Cotações recentes</h2>
+      <table><thead><tr><th>ID</th><th>Nome</th><th>Status</th></tr></thead>
+        <tbody id="dash-recent-tbody"></tbody></table>
+    </div>
+
+    <div class="kpi-grid" style="margin-top:18px">
       <div class="kpi-card secondary">
         <div class="kpi-value" id="kpi-products">—</div>
         <div class="kpi-label">Produtos cadastrados</div>
@@ -889,14 +838,13 @@ function goToQuotationsFiltered(status) {
 // DASHBOARD
 // ============================================================
 async function loadDashboard() {
-  const [quotations, products, reps, suppliers, groups, fillRates, insights] = await Promise.all([
+  const [quotations, products, reps, suppliers, groups, fillRates] = await Promise.all([
     safeCall(() => api('GET', '/quotations')),
     safeCall(() => api('GET', '/products')),
     safeCall(() => api('GET', '/representatives')),
     safeCall(() => api('GET', '/suppliers')),
     safeCall(() => api('GET', '/supplier-groups')),
-    safeCall(() => api('GET', '/quotations/representative-fill-rate')),
-    safeCall(() => api('GET', '/quotations/admin-insights'))
+    safeCall(() => api('GET', '/quotations/representative-fill-rate'))
   ]);
 
   quotationsCache = quotations;
@@ -917,76 +865,6 @@ async function loadDashboard() {
   renderDashboardChart(counts);
   renderRecentQuotations(quotations);
   renderExpiringSoon(quotations);
-  renderAdminInsights(insights);
-}
-
-// Cada lista aqui é populada por um pedaço diferente de getAdminInsights() — ver o
-// comentário no service pra entender de onde cada número vem. Tudo já calculado no
-// backend; aqui é só formatação e cor por faixa.
-function renderAdminInsights(insights) {
-  document.getElementById('kpi-savings').textContent = 'R$ ' + formatCurrencyFromNumber(insights.totalSavings);
-  document.getElementById('kpi-cycle').textContent = insights.averageCycleDays != null
-    ? insights.averageCycleDays.toFixed(1) + ' dias'
-    : '—';
-
-  // Pendentes de resposta — agrupado por cotação, com atalho direto pro detalhe.
-  const pendingEl = document.getElementById('dash-pending-responses');
-  pendingEl.innerHTML = insights.pendingResponses.length
-    ? insights.pendingResponses.map(p => `
-        <div class="expiring-item" style="cursor:pointer; align-items:flex-start" onclick="abrirDetalheCotacao(${p.quotationId})">
-          <div>
-            <div style="font-weight:600">${escapeHtml(p.quotationName)}</div>
-            <div class="insight-row-sub">${p.pendingSupplierNames.map(escapeHtml).join(', ')}</div>
-          </div>
-          <span class="insight-badge warning">${p.pendingSupplierNames.length} falta${p.pendingSupplierNames.length > 1 ? 'm' : ''}</span>
-        </div>`).join('')
-    : '<div class="empty">Todo mundo que podia responder já respondeu.</div>';
-
-  // Confiabilidade — pior primeiro (já vem ordenado assim do backend), cor por faixa.
-  const reliabilityEl = document.getElementById('dash-reliability');
-  reliabilityEl.innerHTML = insights.reliabilityRanking.length
-    ? insights.reliabilityRanking.map(r => {
-        const level = r.reliabilityPercent >= 90 ? 'success' : r.reliabilityPercent >= 70 ? 'warning' : 'danger';
-        return `<div class="insight-row">
-          <div class="insight-row-main">${escapeHtml(r.supplierName)}
-            <div class="insight-row-sub">${r.wonItemsConfirmed} de ${r.wonItemsTotal} itens ganhos confirmados</div>
-          </div>
-          <span class="insight-badge ${level}">${Math.round(r.reliabilityPercent)}%</span>
-        </div>`;
-      }).join('')
-    : '<div class="empty">Sem itens ganhos suficientes ainda.</div>';
-
-  // Concentração — sem badge de cor (não é bom/ruim binário), só a fatia mesmo.
-  const concentrationEl = document.getElementById('dash-concentration');
-  concentrationEl.innerHTML = insights.supplierConcentration.length
-    ? insights.supplierConcentration.map(c => `
-        <div class="insight-row">
-          <div class="insight-row-main">${escapeHtml(c.supplierName)}
-            <div class="insight-row-sub">R$ ${formatCurrencyFromNumber(c.totalValue)}</div>
-          </div>
-          <span class="insight-badge ${c.sharePercent >= 50 ? 'warning' : 'success'}">${c.sharePercent.toFixed(1)}%</span>
-        </div>`).join('')
-    : '<div class="empty">Sem cotações fechadas ainda.</div>';
-
-  const lowCompEl = document.getElementById('dash-low-competition');
-  lowCompEl.innerHTML = insights.lowCompetitionItems.length
-    ? insights.lowCompetitionItems.map(i => `
-        <div class="insight-row">
-          <div class="insight-row-main">${escapeHtml(i.productName)}
-            <div class="insight-row-sub">${escapeHtml(i.quotationName)}</div>
-          </div>
-          <span class="insight-badge warning">só ${escapeHtml(i.onlySupplierName)}</span>
-        </div>`).join('')
-    : '<div class="empty">Todo item fechado teve pelo menos dois fornecedores concorrendo.</div>';
-
-  const savingsListEl = document.getElementById('dash-savings-list');
-  savingsListEl.innerHTML = insights.topSavingsQuotations.length
-    ? insights.topSavingsQuotations.map(s => `
-        <div class="insight-row" style="cursor:pointer" onclick="abrirDetalheCotacao(${s.quotationId})">
-          <div class="insight-row-main">${escapeHtml(s.quotationName)}</div>
-          <span class="insight-badge success">R$ ${formatCurrencyFromNumber(s.saving)}</span>
-        </div>`).join('')
-    : '<div class="empty">Nenhuma economia identificada ainda.</div>';
 }
 
 function renderDashboardChart(counts) {

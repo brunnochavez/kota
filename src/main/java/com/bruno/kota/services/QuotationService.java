@@ -2,7 +2,6 @@ package com.bruno.kota.services;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -16,7 +15,6 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 import com.bruno.kota.dtos.*;
-import com.bruno.kota.dtos.AdminInsights;
 import com.bruno.kota.dtos.RepresentativePerformance;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -736,124 +734,6 @@ public class QuotationService {
                 wonItemsTotal, wonItemsConfirmed, fulfillmentReliability,
                 eligibleCount, respondedCount, participationRate,
                 byProduct, losses
-        );
-    }
-
-    // Visão do lado do admin, espelhando o espírito de getRepresentativePerformance — só
-    // que agregado entre TODOS os fornecedores, não um só. Economia compara o preço
-    // vencedor com o MAIOR lance recebido pra cada item (o que teria custado sem
-    // concorrência); baixa concorrência e "quem não respondeu" olham só pro que ainda é
-    // acionável agora (Disponível), o resto olha pro histórico (Fechada).
-    @Transactional(readOnly = true)
-    public AdminInsights getAdminInsights() {
-        List<Quotation> closedQuotations = quotationRepository.findByStatus(QuotationStatus.CLOSED);
-
-        BigDecimal totalSavings = BigDecimal.ZERO;
-        List<AdminInsights.QuotationSaving> savingsByQuotation = new ArrayList<>();
-        Map<String, BigDecimal> valueBySupplier = new LinkedHashMap<>();
-        List<AdminInsights.LowCompetitionItem> lowCompetition = new ArrayList<>();
-        Map<String, int[]> reliabilityBySupplier = new LinkedHashMap<>();
-        long totalCycleHours = 0;
-        int cycleCount = 0;
-
-        for (Quotation quotation : closedQuotations) {
-            List<QuotationItem> items = quotationItemRepository.findByQuotationId(quotation.getId());
-            BigDecimal quotationSaving = BigDecimal.ZERO;
-
-            for (QuotationItem item : items) {
-                Bid winner = item.getWinningBid();
-                if (winner == null) {
-                    continue;
-                }
-
-                List<Bid> allBids = bidRepository.findByQuotationItemId(item.getId());
-                BigDecimal maxBid = allBids.stream().map(Bid::getValue).max(Comparator.naturalOrder()).orElse(winner.getValue());
-                BigDecimal itemSaving = maxBid.subtract(winner.getValue()).multiply(item.getQuantity());
-                if (itemSaving.compareTo(BigDecimal.ZERO) > 0) {
-                    quotationSaving = quotationSaving.add(itemSaving);
-                }
-
-                if (allBids.size() == 1) {
-                    lowCompetition.add(new AdminInsights.LowCompetitionItem(
-                            quotation.getName(), item.getProduct().getName(), winner.getSupplier().getName()
-                    ));
-                }
-
-                String supplierName = winner.getSupplier().getName();
-                BigDecimal subtotal = winner.getValue().multiply(item.getQuantity());
-                valueBySupplier.merge(supplierName, subtotal, BigDecimal::add);
-
-                int[] stats = reliabilityBySupplier.computeIfAbsent(supplierName, k -> new int[2]);
-                stats[0]++;
-                if (!item.isFulfillmentCut()) {
-                    stats[1]++;
-                }
-            }
-
-            totalSavings = totalSavings.add(quotationSaving);
-            if (quotationSaving.compareTo(BigDecimal.ZERO) > 0) {
-                savingsByQuotation.add(new AdminInsights.QuotationSaving(quotation.getId(), quotation.getName(), quotationSaving));
-            }
-
-            if (quotation.getPublishedAt() != null && quotation.getUpdatedAt() != null) {
-                totalCycleHours += Duration.between(quotation.getPublishedAt(), quotation.getUpdatedAt()).toHours();
-                cycleCount++;
-            }
-        }
-
-        List<AdminInsights.QuotationSaving> topSavings = savingsByQuotation.stream()
-                .sorted((a, b) -> b.saving().compareTo(a.saving()))
-                .limit(5)
-                .toList();
-
-        BigDecimal totalValue = valueBySupplier.values().stream().reduce(BigDecimal.ZERO, BigDecimal::add);
-        List<AdminInsights.SupplierShare> concentration = valueBySupplier.entrySet().stream()
-                .map(e -> new AdminInsights.SupplierShare(
-                        e.getKey(),
-                        e.getValue(),
-                        totalValue.compareTo(BigDecimal.ZERO) > 0
-                                ? e.getValue().multiply(BigDecimal.valueOf(100)).divide(totalValue, 1, RoundingMode.HALF_UP).doubleValue()
-                                : 0
-                ))
-                .sorted((a, b) -> Double.compare(b.sharePercent(), a.sharePercent()))
-                .limit(5)
-                .toList();
-
-        // Pior primeiro — é o que precisa de atenção, não o que já está bem.
-        List<AdminInsights.SupplierReliabilityRank> reliability = reliabilityBySupplier.entrySet().stream()
-                .map(e -> new AdminInsights.SupplierReliabilityRank(
-                        e.getKey(), e.getValue()[0], e.getValue()[1],
-                        e.getValue()[0] > 0 ? e.getValue()[1] * 100.0 / e.getValue()[0] : 0
-                ))
-                .sorted(Comparator.comparingDouble(AdminInsights.SupplierReliabilityRank::reliabilityPercent))
-                .toList();
-
-        Double averageCycleDays = cycleCount > 0 ? (totalCycleHours / 24.0) / cycleCount : null;
-
-        List<Quotation> available = quotationRepository.findByStatus(QuotationStatus.AVAILABLE);
-        List<AdminInsights.PendingResponse> pending = new ArrayList<>();
-        for (Quotation quotation : available) {
-            SupplierGroup group = quotation.getSupplierGroup();
-            if (group == null) {
-                continue;
-            }
-            List<Supplier> eligible = supplierRepository.findByGroup(group);
-            Set<Long> respondedSupplierIds = bidRepository.findByQuotationItem_QuotationId(quotation.getId()).stream()
-                    .map(b -> b.getSupplier().getId())
-                    .collect(Collectors.toSet());
-            List<String> missing = eligible.stream()
-                    .filter(s -> !respondedSupplierIds.contains(s.getId()))
-                    .map(Supplier::getName)
-                    .toList();
-            if (!missing.isEmpty()) {
-                pending.add(new AdminInsights.PendingResponse(quotation.getId(), quotation.getName(), missing));
-            }
-        }
-
-        return new AdminInsights(
-                totalSavings, topSavings, concentration,
-                lowCompetition.stream().limit(10).toList(),
-                averageCycleDays, reliability, pending
         );
     }
 
