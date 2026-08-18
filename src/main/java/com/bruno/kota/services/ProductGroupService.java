@@ -9,6 +9,7 @@ import com.bruno.kota.exceptions.DuplicateResourceException;
 import com.bruno.kota.exceptions.InactiveResourceException;
 import com.bruno.kota.exceptions.ResourceNotFoundException;
 import com.bruno.kota.repositories.ProductGroupRepository;
+import com.bruno.kota.repositories.ProductRepository;
 
 import lombok.RequiredArgsConstructor;
 
@@ -17,6 +18,7 @@ import lombok.RequiredArgsConstructor;
 public class ProductGroupService {
 
     private final ProductGroupRepository productGroupRepository;
+    private final ProductRepository productRepository;
 
     @Transactional(readOnly = true)
     public List<ProductGroupResponse> findAll() {
@@ -77,6 +79,7 @@ public class ProductGroupService {
     }
 
     private ProductGroupResponse toResponse(ProductGroup group) {
-        return new ProductGroupResponse(group.getId(), group.getName());
+        int productCount = productRepository.findByGroup(group).size();
+        return new ProductGroupResponse(group.getId(), group.getName(), productCount);
     }
 }

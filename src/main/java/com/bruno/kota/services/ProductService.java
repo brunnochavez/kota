@@ -1,5 +1,6 @@
 package com.bruno.kota.services;
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -9,6 +10,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import com.bruno.kota.dtos.AddProductsToGroupResult;
 import com.bruno.kota.dtos.PagedResponse;
 import com.bruno.kota.dtos.ProductRequest;
 import com.bruno.kota.dtos.ProductResponse;
@@ -139,6 +141,33 @@ public class ProductService {
                 .orElseThrow(() -> new ResourceNotFoundException("Grupo não encontrado: id " + groupId));
         product.getGroups().add(group);
         return toResponseWithoutPricing(productRepository.save(product));
+    }
+
+    // Uma transação só pra lista inteira, em vez do front disparar N requisições (uma por
+    // produto marcado) — bem mais rápido, e devolve um resumo em vez de deixar o
+    // navegador tentar juntar N respostas separadas. Um id inválido no meio da lista não
+    // derruba os outros: cai em "failed" e segue pros próximos, a transação só falha de
+    // verdade se o GRUPO em si não existir (aí não tem em qual grupo adicionar nada).
+    @Transactional
+    public AddProductsToGroupResult addManyToGroup(Long groupId, List<Long> productIds) {
+        ProductGroup group = productGroupRepository.findById(groupId)
+                .orElseThrow(() -> new ResourceNotFoundException("Grupo não encontrado: id " + groupId));
+
+        int added = 0;
+        List<Long> failed = new ArrayList<>();
+
+        for (Long productId : productIds) {
+            Product product = productRepository.findById(productId).orElse(null);
+            if (product == null) {
+                failed.add(productId);
+                continue;
+            }
+            product.getGroups().add(group);
+            productRepository.save(product);
+            added++;
+        }
+
+        return new AddProductsToGroupResult(added, failed);
     }
 
     @Transactional

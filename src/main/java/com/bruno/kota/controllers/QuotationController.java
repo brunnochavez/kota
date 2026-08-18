@@ -1,5 +1,7 @@
 package com.bruno.kota.controllers;
 
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 
 import org.springframework.http.HttpStatus;
@@ -28,6 +30,7 @@ import com.bruno.kota.dtos.QuotationItemCreateRequest;
 import com.bruno.kota.dtos.QuotationItemResponse;
 import com.bruno.kota.dtos.QuotationItemUpdateRequest;
 import com.bruno.kota.dtos.QuotationResponse;
+import com.bruno.kota.dtos.QuotationReportRow;
 import com.bruno.kota.dtos.QuotationUpdateRequest;
 import com.bruno.kota.dtos.RepresentativePerformance;
 import com.bruno.kota.dtos.QuotationFillRate;
@@ -74,6 +77,25 @@ public class QuotationController {
     @GetMapping("/performance")
     public RepresentativePerformance getRepresentativePerformance(@RequestParam Long supplierId) {
         return quotationService.getRepresentativePerformance(supplierId);
+    }
+
+    @GetMapping("/report")
+    public List<QuotationReportRow> getQuotationReport(
+            @RequestParam(required = false) String from,
+            @RequestParam(required = false) String to,
+            @RequestParam(required = false) Long supplierId,
+            @RequestParam(required = false) Long representativeId,
+            @RequestParam(required = false) String product,
+            @RequestParam(defaultValue = "true") boolean onlyWinners
+    ) {
+        LocalDateTime fromDt = (from != null && !from.isBlank()) ? LocalDate.parse(from).atStartOfDay() : null;
+        LocalDateTime toDt = (to != null && !to.isBlank()) ? LocalDate.parse(to).atTime(23, 59, 59) : null;
+        return quotationService.getQuotationReport(fromDt, toDt, supplierId, representativeId, product, onlyWinners);
+    }
+
+    @GetMapping("/{id}/my-bids")
+    public List<QuotationReportRow> getMyBidsForQuotation(@PathVariable Long id, @RequestParam Long supplierId) {
+        return quotationService.getMyBidsForQuotation(id, supplierId);
     }
 
     @PostMapping("/{id}/items/{itemId}/cut")
@@ -125,8 +147,10 @@ public class QuotationController {
     }
 
     @GetMapping("/{id}/result-pdf")
-    public ResponseEntity<byte[]> exportResultPdf(@PathVariable Long id) {
-        byte[] pdf = quotationPdfService.generateResultPdf(id);
+    public ResponseEntity<byte[]> exportResultPdf(@PathVariable Long id, @RequestParam(required = false) Long supplierId) {
+        byte[] pdf = supplierId != null
+                ? quotationPdfService.generateSupplierResultPdf(id, supplierId)
+                : quotationPdfService.generateResultPdf(id);
         return ResponseEntity.ok()
                 .contentType(MediaType.APPLICATION_PDF)
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=cotacao-" + id + ".pdf")

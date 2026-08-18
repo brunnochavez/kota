@@ -165,6 +165,101 @@ public class QuotationPdfService {
         }
     }
 
+    // Mesmo desenho do PDF geral, só que filtrado pra UM fornecedor — é o que o
+    // representante baixa do lado dele (não faz sentido ele ver o pedido dos outros
+    // fornecedores). Por já ser um fornecedor só, não tem "total geral" separado — o
+    // total do pedido já É o total geral aqui.
+    public byte[] generateSupplierResultPdf(Long quotationId, Long supplierId) {
+        Quotation quotation = quotationRepository.findById(quotationId)
+                .orElseThrow(() -> new ResourceNotFoundException("Cotação não encontrada: id " + quotationId));
+
+        if (quotation.getStatus() != QuotationStatus.CLOSED) {
+            throw new BusinessRuleException("Só é possível exportar o resultado de uma cotação já fechada.");
+        }
+
+        DecimalFormat moneyFormat = new DecimalFormat("#,##0.00", DecimalFormatSymbols.getInstance(PT_BR));
+        DecimalFormat qtyFormat = new DecimalFormat("#,##0.###", DecimalFormatSymbols.getInstance(PT_BR));
+
+        List<QuotationItem> items = quotationItemRepository.findByQuotationId(quotationId);
+        List<QuotationItem> supplierItems = new ArrayList<>();
+        Supplier supplier = null;
+
+        for (QuotationItem item : items) {
+            Bid winner = item.getWinningBid();
+            if (winner == null || !winner.getSupplier().getId().equals(supplierId) || item.isFulfillmentCut()) {
+                continue;
+            }
+            supplier = winner.getSupplier();
+            supplierItems.add(item);
+        }
+
+        if (supplier == null) {
+            throw new BusinessRuleException("Nenhum item ganho por esse fornecedor nesta cotação.");
+        }
+
+        try {
+            ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+            Document document = new Document();
+            PdfWriter.getInstance(document, outputStream);
+            document.open();
+
+            Font titleFont = new Font(Font.HELVETICA, 17, Font.BOLD);
+            Font subtitleFont = new Font(Font.HELVETICA, 9.5f, Font.NORMAL, Color.GRAY);
+            Font supplierFont = new Font(Font.HELVETICA, 13, Font.BOLD);
+            Font headerFont = new Font(Font.HELVETICA, 9, Font.BOLD);
+            Font cellFont = new Font(Font.HELVETICA, 10, Font.NORMAL);
+            Font totalFont = new Font(Font.HELVETICA, 11, Font.BOLD);
+
+            document.add(new Paragraph("Pedido — Cotação #" + quotation.getId() + " — " + quotation.getName(), titleFont));
+            Paragraph subtitle = new Paragraph("Gerado em " + LocalDateTime.now().format(DATE_FORMAT), subtitleFont);
+            subtitle.setSpacingAfter(14);
+            document.add(subtitle);
+
+            Paragraph supplierHeading = new Paragraph("Fornecedor: " + supplier.getName(), supplierFont);
+            supplierHeading.setSpacingAfter(6);
+            document.add(supplierHeading);
+
+            PdfPTable table = new PdfPTable(5);
+            table.setWidthPercentage(100);
+            table.setWidths(new float[]{2.3f, 4f, 1.3f, 1.9f, 1.9f});
+
+            addHeaderCell(table, "Código de Barras", headerFont, Element.ALIGN_LEFT);
+            addHeaderCell(table, "Descrição", headerFont, Element.ALIGN_LEFT);
+            addHeaderCell(table, "Qtd.", headerFont, Element.ALIGN_RIGHT);
+            addHeaderCell(table, "Preço Unit. (R$)", headerFont, Element.ALIGN_RIGHT);
+            addHeaderCell(table, "Subtotal (R$)", headerFont, Element.ALIGN_RIGHT);
+
+            BigDecimal supplierTotal = BigDecimal.ZERO;
+            boolean stripe = false;
+
+            for (QuotationItem item : supplierItems) {
+                Bid winner = item.getWinningBid();
+                BigDecimal subtotal = winner.getValue().multiply(item.getQuantity());
+                supplierTotal = supplierTotal.add(subtotal);
+
+                Color rowColor = stripe ? STRIPE_BG : Color.WHITE;
+                addCell(table, item.getProduct().getBarcode(), cellFont, Element.ALIGN_LEFT, rowColor);
+                addCell(table, item.getProduct().getName(), cellFont, Element.ALIGN_LEFT, rowColor);
+                addCell(table, qtyFormat.format(item.getQuantity()), cellFont, Element.ALIGN_RIGHT, rowColor);
+                addCell(table, moneyFormat.format(winner.getValue()), cellFont, Element.ALIGN_RIGHT, rowColor);
+                addCell(table, moneyFormat.format(subtotal), cellFont, Element.ALIGN_RIGHT, rowColor);
+                stripe = !stripe;
+            }
+
+            document.add(table);
+
+            Paragraph totalParagraph = new Paragraph("Total do pedido: R$ " + moneyFormat.format(supplierTotal), totalFont);
+            totalParagraph.setAlignment(Element.ALIGN_RIGHT);
+            totalParagraph.setSpacingBefore(4);
+            document.add(totalParagraph);
+
+            document.close();
+            return outputStream.toByteArray();
+        } catch (DocumentException e) {
+            throw new BusinessRuleException("Erro ao gerar o PDF: " + e.getMessage());
+        }
+    }
+
     private void addHeaderCell(PdfPTable table, String text, Font font, int align) {
         PdfPCell cell = new PdfPCell(new Phrase(text, font));
         cell.setPadding(6);

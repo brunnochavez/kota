@@ -36,7 +36,11 @@
 
   header { background: var(--surface); border-bottom: 1px solid var(--border); padding: 12px 16px; position: sticky; top: 0; z-index: 30; }
   header .row { display: flex; align-items: center; justify-content: space-between; max-width: 640px; margin: 0 auto; gap: 10px; }
-  .brand { font-weight: 700; font-size: 15.5px; white-space: nowrap; flex-shrink: 0; }
+  .brand {
+    font-weight: 700; font-size: 15.5px; white-space: nowrap; flex-shrink: 0;
+    display: flex; align-items: center; gap: 6px; background: none; border: none; color: var(--text); cursor: pointer; padding: 4px 2px; font-family: var(--sans);
+  }
+  .brand svg { width: 19px; height: 19px; flex-shrink: 0; }
   .whoami { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; justify-content: flex-end; }
   .whoami select { max-width: 140px; width: auto; font-size: 12.5px; padding: 6px 8px; }
   .theme-switch {
@@ -191,6 +195,17 @@
   .item-row-qty { font-size: 11.5px; color: var(--text-dim); white-space: nowrap; flex-shrink: 0; }
   .item-row-price { width: 100px; flex-shrink: 0; padding: 7px 9px; font-size: 13px; margin: 0; margin-left: auto; }
   .mono { font-family: var(--mono); }
+  .export-choice-overlay {
+    position: fixed; inset: 0; background: rgba(15,23,42,0.5); z-index: 998;
+    display: flex; align-items: flex-end; justify-content: center;
+  }
+  .export-choice-card {
+    background: var(--surface); border-radius: 18px 18px 0 0; padding: 22px 20px calc(22px + env(safe-area-inset-bottom));
+    width: 100%; max-width: 480px;
+  }
+  .export-choice-card h3 { margin: 0 0 4px; font-size: 16px; }
+  .export-choice-card .won-action-btn { width: 100%; margin-bottom: 8px; padding: 12px; font-size: 13.5px; }
+
   .empty {
     display: flex; flex-direction: column; align-items: center; gap: 10px;
     color: var(--text-faint); text-align: center; padding: 34px 20px; font-size: 13px;
@@ -218,6 +233,14 @@
   .won-card-chevron { width: 18px; height: 18px; color: var(--text-faint); transition: transform 0.2s; flex-shrink: 0; }
   .won-card-chevron.open { transform: rotate(180deg); }
   .won-card-items { padding: 0 16px 16px; }
+  .won-card-actions { display: flex; gap: 8px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--surface-2); }
+  .won-action-btn {
+    flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px;
+    padding: 9px; border-radius: 10px; border: 1px solid var(--border); background: var(--surface-2);
+    color: var(--text); font-size: 12px; font-weight: 600; cursor: pointer; font-family: var(--sans);
+  }
+  .won-action-btn svg { width: 16px; height: 16px; flex-shrink: 0; }
+  .won-action-btn:hover { border-color: var(--accent); }
   .won-item-row { display: flex; justify-content: space-between; gap: 10px; font-size: 12.5px; padding: 8px 0; border-top: 1px solid var(--surface-2); }
   .won-item-name { flex: 1; min-width: 0; }
   .won-item-name .barcode { display: block; font-family: var(--mono); font-size: 10.5px; color: var(--text-faint); }
@@ -250,7 +273,10 @@
 
 <header>
   <div class="row">
-    <div class="brand">kota</div>
+    <button class="brand" onclick="goHome()" title="Página inicial">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 11l9-8 9 8"/><path d="M5 10v10a1 1 0 001 1h4v-6h4v6h4a1 1 0 001-1V10"/></svg>
+      kota
+    </button>
     <div class="whoami">
       <select id="who-representative" onchange="onRepresentativeChange()"></select>
       <div class="theme-switch">
@@ -463,6 +489,8 @@ const CHEVRON_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
 const TROPHY_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M8 21h8M12 17v4M7 4h10v4a5 5 0 01-10 0V4z"/><path d="M7 5H4a1 1 0 00-1 1 5 5 0 004 4.9M17 5h3a1 1 0 011 1 5 5 0 01-4 4.9"/></svg>';
 const CHECK_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 12l4 4L19 7"/></svg>';
 const COPY_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a1 1 0 01-1-1V4a1 1 0 011-1h10a1 1 0 011 1v1"/></svg>';
+const PDF_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/><path d="M9 15h1.5a1.5 1.5 0 000-3H9v5M13 12v5h1a2 2 0 002-2v-1a2 2 0 00-2-2h-1z"/></svg>';
+const WHATSAPP_ICON = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.75.46 3.45 1.32 4.95L2 22l5.29-1.39a9.9 9.9 0 004.75 1.21h.01c5.46 0 9.91-4.45 9.91-9.91 0-2.65-1.03-5.14-2.9-7.01A9.82 9.82 0 0012.04 2m0 1.67c2.2 0 4.27.86 5.82 2.42a8.2 8.2 0 012.42 5.82c0 4.54-3.7 8.24-8.25 8.24a8.2 8.2 0 01-4.19-1.15l-.3-.18-3.14.82.84-3.06-.2-.31a8.18 8.18 0 01-1.26-4.38c0-4.55 3.7-8.22 8.26-8.22M8.53 6.87c-.16 0-.43.06-.65.31s-.86.83-.86 2.03.88 2.36 1 2.52 1.75 2.8 4.3 3.82c2.13.85 2.56.68 3.03.64s1.5-.61 1.71-1.2.21-1.09.15-1.2-.24-.17-.5-.3-1.5-.74-1.74-.82-.4-.13-.58.13-.68.82-.83 1-.31.2-.57.07a7.2 7.2 0 01-2.13-1.31 8.02 8.02 0 01-1.47-1.84c-.16-.27 0-.4.12-.55s.27-.31.4-.47.18-.27.27-.44.05-.34 0-.48-.58-1.44-.81-1.96-.44-.45-.6-.46h-.24"/></svg>';
 
 // navigator.clipboard só funciona em contexto seguro (HTTPS ou localhost) — acessando
 // pelo IP da rede local em HTTP (como no celular), essa API fica indisponível sem nem
@@ -478,16 +506,20 @@ function copyBarcode(buttonEl, barcode) {
       buttonEl.classList.remove('copied');
     }, 1500);
   };
-  const onFailure = () => toast('Não foi possível copiar.', true);
+  copyTextToClipboard(barcode, onSuccess, () => toast('Não foi possível copiar.', true));
+}
 
+// Helper genérico — copyBarcode usava essa mesma lógica só pra código de barras; agora
+// serve pra qualquer texto (ex: o resumo formatado pro WhatsApp em "Ganhei").
+function copyTextToClipboard(text, onSuccess, onFailure) {
   if (window.isSecureContext && navigator.clipboard && navigator.clipboard.writeText) {
-    navigator.clipboard.writeText(barcode).then(onSuccess).catch(() => copyBarcodeFallback(barcode, onSuccess, onFailure));
+    navigator.clipboard.writeText(text).then(onSuccess).catch(() => copyTextFallback(text, onSuccess, onFailure));
   } else {
-    copyBarcodeFallback(barcode, onSuccess, onFailure);
+    copyTextFallback(text, onSuccess, onFailure);
   }
 }
 
-function copyBarcodeFallback(text, onSuccess, onFailure) {
+function copyTextFallback(text, onSuccess, onFailure) {
   const el = document.createElement('textarea');
   el.value = text;
   el.style.position = 'fixed';
@@ -518,10 +550,21 @@ async function init() {
 
   renderGreeting();
   renderSupplierTabs();
-  await loadQuotations();
-  await loadPendingFulfillmentResults();
 
-  openQuotationFromLink();
+  // Link direto de WhatsApp (?cotacao=) tem prioridade sobre qualquer aba lembrada — se
+  // vier um, ignora o que estava salvo e abre a cotação. Senão, restaura de onde a
+  // página foi atualizada, em vez de sempre voltar pra Disponíveis.
+  const params = new URLSearchParams(window.location.search);
+  const savedTab = localStorage.getItem('kota-rep-tab');
+  const validTabs = ['available', 'history', 'won', 'performance'];
+
+  if (!params.get('cotacao') && savedTab && validTabs.includes(savedTab) && savedTab !== 'available') {
+    switchTab(savedTab);
+  } else {
+    await loadQuotations();
+    await loadPendingFulfillmentResults();
+    openQuotationFromLink();
+  }
 }
 
 const SUN_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="4.5"/><path d="M12 2.5v2.5M12 19v2.5M4.2 4.2l1.8 1.8M18 18l1.8 1.8M2.5 12H5M19 12h2.5M4.2 19.8L6 18M18 6l1.8-1.8"/></svg>';
@@ -746,10 +789,49 @@ async function cutFulfillmentItem(itemId) {
   }
 }
 
-async function finalizeCurrentFulfillment() {
-  if (!confirm('Finalizar esse pedido? Depois disso não dá mais pra cortar itens, e ele passa a aparecer em "Ganhei".')) return;
-  await safeCall(() => api('POST', `/quotations/${currentFulfillmentQuotationId}/finalize-fulfillment?supplierId=${currentFulfillmentSupplierId}`));
+function finalizeCurrentFulfillment() {
+  const overlay = document.createElement('div');
+  overlay.className = 'export-choice-overlay';
+  overlay.id = 'export-choice-overlay';
+  overlay.onclick = (e) => { if (e.target === overlay) closeExportChoiceOverlay(); };
+  overlay.innerHTML = `
+    <div class="export-choice-card">
+      <h3>Finalizar pedido</h3>
+      <div class="subtitle" style="margin-bottom:16px">Depois disso não dá mais pra cortar itens. Quer levar uma cópia do pedido?</div>
+      <button class="won-action-btn" onclick="finalizeWithExport('pdf')">${PDF_ICON} Baixar PDF e finalizar</button>
+      <button class="won-action-btn" onclick="finalizeWithExport('whatsapp')">${WHATSAPP_ICON} Compartilhar no WhatsApp e finalizar</button>
+      <button class="secondary" style="width:100%; margin-bottom:8px" onclick="finalizeWithExport(null)">Só finalizar</button>
+      <button class="secondary" style="width:100%" onclick="closeExportChoiceOverlay()">Cancelar</button>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+}
+
+function closeExportChoiceOverlay() {
+  const el = document.getElementById('export-choice-overlay');
+  if (el) el.remove();
+}
+
+// Finaliza primeiro, exporta depois — assim o PDF/texto gerado já reflete um pedido de
+// verdade confirmado, não um rascunho que ainda podia ser cancelado no meio do caminho.
+async function finalizeWithExport(exportType) {
+  closeExportChoiceOverlay();
+  const quotationId = currentFulfillmentQuotationId;
+  const supplierId = currentFulfillmentSupplierId;
+
+  await safeCall(() => api('POST', `/quotations/${quotationId}/finalize-fulfillment?supplierId=${supplierId}`));
   toast('Pedido finalizado.');
+
+  if (exportType === 'pdf') {
+    window.open(`/quotations/${quotationId}/result-pdf?supplierId=${supplierId}`, '_blank');
+  } else if (exportType === 'whatsapp') {
+    const won = await safeCall(() => api('GET', `/quotations/won?supplierId=${supplierId}`));
+    const q = won.find(w => w.quotationId === quotationId);
+    if (q) {
+      window.open(`https://wa.me/?text=${encodeURIComponent(buildWonWhatsAppText(q))}`, '_blank');
+    }
+  }
+
   closeFulfillmentView();
   loadPendingFulfillmentResults();
 }
@@ -779,8 +861,19 @@ function showBottomChrome() {
   renderSupplierTabs();
 }
 
+// Fecha qualquer tela cheia que esteja aberta (lançamento ou revisão de resultado) antes
+// de voltar — switchTab já cuida da view-entry sozinho, mas view-fulfillment precisa
+// dessa limpeza explícita (barra fixa, ids do fornecedor/cotação em edição).
+function goHome() {
+  if (document.getElementById('view-fulfillment').classList.contains('active')) {
+    closeFulfillmentView();
+  }
+  switchTab('available');
+}
+
 function switchTab(tab) {
   currentTab = tab;
+  localStorage.setItem('kota-rep-tab', tab);
   closeItemsView(false);
   document.querySelectorAll('.tab-bar button').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
@@ -849,30 +942,75 @@ async function loadQuotations() {
 }
 
 // ---------- aba: anteriores ----------
+let historyCache = [];
+
 async function loadHistory() {
   const all = await safeCall(() => api('GET', '/quotations'));
   const history = all
     .filter(q => q.status === 'CLOSED' || q.status === 'EXPIRED')
     .sort((a, b) => new Date(b.updatedAt || b.createdAt) - new Date(a.updatedAt || a.createdAt));
 
+  historyCache = history;
   const list = document.getElementById('history-list');
   list.innerHTML = '';
   document.getElementById('history-list-empty').style.display = history.length ? 'none' : 'block';
-  history.forEach(q => {
+  history.forEach((q, idx) => {
     const div = document.createElement('div');
-    div.className = 'quote-item';
-    div.style.cursor = 'default';
+    div.className = 'card won-card';
     div.innerHTML = `
-      <div class="quote-item-icon muted">${QUOTE_ICON}</div>
-      <div class="quote-item-main">
-        <div class="quote-item-name">${escapeHtml(q.name)}</div>
-        <div class="quote-item-meta">${q.supplierGroupName || 'sem grupo'} · ${fmtDateTime(q.expirationDate)}</div>
+      <div class="won-card-header" onclick="toggleHistoryCard(${idx})">
+        <div>
+          <div class="quote-item-name">${escapeHtml(q.name)}</div>
+          <div class="quote-item-meta">${q.supplierGroupName || 'sem grupo'} · ${fmtDateTime(q.expirationDate)}</div>
+        </div>
+        <div class="won-card-header-right">
+          ${statusBadge(q.status)}
+          <svg class="won-card-chevron" id="history-chevron-${idx}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+        </div>
       </div>
-      ${statusBadge(q.status)}
+      <div class="won-card-items" id="history-items-${idx}" style="display:none"></div>
     `;
     list.appendChild(div);
   });
 }
+
+// Busca sob demanda, só quando expande — cotação antiga que nunca é aberta não gasta
+// requisição à toa. Guarda "já carregou" no próprio elemento pra não buscar de novo ao
+// fechar e reabrir o mesmo card.
+async function toggleHistoryCard(idx) {
+  const itemsEl = document.getElementById('history-items-' + idx);
+  const chevronEl = document.getElementById('history-chevron-' + idx);
+  const isOpen = itemsEl.style.display !== 'none';
+
+  if (isOpen) {
+    itemsEl.style.display = 'none';
+    chevronEl.classList.remove('open');
+    return;
+  }
+
+  itemsEl.style.display = 'block';
+  chevronEl.classList.add('open');
+  if (itemsEl.dataset.loaded) return;
+
+  const q = historyCache[idx];
+  itemsEl.innerHTML = '<div class="empty">Carregando...</div>';
+  const rows = await safeCall(() => api('GET', `/quotations/${q.id}/my-bids?supplierId=${currentSupplierId}`));
+  itemsEl.dataset.loaded = '1';
+
+  itemsEl.innerHTML = rows.length
+    ? rows.map(r => `
+        <div class="won-item-row">
+          <div class="won-item-name">${escapeHtml(r.productName)}</div>
+          <div class="won-item-nums">
+            ${r.quantity} × R$ ${formatCurrencyFromNumber(r.unitValue)}
+            <span style="color:${r.won ? 'var(--success)' : 'var(--text-faint)'}; font-weight:700; font-size:11px; margin-left:6px">${r.won ? 'Venceu' : 'Não venceu'}</span>
+          </div>
+        </div>
+      `).join('')
+    : '<div class="empty">Você não enviou nenhum lance nesta cotação.</div>';
+}
+
+let wonQuotationsCache = [];
 
 // ---------- aba: o que eu ganhei ----------
 async function loadWonQuotations() {
@@ -891,6 +1029,7 @@ async function loadWonQuotations() {
   emptyEl.textContent = 'Você ainda não ganhou nenhum produto em cotações fechadas.';
   emptyEl.style.display = won.length ? 'none' : 'block';
 
+  wonQuotationsCache = won;
   list.innerHTML = won.map((q, idx) => `
     <div class="card won-card">
       <div class="won-card-header" onclick="toggleWonCard(${idx})">
@@ -910,6 +1049,10 @@ async function loadWonQuotations() {
             <div class="won-item-nums">${i.quantity} × R$ ${formatCurrencyFromNumber(i.value)} = R$ ${formatCurrencyFromNumber(i.subtotal)}</div>
           </div>
         `).join('')}
+        <div class="won-card-actions">
+          <button class="won-action-btn" onclick="event.stopPropagation(); downloadWonPdf(${q.quotationId})">${PDF_ICON} PDF</button>
+          <button class="won-action-btn" onclick="event.stopPropagation(); shareWonWhatsApp(${idx})">${WHATSAPP_ICON} WhatsApp</button>
+        </div>
       </div>
     </div>
   `).join('');
@@ -923,6 +1066,31 @@ function toggleWonCard(idx) {
   const isOpen = itemsEl.style.display !== 'none';
   itemsEl.style.display = isOpen ? 'none' : 'block';
   chevronEl.classList.toggle('open', !isOpen);
+}
+
+// PDF já filtrado pra essa empresa — o backend nem devolve o pedido dos outros
+// fornecedores (?supplierId= no result-pdf existente do admin). O navegador cuida do
+// download sozinho por causa do Content-Disposition que o backend já manda.
+function downloadWonPdf(quotationId) {
+  window.open(`/quotations/${quotationId}/result-pdf?supplierId=${currentSupplierId}`, '_blank');
+}
+
+function buildWonWhatsAppText(q) {
+  const lines = [`*Pedido confirmado — ${q.quotationName}*`, `Fechada em ${fmtDateTime(q.closedAt)}`, ''];
+  q.items.forEach(i => {
+    lines.push(`- ${i.productName}: ${i.quantity} × R$ ${formatCurrencyFromNumber(i.value)} = R$ ${formatCurrencyFromNumber(i.subtotal)}`);
+  });
+  lines.push('', `*Total: R$ ${formatCurrencyFromNumber(q.total)}*`);
+  return lines.join('\n');
+}
+
+// wa.me é o link oficial de "clique pra conversar" do WhatsApp — sem precisar de API key
+// nem integração nenhuma. No celular, se o app estiver instalado, o sistema operacional
+// abre ele direto; no navegador, abre o WhatsApp Web (ou avisa que precisa logar, se for
+// a primeira vez). O texto já vem preenchido, só falta escolher o contato e mandar.
+function shareWonWhatsApp(idx) {
+  const q = wonQuotationsCache[idx];
+  window.open(`https://wa.me/?text=${encodeURIComponent(buildWonWhatsAppText(q))}`, '_blank');
 }
 
 // ---------- aba: meu desempenho ----------

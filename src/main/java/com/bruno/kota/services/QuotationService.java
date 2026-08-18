@@ -737,6 +737,99 @@ public class QuotationService {
         );
     }
 
+    // Relatório detalhado, uma linha por LANCE — cruza cotação, fornecedor (empresa),
+    // representante que enviou, e produto. Parte de todos os lances da cotação (não só
+    // do vencedor de cada item) porque o admin também precisa ver o que um representante
+    // digitou mesmo quando não venceu — onlyWinners é quem decide se filtra pra só
+    // vencedor ou mostra tudo, com o campo "won" dizendo qual é qual. Só cotação FECHADA
+    // entra (é resultado definitivo). Filtro de período usa a data de fechamento
+    // (updatedAt) — mesma data que já uso em "Ganhei" e no PDF. Todo filtro é opcional.
+    @Transactional(readOnly = true)
+    public List<QuotationReportRow> getQuotationReport(
+            LocalDateTime from, LocalDateTime to, Long supplierId, Long representativeId,
+            String productQuery, boolean onlyWinners) {
+
+        List<Quotation> closedQuotations = quotationRepository.findByStatus(QuotationStatus.CLOSED);
+        List<QuotationReportRow> rows = new ArrayList<>();
+        String normalizedProductQuery = productQuery != null ? productQuery.trim().toLowerCase() : null;
+
+        for (Quotation quotation : closedQuotations) {
+            LocalDateTime closedAt = quotation.getUpdatedAt();
+            if (from != null && (closedAt == null || closedAt.isBefore(from))) continue;
+            if (to != null && (closedAt == null || closedAt.isAfter(to))) continue;
+
+            List<Bid> bids = bidRepository.findByQuotationItem_QuotationId(quotation.getId());
+            for (Bid bid : bids) {
+                QuotationItem item = bid.getQuotationItem();
+                boolean won = item.getWinningBid() != null && item.getWinningBid().getId().equals(bid.getId());
+                if (onlyWinners && !won) continue;
+
+                Supplier supplier = bid.getSupplier();
+                if (supplierId != null && !supplier.getId().equals(supplierId)) continue;
+
+                Representative rep = bid.getSubmittedBy();
+                if (representativeId != null && (rep == null || !rep.getId().equals(representativeId))) continue;
+
+                String productName = item.getProduct().getName();
+                if (normalizedProductQuery != null && !normalizedProductQuery.isEmpty()
+                        && !productName.toLowerCase().contains(normalizedProductQuery)) continue;
+
+                rows.add(new QuotationReportRow(
+                        quotation.getId(),
+                        quotation.getName(),
+                        closedAt,
+                        supplier.getName(),
+                        rep != null ? rep.getName() : "—",
+                        productName,
+                        item.getQuantity(),
+                        bid.getValue(),
+                        bid.getValue().multiply(item.getQuantity()),
+                        won
+                ));
+            }
+        }
+
+        rows.sort((a, b) -> {
+            if (a.closedAt() == null || b.closedAt() == null) return 0;
+            return b.closedAt().compareTo(a.closedAt());
+        });
+
+        return rows;
+    }
+
+    // Mesma ideia de linha-por-lance do relatório do admin, só que escopado a UMA
+    // cotação e UM fornecedor — é o que o representante vê ao abrir o detalhe de uma
+    // cotação em "Anteriores". Funciona pra CLOSED (mostra won) e EXPIRED (nunca teve
+    // vencedor, então won sempre falso — mas ainda mostra o que foi digitado).
+    @Transactional(readOnly = true)
+    public List<QuotationReportRow> getMyBidsForQuotation(Long quotationId, Long supplierId) {
+        Quotation quotation = quotationRepository.findById(quotationId)
+                .orElseThrow(() -> new ResourceNotFoundException("Cotação não encontrada: id " + quotationId));
+
+        List<Bid> bids = bidRepository.findByQuotationItem_QuotationId(quotationId).stream()
+                .filter(b -> b.getSupplier().getId().equals(supplierId))
+                .toList();
+
+        List<QuotationReportRow> rows = new ArrayList<>();
+        for (Bid bid : bids) {
+            QuotationItem item = bid.getQuotationItem();
+            boolean won = item.getWinningBid() != null && item.getWinningBid().getId().equals(bid.getId());
+            rows.add(new QuotationReportRow(
+                    quotation.getId(),
+                    quotation.getName(),
+                    quotation.getUpdatedAt(),
+                    bid.getSupplier().getName(),
+                    bid.getSubmittedBy() != null ? bid.getSubmittedBy().getName() : "—",
+                    item.getProduct().getName(),
+                    item.getQuantity(),
+                    bid.getValue(),
+                    bid.getValue().multiply(item.getQuantity()),
+                    won
+            ));
+        }
+        return rows;
+    }
+
     // Marca "não tenho isso em estoque" — some da relação pro representante (não conta
     // mais em findFulfillmentSummaries, nem pendente nem finalizado) e fica registrado
     // pro admin ver o que foi cortado. Só antes de finalizar: depois disso o pedido tá

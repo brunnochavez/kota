@@ -46,6 +46,8 @@
     display: flex; flex-direction: column;
   }
   .brand { padding: 4px 20px 18px; border-bottom: 1px solid var(--border); margin-bottom: 10px; display: flex; align-items: center; justify-content: space-between; }
+  .brand-home-btn { display: flex; align-items: center; gap: 10px; background: none; border: none; padding: 0; cursor: pointer; text-align: left; font-family: var(--sans); }
+  .brand-home-btn svg { width: 22px; height: 22px; color: var(--accent); flex-shrink: 0; }
   .brand .name { font-weight: 700; font-size: 18px; letter-spacing: -0.02em; }
   .brand .tag { color: var(--text-dim); font-size: 11.5px; margin-top: 1px; }
   .theme-switch {
@@ -248,10 +250,13 @@
 
 <nav class="sidebar">
   <div class="brand">
-    <div>
-      <div class="name">kota</div>
-      <div class="tag">Painel Administrativo</div>
-    </div>
+    <button class="brand-home-btn" onclick="goToSection('dashboard')" title="Página inicial">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 11l9-8 9 8"/><path d="M5 10v10a1 1 0 001 1h4v-6h4v6h4a1 1 0 001-1V10"/></svg>
+      <div>
+        <div class="name">kota</div>
+        <div class="tag">Painel Administrativo</div>
+      </div>
+    </button>
     <div class="theme-switch">
       <button data-theme-option="light" onclick="setTheme('light')" title="Modo claro"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg></button>
       <button data-theme-option="dark" onclick="setTheme('dark')" title="Modo escuro"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M20 14.5A8.5 8.5 0 119.5 4a7 7 0 0010.5 10.5z"/></svg></button>
@@ -270,6 +275,10 @@
   <div class="nav-item" data-section="quotation-reports">
     <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 3h9l5 5v13a1 1 0 01-1 1H6a1 1 0 01-1-1V4a1 1 0 011-1z"/><path d="M9 12h6M9 16h6M9 8h2"/></svg></span>
     Cotações
+  </div>
+  <div class="nav-item" data-section="reports">
+    <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 3v18h18"/><path d="M7 15l4-6 3 4 5-7"/></svg></span>
+    Relatórios
   </div>
 
   <div class="nav-group-label">Produtos</div>
@@ -416,6 +425,13 @@
       <h2 id="rep-list-title">Representantes ativos</h2>
       <table><thead><tr><th>ID</th><th>CPF</th><th>Nome</th><th>Telefone</th><th>E-mail</th><th></th></tr></thead>
         <tbody id="reps-tbody"></tbody></table>
+      <div class="btn-row" id="reps-pagination" style="justify-content:space-between; margin-top:10px; display:none">
+        <div style="color:var(--text-dim); font-size:12px" id="reps-page-info">—</div>
+        <div class="btn-row">
+          <button class="secondary small" id="reps-prev-btn">← Anterior</button>
+          <button class="secondary small" id="reps-next-btn">Próxima →</button>
+        </div>
+      </div>
       <div class="empty" id="reps-empty" style="display:none">Nenhum representante encontrado.</div>
     </div>
   </section>
@@ -441,6 +457,13 @@
       <h2 id="supplier-list-title">Fornecedores ativos</h2>
       <table><thead><tr><th>ID</th><th>Nome</th><th>CNPJ</th><th>Pedido mín.</th><th>Representante</th><th></th></tr></thead>
         <tbody id="suppliers-tbody"></tbody></table>
+      <div class="btn-row" id="suppliers-pagination" style="justify-content:space-between; margin-top:10px; display:none">
+        <div style="color:var(--text-dim); font-size:12px" id="suppliers-page-info">—</div>
+        <div class="btn-row">
+          <button class="secondary small" id="suppliers-prev-btn">← Anterior</button>
+          <button class="secondary small" id="suppliers-next-btn">Próxima →</button>
+        </div>
+      </div>
       <div class="empty" id="suppliers-empty" style="display:none">Nenhum fornecedor encontrado.</div>
     </div>
   </section>
@@ -458,6 +481,13 @@
       <h2>Todos os grupos</h2>
       <table><thead><tr><th>ID</th><th>Nome</th><th></th></tr></thead>
         <tbody id="groups-tbody"></tbody></table>
+      <div class="btn-row" id="groups-pagination" style="justify-content:space-between; margin-top:10px; display:none">
+        <div style="color:var(--text-dim); font-size:12px" id="groups-page-info">—</div>
+        <div class="btn-row">
+          <button class="secondary small" id="groups-prev-btn">← Anterior</button>
+          <button class="secondary small" id="groups-next-btn">Próxima →</button>
+        </div>
+      </div>
       <div class="empty" id="groups-empty" style="display:none">Nenhum grupo cadastrado ainda.</div>
     </div>
   </section>
@@ -472,8 +502,15 @@
 
     <div class="card">
       <h2>Todos os grupos</h2>
-      <table><thead><tr><th>ID</th><th>Nome</th><th></th></tr></thead>
+      <table><thead><tr><th>ID</th><th>Nome</th><th>Qtd. de Produtos</th><th></th></tr></thead>
         <tbody id="product-groups-tbody"></tbody></table>
+      <div class="btn-row" id="product-groups-pagination" style="justify-content:space-between; margin-top:10px; display:none">
+        <div style="color:var(--text-dim); font-size:12px" id="product-groups-page-info">—</div>
+        <div class="btn-row">
+          <button class="secondary small" id="product-groups-prev-btn">← Anterior</button>
+          <button class="secondary small" id="product-groups-next-btn">Próxima →</button>
+        </div>
+      </div>
       <div class="empty" id="product-groups-empty" style="display:none">Nenhum grupo de produtos cadastrado ainda.</div>
     </div>
   </section>
@@ -557,6 +594,49 @@
       <div class="empty" id="quotations-empty" style="display:none">Nenhuma cotação nesse status.</div>
     </div>
   </section>
+
+  <section class="section" id="section-reports">
+    <h1>Relatórios</h1>
+    <div class="subtitle">Cotações fechadas, detalhadas por empresa, representante e produto — uma linha por lance.</div>
+
+    <div class="card">
+      <h2>Filtros</h2>
+      <div class="inline-form">
+        <div><label>De</label><input type="date" id="report-from"></div>
+        <div><label>Até</label><input type="date" id="report-to"></div>
+        <div><label>Fornecedor</label><select id="report-supplier"><option value="">Todos</option></select></div>
+        <div><label>Representante</label><select id="report-representative"><option value="">Todos</option></select></div>
+        <div><label>Produto</label><input type="text" id="report-product" placeholder="Buscar por nome..."></div>
+        <div><label>Mostrar</label><select id="report-mode">
+          <option value="winners">Só o que ganhou</option>
+          <option value="all">Todos os lances enviados</option>
+        </select></div>
+      </div>
+      <div class="btn-row" style="margin-top:12px">
+        <button onclick="loadReportData()">Gerar Relatório</button>
+        <button class="secondary small" onclick="clearReportFilters()">Limpar filtros</button>
+        <button class="secondary small" onclick="exportReportCsv()">Exportar CSV</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Resultado</h2>
+      <div class="subtitle" id="report-summary" style="margin-bottom:12px">Configure os filtros acima e clique em "Gerar Relatório".</div>
+      <table id="report-table" style="display:none"><thead><tr>
+        <th>Nº da Cotação</th><th>Nome</th><th>Fechada em</th><th>Fornecedor</th><th>Representante</th>
+        <th>Total da Cotação (R$)</th><th>Resultado</th><th></th>
+      </tr></thead>
+        <tbody id="report-tbody"></tbody></table>
+      <div class="btn-row" id="report-pagination" style="justify-content:space-between; margin-top:10px; display:none">
+        <div style="color:var(--text-dim); font-size:12px" id="report-page-info">—</div>
+        <div class="btn-row">
+          <button class="secondary small" onclick="changeReportPage(-1)" id="report-prev-btn">← Anterior</button>
+          <button class="secondary small" onclick="changeReportPage(1)" id="report-next-btn">Próxima →</button>
+        </div>
+      </div>
+      <div class="empty" id="report-empty" style="display:none">Nenhum resultado com esses filtros.</div>
+    </div>
+  </section>
 </main>
 
 <script>
@@ -638,6 +718,43 @@ function escapeHtml(str) {
   return String(str).replace(/[&<>"']/g, c => ({
     '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
   }[c]));
+}
+
+// ============================================================
+// PAGINAÇÃO — genérica, client-side, 10 por página. Reaproveitada em toda lista que já
+// carrega o array inteiro na memória (não busca de novo no servidor a cada página, só
+// corta o array já carregado). idPrefix precisa bater com o bloco de controles gerado
+// por paginationControlsHtml() no HTML daquela lista.
+// ============================================================
+const DEFAULT_PAGE_SIZE = 10;
+
+function paginateSlice(array, page, pageSize) {
+  const totalPages = Math.max(Math.ceil(array.length / pageSize), 1);
+  const safePage = Math.min(Math.max(page, 0), totalPages - 1);
+  return { items: array.slice(safePage * pageSize, safePage * pageSize + pageSize), page: safePage, totalPages };
+}
+
+function paginationControlsHtml(idPrefix) {
+  return `<div class="btn-row" id="${idPrefix}-pagination" style="justify-content:space-between; margin-top:10px; display:none">
+    <div style="color:var(--text-dim); font-size:12px" id="${idPrefix}-page-info">—</div>
+    <div class="btn-row">
+      <button class="secondary small" id="${idPrefix}-prev-btn">← Anterior</button>
+      <button class="secondary small" id="${idPrefix}-next-btn">Próxima →</button>
+    </div>
+  </div>`;
+}
+
+function updatePaginationControls(idPrefix, page, totalPages, totalItems, onChange) {
+  const wrap = document.getElementById(idPrefix + '-pagination');
+  if (!wrap) return;
+  wrap.style.display = totalItems > DEFAULT_PAGE_SIZE ? 'flex' : 'none';
+  document.getElementById(idPrefix + '-page-info').textContent = `Página ${page + 1} de ${totalPages}`;
+  const prevBtn = document.getElementById(idPrefix + '-prev-btn');
+  const nextBtn = document.getElementById(idPrefix + '-next-btn');
+  prevBtn.disabled = page === 0;
+  nextBtn.disabled = page >= totalPages - 1;
+  prevBtn.onclick = () => onChange(page - 1);
+  nextBtn.onclick = () => onChange(page + 1);
 }
 
 // Mostra o erro em vermelho logo abaixo do campo, em vez de só um toast (que fica
@@ -793,6 +910,7 @@ document.querySelectorAll('.nav-item').forEach(item => {
     item.classList.add('active');
     document.getElementById('section-' + item.dataset.section).classList.add('active');
     loadSectionData(item.dataset.section);
+    localStorage.setItem('kota-admin-section', item.dataset.section);
   });
 });
 
@@ -826,6 +944,7 @@ function loadSectionData(section) {
   if (section === 'product-groups') loadProductGroups();
   if (section === 'quotation-start') { loadGroupsForSelects(); loadProductsForManualItems(); }
   if (section === 'quotation-reports') loadQuotations();
+  if (section === 'reports') loadReportsFilters();
 }
 
 function goToQuotationsFiltered(status) {
@@ -1171,6 +1290,7 @@ async function loadRepresentatives() {
 
 function onRepSearchInput() {
   currentRepSearchTerm = document.getElementById('rep-search').value.trim().toLowerCase();
+  repsPage = 0;
   renderRepsList();
 }
 
@@ -1184,19 +1304,26 @@ document.querySelectorAll('#rep-status-tabs .tab').forEach(tab => {
     if (currentRepListFilter === 'inactive' && !repsInactiveCache.length) {
       repsInactiveCache = await safeCall(() => api('GET', '/representatives/inactive'));
     }
+    repsPage = 0;
     renderRepsList();
   });
 });
+
+let repsPage = 0;
 
 function renderRepsList() {
   const source = currentRepListFilter === 'active' ? repsCache : repsInactiveCache;
   const list = currentRepSearchTerm
     ? source.filter(r => r.name.toLowerCase().includes(currentRepSearchTerm) || (r.phone || '').includes(currentRepSearchTerm))
     : source;
+
+  const { items, page, totalPages } = paginateSlice(list, repsPage, DEFAULT_PAGE_SIZE);
+  repsPage = page;
+
   const tbody = document.getElementById('reps-tbody');
   tbody.innerHTML = '';
   document.getElementById('reps-empty').style.display = list.length ? 'none' : 'block';
-  list.forEach(r => {
+  items.forEach(r => {
     const tr = document.createElement('tr');
     const actions = currentRepListFilter === 'active'
       ? `<button class="secondary small" onclick="openRepModal(${r.id})">Editar</button>
@@ -1206,6 +1333,8 @@ function renderRepsList() {
       <td><div class="row-actions">${actions}</div></td>`;
     tbody.appendChild(tr);
   });
+
+  updatePaginationControls('reps', page, totalPages, list.length, (newPage) => { repsPage = newPage; renderRepsList(); });
 }
 
 function findRepById(id) {
@@ -1326,6 +1455,7 @@ async function loadSuppliers() {
 
 function onSupplierSearchInput() {
   currentSupplierSearchTerm = document.getElementById('supplier-search').value.trim().toLowerCase();
+  suppliersPage = 0;
   renderSuppliersList();
 }
 
@@ -1339,19 +1469,26 @@ document.querySelectorAll('#supplier-status-tabs .tab').forEach(tab => {
     if (currentSupplierListFilter === 'inactive' && !suppliersInactiveCache.length) {
       suppliersInactiveCache = await safeCall(() => api('GET', '/suppliers/inactive'));
     }
+    suppliersPage = 0;
     renderSuppliersList();
   });
 });
+
+let suppliersPage = 0;
 
 function renderSuppliersList() {
   const source = currentSupplierListFilter === 'active' ? suppliersCache : suppliersInactiveCache;
   const list = currentSupplierSearchTerm
     ? source.filter(s => s.name.toLowerCase().includes(currentSupplierSearchTerm) || (s.cnpj || '').includes(currentSupplierSearchTerm))
     : source;
+
+  const { items, page, totalPages } = paginateSlice(list, suppliersPage, DEFAULT_PAGE_SIZE);
+  suppliersPage = page;
+
   const tbody = document.getElementById('suppliers-tbody');
   tbody.innerHTML = '';
   document.getElementById('suppliers-empty').style.display = list.length ? 'none' : 'block';
-  list.forEach(s => {
+  items.forEach(s => {
     const tr = document.createElement('tr');
     const actions = currentSupplierListFilter === 'active'
       ? `<button class="secondary small" onclick="openSupplierModal(${s.id})">Editar</button>
@@ -1364,6 +1501,8 @@ function renderSuppliersList() {
       <td><div class="row-actions">${actions}</div></td>`;
     tbody.appendChild(tr);
   });
+
+  updatePaginationControls('suppliers', page, totalPages, list.length, (newPage) => { suppliersPage = newPage; renderSuppliersList(); });
 }
 
 function findSupplierById(id) {
@@ -1521,12 +1660,21 @@ async function submitSupplierGroupModal() {
 // ============================================================
 let groupsCache = [];
 
+let groupsPage = 0;
+
 async function loadGroups() {
   groupsCache = await safeCall(() => api('GET', '/supplier-groups'));
+  renderGroupsList();
+}
+
+function renderGroupsList() {
+  const { items, page, totalPages } = paginateSlice(groupsCache, groupsPage, DEFAULT_PAGE_SIZE);
+  groupsPage = page;
+
   const tbody = document.getElementById('groups-tbody');
   tbody.innerHTML = '';
   document.getElementById('groups-empty').style.display = groupsCache.length ? 'none' : 'block';
-  groupsCache.forEach(g => {
+  items.forEach(g => {
     const tr = document.createElement('tr');
     tr.innerHTML = `<td>${g.id}</td><td>${g.name}</td>
       <td><div class="row-actions">
@@ -1536,6 +1684,8 @@ async function loadGroups() {
       </div></td>`;
     tbody.appendChild(tr);
   });
+
+  updatePaginationControls('groups', page, totalPages, groupsCache.length, (newPage) => { groupsPage = newPage; renderGroupsList(); });
 }
 
 function findGroupById(id) {
@@ -1582,9 +1732,11 @@ async function deleteGroup(id) {
 
 async function openGroupMembersModal(groupId) {
   const group = await safeCall(() => api('GET', `/supplier-groups/${groupId}`));
+  groupMembersPage = 0;
   openModal2(`
     <h2>Fornecedores do grupo "${escapeHtml(group.name)}"</h2>
     <div id="group-members-list">Carregando...</div>
+    ${paginationControlsHtml('group-members')}
     <hr class="divider">
     <h3>Adicionar fornecedor</h3>
     <div class="inline-form">
@@ -1604,21 +1756,31 @@ function manageQdGroupSuppliers() {
   openGroupMembersModal(parseInt(groupId));
 }
 
+let groupMembersPage = 0;
+
 async function refreshGroupMembersModal(groupId) {
   const [members, allSuppliers] = await Promise.all([
     safeCall(() => api('GET', `/suppliers/by-group/${groupId}`)),
     safeCall(() => api('GET', '/suppliers'))
   ]);
 
+  const { items, page, totalPages } = paginateSlice(members, groupMembersPage, DEFAULT_PAGE_SIZE);
+  groupMembersPage = page;
+
   const listEl = document.getElementById('group-members-list');
   if (listEl) {
-    listEl.innerHTML = members.length
-      ? members.map(s => `<div class="expiring-item">
+    listEl.innerHTML = items.length
+      ? items.map(s => `<div class="expiring-item">
           <span>${escapeHtml(s.name)} <span class="mono" style="color:var(--text-dim); font-size:12px">(${escapeHtml(s.cnpj)})</span></span>
           <button class="danger small" onclick="removeSupplierFromGroupModal(${groupId}, ${s.id})">Remover</button>
         </div>`).join('')
       : '<div class="empty">Nenhum fornecedor neste grupo ainda.</div>';
   }
+
+  updatePaginationControls('group-members', page, totalPages, members.length, (newPage) => {
+    groupMembersPage = newPage;
+    refreshGroupMembersModal(groupId);
+  });
 
   const memberIds = new Set(members.map(s => s.id));
   const available = allSuppliers.filter(s => !memberIds.has(s.id));
@@ -1658,15 +1820,25 @@ async function loadGroupsForSelects() {
 // pra adicionar um grupo inteiro (ex: "Vinhos") de uma vez, em vez de item por item.
 // ============================================================
 let productGroupsCache = [];
+let productGroupMembersCache = [];
+
+let productGroupsPage = 0;
 
 async function loadProductGroups() {
   productGroupsCache = await safeCall(() => api('GET', '/product-groups'));
+  renderProductGroupsList();
+}
+
+function renderProductGroupsList() {
+  const { items, page, totalPages } = paginateSlice(productGroupsCache, productGroupsPage, DEFAULT_PAGE_SIZE);
+  productGroupsPage = page;
+
   const tbody = document.getElementById('product-groups-tbody');
   tbody.innerHTML = '';
   document.getElementById('product-groups-empty').style.display = productGroupsCache.length ? 'none' : 'block';
-  productGroupsCache.forEach(g => {
+  items.forEach(g => {
     const tr = document.createElement('tr');
-    tr.innerHTML = `<td>${g.id}</td><td>${g.name}</td>
+    tr.innerHTML = `<td>${g.id}</td><td>${g.name}</td><td>${g.productCount}</td>
       <td><div class="row-actions">
         <button class="secondary small" onclick="openProductGroupModal(${g.id})">Editar</button>
         <button class="danger small" onclick="deleteProductGroup(${g.id})">Desativar</button>
@@ -1674,6 +1846,8 @@ async function loadProductGroups() {
       </div></td>`;
     tbody.appendChild(tr);
   });
+
+  updatePaginationControls('product-groups', page, totalPages, productGroupsCache.length, (newPage) => { productGroupsPage = newPage; renderProductGroupsList(); });
 }
 
 function findProductGroupById(id) {
@@ -1720,15 +1894,47 @@ async function deleteProductGroup(id) {
 
 async function openProductGroupMembersModal(groupId) {
   const group = await safeCall(() => api('GET', `/product-groups/${groupId}`));
+  if (!productsForSelect || !productsForSelect.length) {
+    productsForSelect = await safeCall(() => api('GET', '/products'));
+  }
+  pgCurrentGroupId = groupId;
+  pgSearchMatches = [];
+  pgSearchPage = 0;
+  pgSelectedIds = new Set();
+  pgMembersPage = 0;
+
   openModal2(`
     <h2>Produtos do grupo "${escapeHtml(group.name)}"</h2>
-    <div id="product-group-members-list">Carregando...</div>
-    <hr class="divider">
-    <h3>Adicionar produto</h3>
-    <div class="inline-form">
-      <div style="flex:1"><select id="product-group-members-add-select"></select></div>
-      <button onclick="addProductToGroupModal(${groupId})">Adicionar</button>
+    <div class="subtitle" style="margin-bottom:16px">Busque por código de barras ou nome — marque um ou mais e adicione de uma vez.</div>
+
+    <div style="position:relative; margin-bottom:12px">
+      <label>Adicionar produto</label>
+      <input type="text" id="pg-add-search" placeholder="Digite o código de barras ou o nome..." autocomplete="off"
+        oninput="searchProductForGroup()">
     </div>
+
+    <label id="pg-select-all-wrap" style="display:none; align-items:center; gap:8px; margin-bottom:8px; font-size:12.5px; color:var(--text-dim); cursor:pointer">
+      <input type="checkbox" id="pg-select-all" style="width:auto" onchange="toggleSelectAllOnPage(this.checked)">
+      Marcar todos desta página
+    </label>
+    <div id="pg-add-search-results"></div>
+    <div class="btn-row" id="pg-search-pagination" style="justify-content:space-between; margin-top:8px; display:none">
+      <div style="color:var(--text-dim); font-size:12px" id="pg-search-page-info">—</div>
+      <div class="btn-row">
+        <button class="secondary small" onclick="changePgSearchPage(-1)" id="pg-search-prev-btn">← Anterior</button>
+        <button class="secondary small" onclick="changePgSearchPage(1)" id="pg-search-next-btn">Próxima →</button>
+      </div>
+    </div>
+    <div class="btn-row" style="margin-top:10px; margin-bottom:20px">
+      <button id="pg-add-selected-btn" onclick="addSelectedProductsToGroup()" style="display:none">Adicionar selecionados</button>
+    </div>
+
+    <hr class="divider">
+
+    <h3 id="product-group-members-title" style="margin-top:14px">Produtos no grupo</h3>
+    <div id="product-group-members-list">Carregando...</div>
+    ${paginationControlsHtml('pg-members')}
+
     <div class="btn-row" style="margin-top:16px">
       <button class="secondary" onclick="closeModal2()">Fechar</button>
     </div>
@@ -1736,38 +1942,143 @@ async function openProductGroupMembersModal(groupId) {
   await refreshProductGroupMembersModal(groupId);
 }
 
+let pgMembersPage = 0;
+
 async function refreshProductGroupMembersModal(groupId) {
-  const [members, allProducts] = await Promise.all([
-    safeCall(() => api('GET', `/products/by-group/${groupId}`)),
-    safeCall(() => api('GET', '/products'))
-  ]);
+  const members = await safeCall(() => api('GET', `/products/by-group/${groupId}`));
+  productGroupMembersCache = members;
+
+  const titleEl = document.getElementById('product-group-members-title');
+  if (titleEl) titleEl.textContent = `Produtos no grupo (${members.length})`;
+
+  const { items, page, totalPages } = paginateSlice(members, pgMembersPage, DEFAULT_PAGE_SIZE);
+  pgMembersPage = page;
 
   const listEl = document.getElementById('product-group-members-list');
   if (listEl) {
-    listEl.innerHTML = members.length
-      ? members.map(p => `<div class="expiring-item">
+    listEl.innerHTML = items.length
+      ? items.map(p => `<div class="expiring-item">
           <span>${escapeHtml(p.name)} <span class="mono" style="color:var(--text-dim); font-size:12px">(${escapeHtml(p.barcode)})</span></span>
           <button class="danger small" onclick="removeProductFromGroupModal(${groupId}, ${p.id})">Remover</button>
         </div>`).join('')
       : '<div class="empty">Nenhum produto neste grupo ainda.</div>';
   }
 
-  const memberIds = new Set(members.map(p => p.id));
-  const available = allProducts.filter(p => !memberIds.has(p.id));
-  const selectEl = document.getElementById('product-group-members-add-select');
-  if (selectEl) {
-    selectEl.innerHTML = available.length
-      ? available.map(p => `<option value="${p.id}">${escapeHtml(p.name)}</option>`).join('')
-      : '<option value="">Todos os produtos já estão neste grupo</option>';
-  }
+  updatePaginationControls('pg-members', page, totalPages, members.length, (newPage) => {
+    pgMembersPage = newPage;
+    refreshProductGroupMembersModal(groupId);
+  });
+
+  // Busca já digitada precisa refletir a lista atualizada (produto que acabou de entrar
+  // não pode continuar aparecendo como sugestão pra adicionar de novo).
+  const searchInput = document.getElementById('pg-add-search');
+  if (searchInput && searchInput.value.trim()) searchProductForGroup();
 }
 
-async function addProductToGroupModal(groupId) {
-  const productId = document.getElementById('product-group-members-add-select').value;
-  if (!productId) return;
-  await safeCall(() => api('POST', `/products/${productId}/groups/${groupId}`));
-  toast('Produto adicionado ao grupo.');
-  await refreshProductGroupMembersModal(groupId);
+// ---------- busca com seleção múltipla + paginação (10 por página) ----------
+let pgCurrentGroupId = null;
+let pgSearchMatches = [];
+let pgSearchPage = 0;
+let pgSelectedIds = new Set();
+const PG_SEARCH_PAGE_SIZE = 10;
+
+function searchProductForGroup() {
+  const term = document.getElementById('pg-add-search').value.trim().toLowerCase();
+  const memberIds = new Set(productGroupMembersCache.map(p => p.id));
+  pgSearchMatches = term
+    ? productsForSelect.filter(p => !memberIds.has(p.id) && (p.name.toLowerCase().includes(term) || (p.barcode || '').includes(term)))
+    : [];
+  pgSearchPage = 0;
+  renderPgSearchResults();
+}
+
+function renderPgSearchResults() {
+  const wrap = document.getElementById('pg-add-search-results');
+  const paginationEl = document.getElementById('pg-search-pagination');
+  const selectAllWrap = document.getElementById('pg-select-all-wrap');
+  const term = document.getElementById('pg-add-search').value.trim();
+
+  if (!pgSearchMatches.length) {
+    wrap.innerHTML = term ? '<div class="empty">Nenhum produto encontrado (ou já está todo no grupo).</div>' : '';
+    paginationEl.style.display = 'none';
+    selectAllWrap.style.display = 'none';
+    updatePgAddButton();
+    return;
+  }
+
+  const totalPages = Math.max(Math.ceil(pgSearchMatches.length / PG_SEARCH_PAGE_SIZE), 1);
+  if (pgSearchPage >= totalPages) pgSearchPage = totalPages - 1;
+  if (pgSearchPage < 0) pgSearchPage = 0;
+  const pageStart = pgSearchPage * PG_SEARCH_PAGE_SIZE;
+  const pageItems = pgSearchMatches.slice(pageStart, pageStart + PG_SEARCH_PAGE_SIZE);
+
+  wrap.innerHTML = pageItems.map(p => `
+    <label class="search-result-item" style="display:flex; align-items:center; gap:10px">
+      <input type="checkbox" style="width:auto; flex-shrink:0" ${pgSelectedIds.has(p.id) ? 'checked' : ''} onchange="togglePgSelected(${p.id}, this.checked)">
+      <span><strong>${escapeHtml(p.name)}</strong> <span class="mono" style="color:var(--text-dim); font-size:12px">(${escapeHtml(p.barcode)})</span></span>
+    </label>`).join('');
+
+  paginationEl.style.display = pgSearchMatches.length > PG_SEARCH_PAGE_SIZE ? 'flex' : 'none';
+  document.getElementById('pg-search-page-info').textContent = `Página ${pgSearchPage + 1} de ${totalPages}`;
+  document.getElementById('pg-search-prev-btn').disabled = pgSearchPage === 0;
+  document.getElementById('pg-search-next-btn').disabled = pgSearchPage >= totalPages - 1;
+
+  // "Marcar todos" reflete a página atual — marcado só quando TODO item desta página já
+  // está selecionado, não quando é o total geral (que pode incluir outras páginas).
+  selectAllWrap.style.display = 'flex';
+  document.getElementById('pg-select-all').checked = pageItems.every(p => pgSelectedIds.has(p.id));
+
+  updatePgAddButton();
+}
+
+function toggleSelectAllOnPage(checked) {
+  const pageStart = pgSearchPage * PG_SEARCH_PAGE_SIZE;
+  const pageItems = pgSearchMatches.slice(pageStart, pageStart + PG_SEARCH_PAGE_SIZE);
+  pageItems.forEach(p => {
+    if (checked) pgSelectedIds.add(p.id); else pgSelectedIds.delete(p.id);
+  });
+  renderPgSearchResults();
+}
+
+function changePgSearchPage(delta) {
+  pgSearchPage += delta;
+  renderPgSearchResults();
+}
+
+function togglePgSelected(productId, checked) {
+  if (checked) pgSelectedIds.add(productId); else pgSelectedIds.delete(productId);
+  // Um item desmarcado manualmente pode derrubar o "Marcar todos" da página pra
+  // desmarcado — recalcula o resto da tela sem perder a página nem os já marcados.
+  renderPgSearchResults();
+}
+
+function updatePgAddButton() {
+  const btn = document.getElementById('pg-add-selected-btn');
+  btn.style.display = pgSelectedIds.size ? 'inline-block' : 'none';
+  btn.textContent = `Adicionar selecionados (${pgSelectedIds.size})`;
+}
+
+async function addSelectedProductsToGroup() {
+  if (!pgSelectedIds.size) return;
+  const ids = Array.from(pgSelectedIds);
+
+  const result = await safeCall(() => api('POST', `/product-groups/${pgCurrentGroupId}/products`, { productIds: ids }));
+
+  if (result.failedProductIds && result.failedProductIds.length) {
+    toast(`${result.addedCount} adicionado${result.addedCount !== 1 ? 's' : ''}, ${result.failedProductIds.length} falhou/falharam (produto não encontrado).`, true);
+  } else {
+    toast(`${result.addedCount} produto${result.addedCount !== 1 ? 's' : ''} adicionado${result.addedCount !== 1 ? 's' : ''} ao grupo.`);
+  }
+
+  pgSelectedIds = new Set();
+  pgSearchMatches = [];
+  document.getElementById('pg-add-search').value = '';
+  document.getElementById('pg-add-search-results').innerHTML = '';
+  document.getElementById('pg-search-pagination').style.display = 'none';
+  document.getElementById('pg-select-all-wrap').style.display = 'none';
+  updatePgAddButton();
+
+  await refreshProductGroupMembersModal(pgCurrentGroupId);
 }
 
 async function removeProductFromGroupModal(groupId, productId) {
@@ -1846,6 +2157,226 @@ function renderQuotationsList() {
       }
     }
   });
+}
+
+// ============================================================
+// RELATÓRIOS — uma linha por item ganho (cotação × fornecedor × representante × produto),
+// com filtro por período/empresa/representante/produto. Backend já devolve tudo pronto
+// (GET /quotations/report) — aqui é só popular os selects de filtro e renderizar.
+// ============================================================
+let reportRowsCache = [];
+let reportGroupsCache = [];
+let reportPage = 0;
+const REPORT_PAGE_SIZE = 10;
+let reportHasSearched = false;
+
+async function loadReportsFilters() {
+  const [suppliers, reps] = await Promise.all([
+    safeCall(() => api('GET', '/suppliers')),
+    safeCall(() => api('GET', '/representatives'))
+  ]);
+  document.getElementById('report-supplier').innerHTML =
+    '<option value="">Todos</option>' + suppliers.map(s => `<option value="${s.id}">${escapeHtml(s.name)}</option>`).join('');
+  document.getElementById('report-representative').innerHTML =
+    '<option value="">Todos</option>' + reps.map(r => `<option value="${r.id}">${escapeHtml(r.name)}</option>`).join('');
+  // Não carrega nada sozinho — só ao clicar em "Gerar Relatório". Reseta o estado da
+  // tela toda vez que a seção é aberta, pra não mostrar resultado de uma visita anterior.
+  reportHasSearched = false;
+  document.getElementById('report-table').style.display = 'none';
+  document.getElementById('report-empty').style.display = 'none';
+  document.getElementById('report-summary').textContent = 'Configure os filtros acima e clique em "Gerar Relatório".';
+}
+
+async function loadReportData() {
+  const params = new URLSearchParams();
+  const from = document.getElementById('report-from').value;
+  const to = document.getElementById('report-to').value;
+  const supplierId = document.getElementById('report-supplier').value;
+  const repId = document.getElementById('report-representative').value;
+  const product = document.getElementById('report-product').value.trim();
+  const onlyWinners = document.getElementById('report-mode').value === 'winners';
+
+  if (from) params.set('from', from);
+  if (to) params.set('to', to);
+  if (supplierId) params.set('supplierId', supplierId);
+  if (repId) params.set('representativeId', repId);
+  if (product) params.set('product', product);
+  params.set('onlyWinners', onlyWinners);
+
+  reportRowsCache = await safeCall(() => api('GET', `/quotations/report?${params.toString()}`));
+  reportHasSearched = true;
+  reportPage = 0;
+  renderReportTable();
+}
+
+function clearReportFilters() {
+  document.getElementById('report-from').value = '';
+  document.getElementById('report-to').value = '';
+  document.getElementById('report-supplier').value = '';
+  document.getElementById('report-representative').value = '';
+  document.getElementById('report-product').value = '';
+  document.getElementById('report-mode').value = 'winners';
+  // Limpar só reseta os campos — não gera relatório sozinho, mesma regra do carregamento
+  // inicial: só mostra o que foi explicitamente procurado.
+  reportHasSearched = false;
+  reportRowsCache = [];
+  reportGroupsCache = [];
+  reportPage = 0;
+  document.getElementById('report-table').style.display = 'none';
+  document.getElementById('report-pagination').style.display = 'none';
+  document.getElementById('report-empty').style.display = 'none';
+  document.getElementById('report-summary').textContent = 'Configure os filtros acima e clique em "Gerar Relatório".';
+}
+
+// Backend devolve uma linha por lance (nível de item) — pro relatório ficar legível numa
+// cotação com vários produtos, agrupa aqui na tela por cotação + fornecedor, e guarda os
+// lances originais em "items" pro botão "Ver Detalhes" abrir depois. Nenhuma chamada nova
+// à API: é tudo reagrupamento do que já veio de loadReportData().
+// Número "oficial" da cotação, com zero à esquerda (000002 em vez de 2) — visual mais
+// de documento formal, tipo número de pedido/nota. Só formatação de exibição, o id
+// continua o mesmo por baixo (é ele que abre o detalhe ao clicar).
+function formatQuotationNumber(id) {
+  return String(id).padStart(6, '0');
+}
+
+function groupReportRows() {
+  const groups = new Map();
+  reportRowsCache.forEach(r => {
+    const key = r.quotationId + '|' + r.supplierName;
+    if (!groups.has(key)) {
+      groups.set(key, {
+        quotationId: r.quotationId,
+        quotationName: r.quotationName,
+        closedAt: r.closedAt,
+        supplierName: r.supplierName,
+        representativeName: r.representativeName,
+        total: 0,
+        wonCount: 0,
+        items: []
+      });
+    }
+    const g = groups.get(key);
+    g.total += r.subtotal;
+    if (r.won) g.wonCount++;
+    g.items.push(r);
+  });
+  return Array.from(groups.values());
+}
+
+function reportResultBadge(group) {
+  const total = group.items.length;
+  if (group.wonCount === total) {
+    return `<span class="badge badge-available">Venceu (${total} ${total > 1 ? 'itens' : 'item'})</span>`;
+  }
+  if (group.wonCount === 0) {
+    return '<span class="badge badge-expired">Não venceu</span>';
+  }
+  return `<span class="badge badge-closed">Parcial (${group.wonCount}/${total} itens)</span>`;
+}
+
+function renderReportTable() {
+  const table = document.getElementById('report-table');
+  const tbody = document.getElementById('report-tbody');
+  const emptyEl = document.getElementById('report-empty');
+  const summaryEl = document.getElementById('report-summary');
+  const paginationEl = document.getElementById('report-pagination');
+
+  const groups = groupReportRows();
+  reportGroupsCache = groups;
+
+  const totalPages = Math.max(Math.ceil(groups.length / REPORT_PAGE_SIZE), 1);
+  if (reportPage >= totalPages) reportPage = totalPages - 1;
+  if (reportPage < 0) reportPage = 0;
+  const pageStart = reportPage * REPORT_PAGE_SIZE;
+  const pageGroups = groups.slice(pageStart, pageStart + REPORT_PAGE_SIZE);
+
+  tbody.innerHTML = '';
+  table.style.display = groups.length ? 'table' : 'none';
+  emptyEl.style.display = groups.length ? 'none' : 'block';
+  paginationEl.style.display = groups.length ? 'flex' : 'none';
+
+  const grandTotal = reportRowsCache.reduce((sum, r) => sum + r.subtotal, 0);
+  summaryEl.textContent = reportRowsCache.length
+    ? `${reportRowsCache.length} lance${reportRowsCache.length > 1 ? 's' : ''} em ${groups.length} cotaç${groups.length > 1 ? 'ões' : 'ão'} — total: R$ ${formatCurrencyFromNumber(grandTotal)}`
+    : 'Nenhum lance encontrado com esses filtros.';
+
+  // idx usa a posição no array COMPLETO (pageStart + i), não a posição na página — senão
+  // "Ver Detalhes" abriria o grupo errado a partir da segunda página em diante.
+  pageGroups.forEach((g, i) => {
+    const idx = pageStart + i;
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td><a href="#" onclick="abrirDetalheCotacao(${g.quotationId}); return false;">${formatQuotationNumber(g.quotationId)}</a></td>
+      <td><a href="#" onclick="abrirDetalheCotacao(${g.quotationId}); return false;">${escapeHtml(g.quotationName)}</a></td>
+      <td>${fmtDate(g.closedAt)}</td>
+      <td>${escapeHtml(g.supplierName)}</td>
+      <td>${escapeHtml(g.representativeName)}</td>
+      <td style="text-align:right">${formatCurrencyFromNumber(g.total)}</td>
+      <td>${reportResultBadge(g)}</td>
+      <td><button class="secondary small" onclick="openReportDetailModal(${idx})">Ver Detalhes</button></td>`;
+    tbody.appendChild(tr);
+  });
+
+  document.getElementById('report-page-info').textContent = `Página ${reportPage + 1} de ${totalPages}`;
+  document.getElementById('report-prev-btn').disabled = reportPage === 0;
+  document.getElementById('report-next-btn').disabled = reportPage >= totalPages - 1;
+}
+
+function changeReportPage(delta) {
+  reportPage += delta;
+  renderReportTable();
+}
+
+// Tela focada só nos dados desse grupo (cotação + fornecedor) — não é o modal de edição
+// da cotação (abrirDetalheCotacao), que tem formulário, botão de publicar/fechar etc.
+// Aqui é só leitura: produto, quantidade, preço, subtotal e resultado de cada lance.
+function openReportDetailModal(idx) {
+  const g = reportGroupsCache[idx];
+  const rowsHtml = g.items.map(i => `
+    <tr>
+      <td>${escapeHtml(i.productName)}</td>
+      <td style="text-align:right">${i.quantity}</td>
+      <td style="text-align:right">${formatCurrencyFromNumber(i.unitValue)}</td>
+      <td style="text-align:right">${formatCurrencyFromNumber(i.subtotal)}</td>
+      <td>${i.won ? '<span class="badge badge-available">Venceu</span>' : '<span class="badge badge-expired">Não venceu</span>'}</td>
+    </tr>`).join('');
+
+  openModal2(`
+    <h2>${formatQuotationNumber(g.quotationId)} — ${escapeHtml(g.quotationName)}</h2>
+    <div class="subtitle" style="margin-bottom:14px">${escapeHtml(g.supplierName)} · ${escapeHtml(g.representativeName)} · Fechada em ${fmtDate(g.closedAt)}</div>
+    <table><thead><tr><th>Produto</th><th>Qtd.</th><th>Preço Unit. (R$)</th><th>Subtotal (R$)</th><th>Resultado</th></tr></thead>
+      <tbody>${rowsHtml}</tbody></table>
+    <div style="text-align:right; margin-top:14px; font-weight:700">Total: R$ ${formatCurrencyFromNumber(g.total)}</div>
+    <div class="btn-row" style="margin-top:16px">
+      <button class="secondary" onclick="closeModal2()">Fechar</button>
+    </div>
+  `);
+}
+
+// CSV é montado no próprio navegador a partir do que já está carregado — não precisa ir
+// no backend de novo, o relatório filtrado já está todo na tela.
+function exportReportCsv() {
+  if (!reportHasSearched || !reportRowsCache.length) { toast('Gere o relatório antes de exportar.', true); return; }
+
+  const header = ['Nº da Cotação', 'Nome', 'Fechada em', 'Fornecedor', 'Representante', 'Produto', 'Quantidade', 'Preço Unit.', 'Subtotal', 'Resultado'];
+  const csvEscape = (v) => `"${String(v).replace(/"/g, '""')}"`;
+  const lines = [header.map(csvEscape).join(';')];
+
+  reportRowsCache.forEach(r => {
+    lines.push([
+      formatQuotationNumber(r.quotationId), r.quotationName, fmtDate(r.closedAt), r.supplierName, r.representativeName, r.productName,
+      r.quantity, formatCurrencyFromNumber(r.unitValue), formatCurrencyFromNumber(r.subtotal),
+      r.won ? 'Venceu' : 'Não venceu'
+    ].map(csvEscape).join(';'));
+  });
+
+  const blob = new Blob(['\uFEFF' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `relatorio-cotacoes-${new Date().toISOString().slice(0, 10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
 let currentQuotationId = null;
@@ -2905,7 +3436,18 @@ async function importFile(withMapping) {
 }
 
 // ---------- init ----------
-loadDashboard();
+// Restaura a seção de onde a página foi atualizada (F5) — sem isso, dar refresh em
+// qualquer tela sempre jogava de volta pro Dashboard, perdendo o contexto de onde
+// o admin estava trabalhando.
+(function initSection() {
+  const savedSection = localStorage.getItem('kota-admin-section');
+  const validSections = Array.from(document.querySelectorAll('.nav-item')).map(el => el.dataset.section);
+  if (savedSection && validSections.includes(savedSection)) {
+    goToSection(savedSection);
+  } else {
+    loadDashboard();
+  }
+})();
 </script>
 </body>
 </html>

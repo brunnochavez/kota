@@ -13,9 +13,12 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.bruno.kota.dtos.AddProductsToGroupRequest;
+import com.bruno.kota.dtos.AddProductsToGroupResult;
 import com.bruno.kota.dtos.ProductGroupRequest;
 import com.bruno.kota.dtos.ProductGroupResponse;
 import com.bruno.kota.services.ProductGroupService;
+import com.bruno.kota.services.ProductService;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -26,6 +29,7 @@ import lombok.RequiredArgsConstructor;
 public class ProductGroupController {
 
     private final ProductGroupService productGroupService;
+    private final ProductService productService;
 
     @GetMapping
     public List<ProductGroupResponse> findAll() {
@@ -56,5 +60,10 @@ public class ProductGroupController {
     public ResponseEntity<Void> delete(@PathVariable Long id) {
         productGroupService.delete(id);
         return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/{id}/products")
+    public AddProductsToGroupResult addProducts(@PathVariable Long id, @RequestBody AddProductsToGroupRequest request) {
+        return productService.addManyToGroup(id, request.productIds());
     }
 }
