@@ -210,6 +210,14 @@
   .export-choice-card h3 { margin: 0 0 4px; font-size: 16px; }
   .export-choice-card .won-action-btn { width: 100%; margin-bottom: 8px; padding: 12px; font-size: 13.5px; }
 
+  .pagination-row {
+    display: none; justify-content: space-between; align-items: center; margin-top: 14px; gap: 10px;
+  }
+  .pagination-row .page-info { color: var(--text-dim); font-size: 12px; }
+  .pagination-row .page-btns { display: flex; gap: 8px; }
+  .pagination-row button { width: auto; padding: 8px 14px; font-size: 12.5px; }
+  .pagination-row button:disabled { opacity: 0.45; cursor: default; }
+
   .empty {
     display: flex; flex-direction: column; align-items: center; gap: 10px;
     color: var(--text-faint); text-align: center; padding: 34px 20px; font-size: 13px;
@@ -225,7 +233,8 @@
     background: var(--surface); border-top: 1px solid var(--border);
     padding: 12px 16px calc(12px + env(safe-area-inset-bottom, 0px)); box-shadow: 0 -6px 16px rgba(0,0,0,0.06); justify-content: center;
   }
-  #sticky-submit-bar button { width: 100%; max-width: 600px; padding: 12px 16px; font-size: 14px; }
+  .sticky-bar-row { display: flex; gap: 10px; width: 100%; max-width: 600px; }
+  .sticky-bar-row button { flex: 1; padding: 12px 16px; font-size: 14px; }
 
   /* ---------- "o que eu ganhei" ---------- */
   .won-card { border-left: 3px solid var(--success); padding: 0; overflow: hidden; }
@@ -312,6 +321,7 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M9 12l2 2 4-4"/><circle cx="12" cy="12" r="9"/></svg>
       <span>Nenhuma cotação disponível no momento.</span>
     </div>
+    <div id="quote-list-pagination-slot"></div>
 
     <h1 style="margin-top:26px">Resultados de Cotações</h1>
     <div class="subtitle">Cotações fechadas com produtos seus — confirme o pedido pra fechar.</div>
@@ -320,6 +330,7 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M9 12l2 2 4-4"/><circle cx="12" cy="12" r="9"/></svg>
       <span>Nenhum resultado pendente de confirmação.</span>
     </div>
+    <div id="fulfillment-pending-pagination-slot"></div>
   </div>
 
   <!-- ---------- histórico: cotações fechadas/expiradas ---------- -->
@@ -331,6 +342,7 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/></svg>
       <span>Nenhuma cotação anterior ainda.</span>
     </div>
+    <div id="history-list-pagination-slot"></div>
   </div>
 
   <!-- ---------- o que eu ganhei ---------- -->
@@ -342,6 +354,7 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M8 21h8M12 17v4M7 4h10v4a5 5 0 01-10 0V4z"/><path d="M7 5H4a1 1 0 00-1 1 5 5 0 004 4.9M17 5h3a1 1 0 011 1 5 5 0 01-4 4.9"/></svg>
       <span>Você ainda não ganhou nenhum produto em cotações fechadas.</span>
     </div>
+    <div id="won-list-pagination-slot"></div>
   </div>
 
   <!-- ---------- meu desempenho: indicadores calculados em cima dos lances já enviados ---------- -->
@@ -390,7 +403,10 @@
 </main>
 
 <div id="sticky-submit-bar">
-  <button onclick="submitAllBids()">Salvar Cotação</button>
+  <div class="sticky-bar-row">
+    <button id="sticky-decline-btn" class="secondary" onclick="declineCurrentQuotation(this)" style="display:none">Não Cotar</button>
+    <button id="sticky-main-btn" onclick="submitAllBids()">Salvar Cotação</button>
+  </div>
 </div>
 
 <nav class="tab-bar" id="tab-bar">
@@ -459,9 +475,50 @@ async function api(method, path, body) {
   return data;
 }
 
+const REP_PAGE_SIZE = 10;
+
+function paginateSlice(array, page, pageSize) {
+  const totalPages = Math.max(Math.ceil(array.length / pageSize), 1);
+  const safePage = Math.min(Math.max(page, 0), totalPages - 1);
+  return { items: array.slice(safePage * pageSize, safePage * pageSize + pageSize), page: safePage, totalPages };
+}
+
+function paginationControlsHtml(idPrefix) {
+  return `<div class="pagination-row" id="${idPrefix}-pagination">
+    <div class="page-info" id="${idPrefix}-page-info">—</div>
+    <div class="page-btns">
+      <button class="secondary" id="${idPrefix}-prev-btn">← Anterior</button>
+      <button class="secondary" id="${idPrefix}-next-btn">Próxima →</button>
+    </div>
+  </div>`;
+}
+
+function updatePaginationControls(idPrefix, page, totalPages, totalItems, onChange) {
+  const wrap = document.getElementById(idPrefix + '-pagination');
+  if (!wrap) return;
+  wrap.style.display = totalItems > REP_PAGE_SIZE ? 'flex' : 'none';
+  document.getElementById(idPrefix + '-page-info').textContent = `Página ${page + 1} de ${totalPages}`;
+  const prevBtn = document.getElementById(idPrefix + '-prev-btn');
+  const nextBtn = document.getElementById(idPrefix + '-next-btn');
+  prevBtn.disabled = page === 0;
+  nextBtn.disabled = page >= totalPages - 1;
+  prevBtn.onclick = () => onChange(page - 1);
+  nextBtn.onclick = () => onChange(page + 1);
+}
+
 async function safeCall(fn) {
   try { return await fn(); }
   catch (e) { toast(e.message, true); throw e; }
+}
+
+// Monta NomeDaCotação_NomeDaEmpresa_NumeroDaCotação.pdf — tira caracteres que dão
+// problema em nome de arquivo (barra, dois-pontos, etc.), mas mantém espaço, já que
+// isso não é um risco real em sistema de arquivo nenhum hoje em dia.
+function buildPdfFilename(quotationName, quotationId) {
+  const companyName = (companySettingsCache && companySettingsCache.name) ? companySettingsCache.name : 'Empresa';
+  const sanitize = (s) => String(s).replace(/[\\/:*?"<>|]/g, '').trim();
+  const parts = [sanitize(quotationName), sanitize(companyName), formatQuotationNumber(quotationId)];
+  return parts.join('_') + '.pdf';
 }
 
 // Mesmo motivo do admin.html: link/window.open direto não manda o Authorization header,
@@ -602,6 +659,10 @@ let currentTab = 'available';
 async function init() {
   const token = localStorage.getItem('kota-token');
   if (!token) { window.location.href = '/login.html'; return; }
+
+  ['quote-list', 'fulfillment-pending', 'history-list', 'won-list'].forEach(prefix => {
+    document.getElementById(prefix + '-pagination-slot').innerHTML = paginationControlsHtml(prefix);
+  });
 
   // Essa tela é só pra representante — admin não tem fornecedor nenhum vinculado, então
   // toda a lógica de "qual empresa estou cotizando" quebra em cascata se ele cair aqui
@@ -758,6 +819,9 @@ let currentFulfillmentSupplierId = null;
 
 // Usa a empresa selecionada nas abas da tela inicial — não mescla mais todas as empresas
 // do representante numa lista só (isso ficou responsabilidade das abas agora).
+let pendingFulfillmentCache = [];
+let pendingPage = 0;
+
 async function loadPendingFulfillmentResults() {
   const list = document.getElementById('fulfillment-pending-list');
   const emptyEl = document.getElementById('fulfillment-pending-empty');
@@ -765,14 +829,24 @@ async function loadPendingFulfillmentResults() {
   if (!currentSupplierId) {
     list.innerHTML = '';
     emptyEl.style.display = 'block';
+    pendingFulfillmentCache = [];
+    updatePaginationControls('fulfillment-pending', 0, 1, 0, () => {});
     return;
   }
 
-  const pending = await safeCall(() => api('GET', `/quotations/pending-fulfillment?supplierId=${currentSupplierId}`));
+  pendingFulfillmentCache = await safeCall(() => api('GET', `/quotations/pending-fulfillment?supplierId=${currentSupplierId}`));
+  emptyEl.style.display = pendingFulfillmentCache.length ? 'none' : 'block';
+  pendingPage = 0;
+  renderPendingFulfillmentPage();
+}
 
+function renderPendingFulfillmentPage() {
+  const { items, page, totalPages } = paginateSlice(pendingFulfillmentCache, pendingPage, REP_PAGE_SIZE);
+  pendingPage = page;
+
+  const list = document.getElementById('fulfillment-pending-list');
   list.innerHTML = '';
-  emptyEl.style.display = pending.length ? 'none' : 'block';
-  pending.forEach(q => {
+  items.forEach(q => {
     const div = document.createElement('div');
     div.className = 'quote-item';
     div.innerHTML = `
@@ -786,6 +860,11 @@ async function loadPendingFulfillmentResults() {
     div.onclick = () => openFulfillmentView(q.quotationId, currentSupplierId);
     list.appendChild(div);
   });
+
+  updatePaginationControls('fulfillment-pending', page, totalPages, pendingFulfillmentCache.length, (newPage) => {
+    pendingPage = newPage;
+    renderPendingFulfillmentPage();
+  });
 }
 
 async function openFulfillmentView(quotationId, supplierId) {
@@ -796,9 +875,10 @@ async function openFulfillmentView(quotationId, supplierId) {
   document.getElementById('view-fulfillment').classList.add('active');
   hideBottomChrome();
 
-  const btn = document.querySelector('#sticky-submit-bar button');
+  const btn = document.getElementById('sticky-main-btn');
   btn.textContent = 'Finalizar Pedido';
   btn.onclick = finalizeCurrentFulfillment;
+  document.getElementById('sticky-decline-btn').style.display = 'none';
   document.getElementById('sticky-submit-bar').style.display = 'flex';
 
   await renderFulfillmentItems();
@@ -890,7 +970,8 @@ async function finalizeWithExport(exportType) {
   toast('Pedido finalizado.');
 
   if (exportType === 'pdf') {
-    sharePdfOrDownload(`/quotations/${quotationId}/result-pdf?supplierId=${supplierId}`, `pedido-${quotationId}.pdf`);
+    const quotation = await safeCall(() => api('GET', `/quotations/${quotationId}`));
+    sharePdfOrDownload(`/quotations/${quotationId}/result-pdf?supplierId=${supplierId}`, buildPdfFilename(quotation.name, quotationId));
   } else if (exportType === 'whatsapp') {
     const won = await safeCall(() => api('GET', `/quotations/won?supplierId=${supplierId}`));
     const q = won.find(w => w.quotationId === quotationId);
@@ -978,6 +1059,8 @@ function isQuotationEligibleForMe(quotation) {
   return !!supplier && (supplier.groupIds || []).includes(quotation.supplierGroupId);
 }
 
+let quotePage = 0;
+
 async function loadQuotations() {
   const all = await safeCall(() => api('GET', '/quotations'));
   quotationsCache = all.filter(q => q.status === 'AVAILABLE' && isQuotationEligibleForMe(q));
@@ -987,10 +1070,17 @@ async function loadQuotations() {
     ? `${quotationsCache.length} cotação${quotationsCache.length > 1 ? 'ões' : ''} aguardando seus preços.`
     : 'Toque numa cotação pra enviar seus preços.';
 
+  renderQuoteListPage();
+}
+
+function renderQuoteListPage() {
+  const { items, page, totalPages } = paginateSlice(quotationsCache, quotePage, REP_PAGE_SIZE);
+  quotePage = page;
+
   const list = document.getElementById('quote-list');
   list.innerHTML = '';
   document.getElementById('quote-list-empty').style.display = quotationsCache.length ? 'none' : 'block';
-  quotationsCache.forEach(q => {
+  items.forEach(q => {
     const deadline = relativeDeadlineLabel(q.expirationDate);
     const div = document.createElement('div');
     div.className = 'quote-item';
@@ -1006,22 +1096,39 @@ async function loadQuotations() {
     div.onclick = () => openItemsView(q.id);
     list.appendChild(div);
   });
+
+  updatePaginationControls('quote-list', page, totalPages, quotationsCache.length, (newPage) => {
+    quotePage = newPage;
+    renderQuoteListPage();
+  });
 }
 
 // ---------- aba: anteriores ----------
 let historyCache = [];
+let historyPage = 0;
 
 async function loadHistory() {
   const all = await safeCall(() => api('GET', '/quotations'));
-  const history = all
+  historyCache = all
     .filter(q => q.status === 'CLOSED' || q.status === 'EXPIRED')
     .sort((a, b) => new Date(b.updatedAt || b.createdAt) - new Date(a.updatedAt || a.createdAt));
 
-  historyCache = history;
+  document.getElementById('history-list-empty').style.display = historyCache.length ? 'none' : 'block';
+  historyPage = 0;
+  renderHistoryPage();
+}
+
+// Usa o índice GLOBAL (posição em historyCache), não a posição local dentro da página
+// renderizada — os ids (history-items-N) e toggleHistoryCard(N) continuam batendo com
+// historyCache não importa em qual página o card está.
+function renderHistoryPage() {
+  const { items, page, totalPages } = paginateSlice(historyCache, historyPage, REP_PAGE_SIZE);
+  historyPage = page;
+
   const list = document.getElementById('history-list');
   list.innerHTML = '';
-  document.getElementById('history-list-empty').style.display = history.length ? 'none' : 'block';
-  history.forEach((q, idx) => {
+  items.forEach((q, localIdx) => {
+    const idx = page * REP_PAGE_SIZE + localIdx;
     const div = document.createElement('div');
     div.className = 'card won-card';
     div.innerHTML = `
@@ -1038,6 +1145,11 @@ async function loadHistory() {
       <div class="won-card-items" id="history-items-${idx}" style="display:none"></div>
     `;
     list.appendChild(div);
+  });
+
+  updatePaginationControls('history-list', page, totalPages, historyCache.length, (newPage) => {
+    historyPage = newPage;
+    renderHistoryPage();
   });
 }
 
@@ -1078,6 +1190,7 @@ async function toggleHistoryCard(idx) {
 }
 
 let wonQuotationsCache = [];
+let wonPage = 0;
 
 // ---------- aba: o que eu ganhei ----------
 async function loadWonQuotations() {
@@ -1089,15 +1202,28 @@ async function loadWonQuotations() {
     list.innerHTML = '';
     emptyEl.style.display = 'block';
     emptyEl.textContent = 'Este representante não está associado a nenhum fornecedor.';
+    wonQuotationsCache = [];
+    updatePaginationControls('won-list', 0, 1, 0, () => {});
     return;
   }
 
-  const won = await safeCall(() => api('GET', `/quotations/won?supplierId=${supplierId}`));
+  wonQuotationsCache = await safeCall(() => api('GET', `/quotations/won?supplierId=${supplierId}`));
   emptyEl.textContent = 'Você ainda não ganhou nenhum produto em cotações fechadas.';
-  emptyEl.style.display = won.length ? 'none' : 'block';
+  emptyEl.style.display = wonQuotationsCache.length ? 'none' : 'block';
+  wonPage = 0;
+  renderWonListPage();
+}
 
-  wonQuotationsCache = won;
-  list.innerHTML = won.map((q, idx) => `
+// Mesma cautela de Anteriores: índice GLOBAL (posição em wonQuotationsCache), não local
+// da página — downloadWonPdf e shareWonWhatsApp dependem desse índice bater certo.
+function renderWonListPage() {
+  const { items, page, totalPages } = paginateSlice(wonQuotationsCache, wonPage, REP_PAGE_SIZE);
+  wonPage = page;
+
+  const list = document.getElementById('won-list');
+  list.innerHTML = items.map((q, localIdx) => {
+    const idx = page * REP_PAGE_SIZE + localIdx;
+    return `
     <div class="card won-card">
       <div class="won-card-header" onclick="toggleWonCard(${idx})">
         <div>
@@ -1122,7 +1248,13 @@ async function loadWonQuotations() {
         </div>
       </div>
     </div>
-  `).join('');
+  `;
+  }).join('');
+
+  updatePaginationControls('won-list', page, totalPages, wonQuotationsCache.length, (newPage) => {
+    wonPage = newPage;
+    renderWonListPage();
+  });
 }
 
 // Fechado por padrão — com várias cotações ganhas, uma lista toda expandida vira uma
@@ -1139,7 +1271,9 @@ function toggleWonCard(idx) {
 // fornecedores (?supplierId= no result-pdf existente do admin). Compartilha o arquivo
 // de verdade via Web Share API quando o navegador suporta (ver sharePdfOrDownload).
 function downloadWonPdf(quotationId) {
-  sharePdfOrDownload(`/quotations/${quotationId}/result-pdf?supplierId=${currentSupplierId}`, `pedido-${quotationId}.pdf`);
+  const q = wonQuotationsCache.find(w => w.quotationId === quotationId);
+  const filename = buildPdfFilename(q ? q.quotationName : quotationId, quotationId);
+  sharePdfOrDownload(`/quotations/${quotationId}/result-pdf?supplierId=${currentSupplierId}`, filename);
 }
 
 function maskCnpj(raw) {
@@ -1423,9 +1557,10 @@ async function openItemsView(id) {
   document.getElementById('view-entry').classList.add('active');
   hideBottomChrome();
 
-  const btn = document.querySelector('#sticky-submit-bar button');
+  const btn = document.getElementById('sticky-main-btn');
   btn.textContent = 'Salvar Cotação';
   btn.onclick = submitAllBids;
+  document.getElementById('sticky-decline-btn').style.display = 'block';
   document.getElementById('sticky-submit-bar').style.display = 'flex';
 
   renderSupplierResolution();
@@ -1434,6 +1569,26 @@ async function openItemsView(id) {
 
 // Um único envio pro lote inteiro — fornecedor resolvido automaticamente e prazo
 // preenchido uma vez, aplicados a todo item que tiver preço digitado.
+// "Não Cotar" — pra quando não tem nenhum produto pra ofertar nessa cotação. Diferente
+// de simplesmente sair da tela sem fazer nada (que fica indistinguível de "esqueceu"),
+// isso registra uma resposta explícita — inclusive conta na taxa de participação do
+// admin, só sem preço nenhum associado.
+function declineCurrentQuotation(buttonEl) {
+  const supplierId = resolveSupplierId();
+  if (!supplierId) { toast('Não foi possível identificar o fornecedor deste representante.', true); return; }
+
+  showConfirmPopover(
+    buttonEl,
+    'Declinar essa cotação inteira? Isso avisa o administrador que você não tem nada pra ofertar dessa vez.',
+    async () => {
+      await safeCall(() => api('POST', `/quotations/${currentQuotationId}/decline?supplierId=${supplierId}`));
+      toast('Cotação declinada.');
+      closeItemsView();
+      await loadQuotations();
+    }
+  );
+}
+
 async function submitAllBids() {
   const supplierId = resolveSupplierId();
 

@@ -23,6 +23,7 @@ import com.bruno.kota.entities.Bid;
 import com.bruno.kota.entities.OrderFulfillmentConfirmation;
 import com.bruno.kota.entities.Product;
 import com.bruno.kota.entities.Quotation;
+import com.bruno.kota.entities.QuotationDecline;
 import com.bruno.kota.entities.QuotationItem;
 import com.bruno.kota.entities.QuotationStatus;
 import com.bruno.kota.entities.Representative;
@@ -32,6 +33,7 @@ import com.bruno.kota.exceptions.BusinessRuleException;
 import com.bruno.kota.exceptions.ResourceNotFoundException;
 import com.bruno.kota.repositories.BidRepository;
 import com.bruno.kota.repositories.OrderFulfillmentConfirmationRepository;
+import com.bruno.kota.repositories.QuotationDeclineRepository;
 import com.bruno.kota.repositories.ProductRepository;
 import com.bruno.kota.repositories.QuotationItemRepository;
 import com.bruno.kota.repositories.QuotationRepository;
@@ -53,6 +55,7 @@ public class QuotationService {
     private final RepresentativeRepository representativeRepository;
     private final BidRepository bidRepository;
     private final OrderFulfillmentConfirmationRepository orderFulfillmentConfirmationRepository;
+    private final QuotationDeclineRepository quotationDeclineRepository;
 
     @Transactional(readOnly = true)
     public List<QuotationResponse> findAll() {
@@ -564,7 +567,17 @@ public class QuotationService {
                     .map(bid -> bid.getSubmittedBy().getId())
                     .collect(Collectors.toSet());
 
-            int filled = (int) eligibleRepIds.stream().filter(submittedRepIds::contains).count();
+            // "Não Cotar" conta como resposta pra taxa de participação — o representante
+            // olhou a cotação e declarou explicitamente que não tem nada a oferecer, o
+            // que é bem diferente de simplesmente nunca ter aberto a cotação.
+            Set<Long> declinedRepIds = quotationDeclineRepository.findByQuotationId(quotation.getId()).stream()
+                    .map(d -> d.getDeclinedBy().getId())
+                    .collect(Collectors.toSet());
+
+            Set<Long> respondedRepIds = new HashSet<>(submittedRepIds);
+            respondedRepIds.addAll(declinedRepIds);
+
+            int filled = (int) eligibleRepIds.stream().filter(respondedRepIds::contains).count();
             rates.add(new QuotationFillRate(quotation.getId(), eligibleRepIds.size(), filled));
         }
 
@@ -859,6 +872,44 @@ public class QuotationService {
             ));
         }
         return rows;
+    }
+
+    // "Não Cotar" — pra quando o representante abre uma cotação e não tem nenhum produto
+    // pra ofertar. Idempotente (clicar duas vezes não duplica nem dá erro) e bloqueia se
+    // já existir algum lance desse fornecedor nessa cotação — não faz sentido "declinar"
+    // depois de já ter enviado preço pra pelo menos um item.
+    @Transactional
+    public void declineQuotation(Long quotationId, Long supplierId, Long authenticatedRepresentativeId) {
+        validateSupplierOwnership(supplierId, authenticatedRepresentativeId);
+
+        Quotation quotation = findEntityById(quotationId);
+        if (quotation.getStatus() != QuotationStatus.AVAILABLE) {
+            throw new BusinessRuleException("Só é possível declinar uma cotação disponível.");
+        }
+
+        if (quotationDeclineRepository.existsByQuotationIdAndSupplierId(quotationId, supplierId)) {
+            return;
+        }
+
+        Supplier supplier = supplierRepository.findById(supplierId)
+                .orElseThrow(() -> new ResourceNotFoundException("Fornecedor não encontrado: id " + supplierId));
+
+        boolean hasBids = bidRepository.findByQuotationItem_QuotationId(quotationId).stream()
+                .anyMatch(b -> b.getSupplier().getId().equals(supplierId));
+        if (hasBids) {
+            throw new BusinessRuleException("Esse fornecedor já enviou preços nessa cotação — não é possível declinar.");
+        }
+
+        if (supplier.getRepresentative() == null) {
+            throw new BusinessRuleException("Esse fornecedor não tem representante vinculado.");
+        }
+
+        quotationDeclineRepository.save(QuotationDecline.builder()
+                .quotation(quotation)
+                .supplier(supplier)
+                .declinedBy(supplier.getRepresentative())
+                .declinedAt(LocalDateTime.now())
+                .build());
     }
 
     // Marca "não tenho isso em estoque" — some da relação pro representante (não conta

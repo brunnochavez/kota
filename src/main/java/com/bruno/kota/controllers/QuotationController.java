@@ -109,6 +109,12 @@ public class QuotationController {
         return ResponseEntity.noContent().build();
     }
 
+    @PostMapping("/{id}/decline")
+    public ResponseEntity<Void> declineQuotation(@AuthenticationPrincipal AuthPrincipal principal, @PathVariable Long id, @RequestParam Long supplierId) {
+        quotationService.declineQuotation(id, supplierId, repIdOrNull(principal));
+        return ResponseEntity.noContent().build();
+    }
+
     @PostMapping("/{id}/finalize-fulfillment")
     public ResponseEntity<Void> finalizeFulfillment(@AuthenticationPrincipal AuthPrincipal principal, @PathVariable Long id, @RequestParam Long supplierId) {
         quotationService.finalizeFulfillment(id, supplierId, repIdOrNull(principal));
