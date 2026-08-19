@@ -35,7 +35,8 @@
   }
   .brand { display: flex; align-items: center; gap: 10px; margin-bottom: 4px; }
   .brand svg { width: 26px; height: 26px; color: var(--accent); flex-shrink: 0; }
-  .brand span { font-weight: 700; font-size: 20px; }
+  .brand-logo-slot img { width: 32px; height: 32px; object-fit: contain; border-radius: 6px; flex-shrink: 0; }
+  .brand-name { font-weight: 700; font-size: 20px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .subtitle { color: var(--text-dim); font-size: 13px; margin: 0 0 26px; }
   label { display: block; font-size: 12.5px; font-weight: 600; color: var(--text-dim); margin-bottom: 6px; }
   input {
@@ -69,8 +70,8 @@
 
 <div class="card" id="login-card">
   <div class="brand">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 11l9-8 9 8"/><path d="M5 10v10a1 1 0 001 1h4v-6h4v6h4a1 1 0 001-1V10"/></svg>
-    <span>kota</span>
+    <span class="brand-logo-slot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 11l9-8 9 8"/><path d="M5 10v10a1 1 0 001 1h4v-6h4v6h4a1 1 0 001-1V10"/></svg></span>
+    <span class="brand-name">kota</span>
   </div>
   <div class="subtitle">Entre com seu e-mail e senha.</div>
 
@@ -95,8 +96,8 @@
 
 <div class="card" id="change-password-card" style="display:none">
   <div class="brand">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 11l9-8 9 8"/><path d="M5 10v10a1 1 0 001 1h4v-6h4v6h4a1 1 0 001-1V10"/></svg>
-    <span>kota</span>
+    <span class="brand-logo-slot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 11l9-8 9 8"/><path d="M5 10v10a1 1 0 001 1h4v-6h4v6h4a1 1 0 001-1V10"/></svg></span>
+    <span class="brand-name">kota</span>
   </div>
   <div class="subtitle">Essa senha foi definida por outra pessoa — defina uma nova, que só você vai saber, antes de continuar.</div>
 
@@ -137,6 +138,29 @@ function applyTheme(theme) { document.documentElement.setAttribute('data-theme',
   const role = localStorage.getItem('kota-role');
   if (token && role) {
     window.location.href = role === 'ADMIN' ? '/admin.html' : '/representante.html';
+  }
+})();
+
+// Nome/CNPJ (GET /company-settings) e a logo (/company-settings/logo) são públicos de
+// propósito — a tela de login roda ANTES de qualquer token existir, então precisam ser
+// acessíveis sem autenticação. Se a empresa ainda não configurou nada, o "kota" que já
+// está no HTML fica como está (fallback natural, sem precisar de lógica extra aqui).
+(async function applyCompanyBranding() {
+  try {
+    const res = await fetch('/company-settings');
+    if (!res.ok) return;
+    const company = await res.json();
+
+    if (company.name) {
+      document.querySelectorAll('.brand-name').forEach(el => { el.textContent = company.name; el.title = company.name; });
+    }
+    if (company.logoUrl) {
+      document.querySelectorAll('.brand-logo-slot').forEach(el => {
+        el.innerHTML = `<img src="${company.logoUrl}?t=${Date.now()}" alt="">`;
+      });
+    }
+  } catch (e) {
+    // Sem conexão ou erro qualquer — mantém "kota" no HTML, não trava o login por causa disso.
   }
 })();
 

@@ -37,10 +37,17 @@
   header { background: var(--surface); border-bottom: 1px solid var(--border); padding: 12px 16px; position: sticky; top: 0; z-index: 30; }
   header .row { display: flex; align-items: center; justify-content: space-between; max-width: 640px; margin: 0 auto; gap: 10px; }
   .brand {
-    font-weight: 700; font-size: 15.5px; white-space: nowrap; flex-shrink: 0;
+    font-weight: 700; font-size: 15.5px; flex-shrink: 0; min-width: 0;
     display: flex; align-items: center; gap: 6px; background: none; border: none; color: var(--text); cursor: pointer; padding: 4px 2px; font-family: var(--sans);
   }
   .brand svg { width: 19px; height: 19px; flex-shrink: 0; }
+  #brand-logo-slot img { width: 22px; height: 22px; object-fit: contain; border-radius: 5px; flex-shrink: 0; }
+  #brand-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 58px; }
+  .brand-company-name {
+    color: var(--text-dim); font-weight: 500; font-size: 13px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 84px;
+  }
+  .brand-company-name:not(:empty)::before { content: '· '; }
   .whoami { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; justify-content: flex-end; }
   .my-identity-label { font-size: 13px; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 140px; }
   .logout-btn { background: none; border: none; padding: 6px; cursor: pointer; color: var(--text-dim); display: flex; border-radius: 8px; }
@@ -287,8 +294,9 @@
 <header>
   <div class="row">
     <button class="brand" onclick="goHome()" title="Página inicial">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 11l9-8 9 8"/><path d="M5 10v10a1 1 0 001 1h4v-6h4v6h4a1 1 0 001-1V10"/></svg>
-      kota
+      <span id="brand-logo-slot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 11l9-8 9 8"/><path d="M5 10v10a1 1 0 001 1h4v-6h4v6h4a1 1 0 001-1V10"/></svg></span>
+      <span id="brand-name">kota</span>
+      <span id="brand-company-name" class="brand-company-name"></span>
     </button>
     <div class="whoami">
       <span id="my-identity" class="my-identity-label"></span>
@@ -676,6 +684,7 @@ async function init() {
 
   suppliersCache = await safeCall(() => api('GET', '/suppliers'));
   companySettingsCache = await safeCall(() => api('GET', '/company-settings'));
+  applyCompanyBrandingToHeader();
 
   renderGreeting();
   renderSupplierTabs();
@@ -1012,6 +1021,22 @@ function showBottomChrome() {
 // Fecha qualquer tela cheia que esteja aberta (lançamento ou revisão de resultado) antes
 // de voltar — switchTab já cuida da view-entry sozinho, mas view-fulfillment precisa
 // dessa limpeza explícita (barra fixa, ids do fornecedor/cotação em edição).
+// Se a empresa ainda não configurou nada, o "kota" que já está no HTML fica como está —
+// sem precisar de lógica de fallback aqui, é só não sobrescrever nada.
+function applyCompanyBrandingToHeader() {
+  if (!companySettingsCache) return;
+
+  if (companySettingsCache.name) {
+    const companyEl = document.getElementById('brand-company-name');
+    companyEl.textContent = companySettingsCache.name;
+    companyEl.title = companySettingsCache.name;
+  }
+  if (companySettingsCache.logoUrl) {
+    document.getElementById('brand-logo-slot').innerHTML =
+      `<img src="${companySettingsCache.logoUrl}?t=${Date.now()}" alt="">`;
+  }
+}
+
 function goHome() {
   if (document.getElementById('view-fulfillment').classList.contains('active')) {
     closeFulfillmentView();
