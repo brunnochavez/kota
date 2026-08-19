@@ -571,6 +571,25 @@ public class QuotationService {
         return rates;
     }
 
+    // Mesmo princípio do BidService.submit(): authenticatedRepresentativeId vem do token,
+    // não de nada que o cliente declare. null = quem chamou é admin, sem restrição —
+    // admin já tem acesso a qualquer fornecedor. Pra representante, barra na hora se o
+    // supplierId pedido não for de uma empresa que ele de fato representa — sem isso,
+    // um representante logado podia trocar o supplierId na URL e ver/agir em nome de
+    // qualquer outro fornecedor do sistema.
+    private void validateSupplierOwnership(Long supplierId, Long authenticatedRepresentativeId) {
+        if (authenticatedRepresentativeId == null) {
+            return;
+        }
+        Supplier supplier = supplierRepository.findById(supplierId)
+                .orElseThrow(() -> new ResourceNotFoundException("Fornecedor não encontrado: id " + supplierId));
+        boolean owns = supplier.getRepresentative() != null
+                && supplier.getRepresentative().getId().equals(authenticatedRepresentativeId);
+        if (!owns) {
+            throw new BusinessRuleException("Esse representante não está autorizado a agir em nome desse fornecedor.");
+        }
+    }
+
     // Cotações fechadas onde esse fornecedor ganhou pelo menos um item — usado na tela do
     // representante ("O que eu ganhei"). Só entra cotação CLOSED (Em Revisão ainda pode
     // mudar, não faz sentido mostrar como resultado definitivo ainda). Cada representante
@@ -580,7 +599,8 @@ public class QuotationService {
     // Só mostra depois de finalizado (ver finalizeFulfillment) — antes disso, os mesmos
     // itens aparecem em findPendingFulfillmentResults, não aqui.
     @Transactional(readOnly = true)
-    public List<WonQuotationSummary> findWonQuotations(Long supplierId) {
+    public List<WonQuotationSummary> findWonQuotations(Long supplierId, Long authenticatedRepresentativeId) {
+        validateSupplierOwnership(supplierId, authenticatedRepresentativeId);
         return findFulfillmentSummaries(supplierId, true);
     }
 
@@ -588,7 +608,8 @@ public class QuotationService {
     // alimenta "Resultados de Cotações" na tela do representante, onde ele confirma ou
     // corta cada item antes de finalizar o pedido.
     @Transactional(readOnly = true)
-    public List<WonQuotationSummary> findPendingFulfillmentResults(Long supplierId) {
+    public List<WonQuotationSummary> findPendingFulfillmentResults(Long supplierId, Long authenticatedRepresentativeId) {
+        validateSupplierOwnership(supplierId, authenticatedRepresentativeId);
         return findFulfillmentSummaries(supplierId, false);
     }
 
@@ -648,11 +669,19 @@ public class QuotationService {
     // — se o grupo mudou depois de alguma cotação antiga, isso é aproximado, não um
     // retrato histórico exato (o sistema não guarda "grupo em que estava em cada data").
     @Transactional(readOnly = true)
-    public RepresentativePerformance getRepresentativePerformance(Long supplierId) {
+    public RepresentativePerformance getRepresentativePerformance(Long supplierId, Long authenticatedRepresentativeId) {
+        validateSupplierOwnership(supplierId, authenticatedRepresentativeId);
         Supplier supplier = supplierRepository.findById(supplierId)
                 .orElseThrow(() -> new ResourceNotFoundException("Fornecedor não encontrado: id " + supplierId));
 
-        List<Bid> myBids = bidRepository.findBySupplierId(supplierId);
+        // Só últimos 30 dias — desempenho antigo não representa como o representante
+        // está indo AGORA, e ia deixar o número "empacado" pra sempre em cima de coisa
+        // de meses atrás. Um único corte na origem (aqui) já reflete em tudo que vem
+        // depois: taxa de vitória, produtos, perdas, valor ganho.
+        LocalDateTime performanceCutoff = LocalDateTime.now().minusDays(30);
+        List<Bid> myBids = bidRepository.findBySupplierId(supplierId).stream()
+                .filter(b -> b.getSubmittedAt() != null && b.getSubmittedAt().isAfter(performanceCutoff))
+                .toList();
 
         int decidedBids = 0;
         int wonBids = 0;
@@ -719,6 +748,7 @@ public class QuotationService {
         List<Quotation> published = quotationRepository.findAll().stream()
                 .filter(q -> q.getStatus() != QuotationStatus.DRAFT)
                 .filter(q -> q.getSupplierGroup() != null && myGroupIds.contains(q.getSupplierGroup().getId()))
+                .filter(q -> q.getPublishedAt() != null && q.getPublishedAt().isAfter(performanceCutoff))
                 .toList();
 
         Set<Long> respondedQuotationIds = myBids.stream()
@@ -802,7 +832,8 @@ public class QuotationService {
     // cotação em "Anteriores". Funciona pra CLOSED (mostra won) e EXPIRED (nunca teve
     // vencedor, então won sempre falso — mas ainda mostra o que foi digitado).
     @Transactional(readOnly = true)
-    public List<QuotationReportRow> getMyBidsForQuotation(Long quotationId, Long supplierId) {
+    public List<QuotationReportRow> getMyBidsForQuotation(Long quotationId, Long supplierId, Long authenticatedRepresentativeId) {
+        validateSupplierOwnership(supplierId, authenticatedRepresentativeId);
         Quotation quotation = quotationRepository.findById(quotationId)
                 .orElseThrow(() -> new ResourceNotFoundException("Cotação não encontrada: id " + quotationId));
 
@@ -835,7 +866,7 @@ public class QuotationService {
     // pro admin ver o que foi cortado. Só antes de finalizar: depois disso o pedido tá
     // fechado de vez, igual não dá pra editar quantidade de cotação já CLOSED.
     @Transactional
-    public void cutFulfillmentItem(Long quotationId, Long itemId) {
+    public void cutFulfillmentItem(Long quotationId, Long itemId, Long authenticatedRepresentativeId) {
         QuotationItem item = quotationItemRepository.findById(itemId)
                 .orElseThrow(() -> new ResourceNotFoundException("Item não encontrado: id " + itemId));
 
@@ -850,6 +881,8 @@ public class QuotationService {
         }
 
         Long supplierId = item.getWinningBid().getSupplier().getId();
+        validateSupplierOwnership(supplierId, authenticatedRepresentativeId);
+
         if (orderFulfillmentConfirmationRepository.existsByQuotationIdAndSupplierId(item.getQuotation().getId(), supplierId)) {
             throw new BusinessRuleException("Esse pedido já foi finalizado — não é mais possível cortar itens.");
         }
@@ -861,7 +894,8 @@ public class QuotationService {
     // Idempotente de propósito — clicar em "Finalizar Pedido" duas vezes (duplo toque,
     // rede lenta) não deve dar erro, só não faz nada na segunda vez.
     @Transactional
-    public void finalizeFulfillment(Long quotationId, Long supplierId) {
+    public void finalizeFulfillment(Long quotationId, Long supplierId, Long authenticatedRepresentativeId) {
+        validateSupplierOwnership(supplierId, authenticatedRepresentativeId);
         Quotation quotation = findEntityById(quotationId);
 
         if (quotation.getStatus() != QuotationStatus.CLOSED) {

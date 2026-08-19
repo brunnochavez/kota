@@ -44,15 +44,20 @@ public class BidService {
     }
 
     @Transactional
-    public BidResponse submit(BidRequest request) {
+    // authenticatedRepresentativeId vem do token, não do corpo da requisição — é o que
+    // fecha a brecha de um representante conseguir enviar lance em nome de outro só
+    // mudando um número no JSON. null significa "quem chamou é admin", caso em que o
+    // submittedById declarado no corpo ainda é respeitado (admin já tem acesso total).
+    public BidResponse submit(BidRequest request, Long authenticatedRepresentativeId) {
         QuotationItem quotationItem = quotationItemRepository.findById(request.quotationItemId())
                 .orElseThrow(() -> new ResourceNotFoundException("Item de cotação não encontrado: id " + request.quotationItemId()));
 
         Supplier supplier = supplierRepository.findById(request.supplierId())
                 .orElseThrow(() -> new ResourceNotFoundException("Fornecedor não encontrado: id " + request.supplierId()));
 
-        Representative submittedBy = representativeRepository.findById(request.submittedById())
-                .orElseThrow(() -> new ResourceNotFoundException("Representante não encontrado: id " + request.submittedById()));
+        Long submittedById = authenticatedRepresentativeId != null ? authenticatedRepresentativeId : request.submittedById();
+        Representative submittedBy = representativeRepository.findById(submittedById)
+                .orElseThrow(() -> new ResourceNotFoundException("Representante não encontrado: id " + submittedById));
 
         validateWindow(quotationItem);
         validateGroupAccess(quotationItem, supplier);

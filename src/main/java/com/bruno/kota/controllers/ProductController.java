@@ -3,6 +3,7 @@ import java.util.List;
 import com.bruno.kota.dtos.PagedResponse;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import com.bruno.kota.dtos.ProductRequest;
 import com.bruno.kota.dtos.ProductResponse;
@@ -28,21 +29,25 @@ public class ProductController {
     }
 
     @PostMapping
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ProductResponse> create(@Valid @RequestBody ProductRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(productService.create(request));
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ProductResponse update(@PathVariable Long id, @Valid @RequestBody ProductRequest request) {
         return productService.update(id, request);
     }
 
     @PostMapping("/{id}/reactivate")
+    @PreAuthorize("hasRole('ADMIN')")
     public ProductResponse reactivate(@PathVariable Long id, @Valid @RequestBody ProductRequest request) {
         return productService.reactivate(id, request);
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Void> delete(@PathVariable Long id) {
         productService.delete(id);
         return ResponseEntity.noContent().build();
@@ -57,6 +62,7 @@ public class ProductController {
     }
 
     @GetMapping("/inactive")
+    @PreAuthorize("hasRole('ADMIN')")
     public List<ProductResponse> findAllInactive() {
         return productService.findAllInactive();
     }
@@ -67,11 +73,13 @@ public class ProductController {
     }
 
     @PostMapping("/{id}/groups/{groupId}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ProductResponse addToGroup(@PathVariable Long id, @PathVariable Long groupId) {
         return productService.addToGroup(id, groupId);
     }
 
     @DeleteMapping("/{id}/groups/{groupId}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ProductResponse removeFromGroup(@PathVariable Long id, @PathVariable Long groupId) {
         return productService.removeFromGroup(id, groupId);
     }

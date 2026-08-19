@@ -40,4 +40,12 @@ public class User {
     @Column(nullable = false)
     @Builder.Default
     private Boolean enabled = true;
+
+    // true sempre que a senha foi definida por OUTRA pessoa (admin criando acesso, ou
+    // resetando) — nesses casos, o admin chegou a saber a senha em algum momento, então
+    // ela precisa ser trocada por uma que só o próprio dono conhece antes de valer pra
+    // valer. Fica false assim que o próprio usuário troca via /auth/change-password.
+    @Column(name = "must_change_password", nullable = false)
+    @Builder.Default
+    private Boolean mustChangePassword = true;
 }

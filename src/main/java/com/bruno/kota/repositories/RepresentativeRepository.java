@@ -13,6 +13,8 @@ public interface RepresentativeRepository extends JpaRepository<Representative, 
 
     Optional<Representative> findByCpf(String cpf);
 
+    Optional<Representative> findByUserId(Long userId);
+
     @Query(value = "SELECT * FROM representatives WHERE cpf = :cpf", nativeQuery = true)
     Optional<Representative> findByCpfIncludingDeleted(@Param("cpf") String cpf);
 

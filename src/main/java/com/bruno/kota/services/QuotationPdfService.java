@@ -17,6 +17,7 @@ import org.openpdf.text.Document;
 import org.openpdf.text.DocumentException;
 import org.openpdf.text.Element;
 import org.openpdf.text.Font;
+import org.openpdf.text.Image;
 import org.openpdf.text.Paragraph;
 import org.openpdf.text.Phrase;
 import org.openpdf.text.pdf.PdfPCell;
@@ -25,6 +26,7 @@ import org.openpdf.text.pdf.PdfWriter;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.bruno.kota.dtos.CompanySettingsResponse;
 import com.bruno.kota.entities.Bid;
 import com.bruno.kota.entities.Quotation;
 import com.bruno.kota.entities.QuotationItem;
@@ -43,6 +45,7 @@ public class QuotationPdfService {
 
     private final QuotationRepository quotationRepository;
     private final QuotationItemRepository quotationItemRepository;
+    private final CompanySettingsService companySettingsService;
 
     // Locale, Color e DateTimeFormatter são todos imutáveis/thread-safe — dá pra
     // deixar como campo estático sem risco. DecimalFormat NÃO é thread-safe (é um
@@ -54,6 +57,74 @@ public class QuotationPdfService {
     private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
     private static final Color HEADER_BG = new Color(230, 236, 245);
     private static final Color STRIPE_BG = new Color(246, 248, 251);
+
+    // Reaproveitado pelos dois PDFs — logo (se tiver sido cadastrada) mais nome/CNPJ/
+    // endereço/telefone da empresa, sempre no topo do documento. Se não tiver nada
+    // configurado ainda (empresa nova, ninguém preencheu os dados), simplesmente não
+    // adiciona nada — o PDF continua funcionando normalmente, só sem esse cabeçalho.
+    private void addCompanyHeader(Document document) throws DocumentException {
+        CompanySettingsResponse company = companySettingsService.get();
+        byte[] logoBytes = companySettingsService.readLogoBytes();
+
+        if (logoBytes != null) {
+            try {
+                Image logo = Image.getInstance(logoBytes);
+                logo.scaleToFit(90, 50);
+                logo.setAlignment(Element.ALIGN_LEFT);
+                document.add(logo);
+            } catch (Exception e) {
+                // Logo corrompida ou formato que o OpenPDF não reconhece — não trava a
+                // geração do PDF por causa disso, só segue sem a imagem.
+            }
+        }
+
+        Font companyNameFont = new Font(Font.HELVETICA, 12, Font.BOLD);
+        Font companyDetailFont = new Font(Font.HELVETICA, 8.5f, Font.NORMAL, Color.GRAY);
+
+        if (company.name() != null && !company.name().isBlank()) {
+            document.add(new Paragraph(company.name(), companyNameFont));
+        }
+
+        // Linha 1: identificação fiscal. Linha 2: endereço completo, já remontado a
+        // partir dos campos separados. Linha 3: contato. Cada uma só aparece se tiver
+        // pelo menos um dado preenchido — não deixa "CNPJ: · IE: " com separador solto.
+        String fiscalLine = joinNonBlank(" · ",
+                labelOrNull("CNPJ: ", company.cnpj()),
+                labelOrNull("IE: ", company.stateRegistration()));
+
+        String addressLine = joinNonBlank(", ",
+                company.address(),
+                company.neighborhood());
+        String cityStateLine = joinNonBlank(" - ", company.city(), company.state());
+        String fullAddress = joinNonBlank(" · ", addressLine, cityStateLine,
+                labelOrNull("CEP ", company.zipCode()));
+
+        String contactLine = joinNonBlank(" · ", company.phone(), company.email());
+
+        for (String line : new String[]{fiscalLine, fullAddress, contactLine}) {
+            if (line != null && !line.isBlank()) {
+                document.add(new Paragraph(line, companyDetailFont));
+            }
+        }
+        Paragraph spacer = new Paragraph(" ", companyDetailFont);
+        spacer.setSpacingAfter(6);
+        document.add(spacer);
+    }
+
+    private String labelOrNull(String label, String value) {
+        return (value != null && !value.isBlank()) ? label + value : null;
+    }
+
+    private String joinNonBlank(String separator, String... parts) {
+        StringBuilder sb = new StringBuilder();
+        for (String part : parts) {
+            if (part != null && !part.isBlank()) {
+                if (sb.length() > 0) sb.append(separator);
+                sb.append(part);
+            }
+        }
+        return sb.length() > 0 ? sb.toString() : null;
+    }
 
     @Transactional(readOnly = true)
     public byte[] generateResultPdf(Long quotationId) {
@@ -87,6 +158,7 @@ public class QuotationPdfService {
             Document document = new Document();
             PdfWriter.getInstance(document, outputStream);
             document.open();
+            addCompanyHeader(document);
 
             Font titleFont = new Font(Font.HELVETICA, 17, Font.BOLD);
             Font subtitleFont = new Font(Font.HELVETICA, 9.5f, Font.NORMAL, Color.GRAY);
@@ -202,6 +274,7 @@ public class QuotationPdfService {
             Document document = new Document();
             PdfWriter.getInstance(document, outputStream);
             document.open();
+            addCompanyHeader(document);
 
             Font titleFont = new Font(Font.HELVETICA, 17, Font.BOLD);
             Font subtitleFont = new Font(Font.HELVETICA, 9.5f, Font.NORMAL, Color.GRAY);

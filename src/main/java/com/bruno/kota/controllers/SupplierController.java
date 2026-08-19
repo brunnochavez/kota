@@ -2,6 +2,7 @@ package com.bruno.kota.controllers;
 import java.util.List;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -34,6 +35,7 @@ public class SupplierController {
     }
 
     @GetMapping("/inactive")
+    @PreAuthorize("hasRole('ADMIN')")
     public List<SupplierResponse> findAllInactive() {
         return supplierService.findAllInactive();
     }
@@ -44,32 +46,38 @@ public class SupplierController {
     }
 
     @PostMapping
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<SupplierResponse> create(@Valid @RequestBody SupplierRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(supplierService.create(request));
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     public SupplierResponse update(@PathVariable Long id, @Valid @RequestBody SupplierRequest request) {
         return supplierService.update(id, request);
     }
 
     @PostMapping("/{id}/reactivate")
+    @PreAuthorize("hasRole('ADMIN')")
     public SupplierResponse reactivate(@PathVariable Long id, @Valid @RequestBody SupplierRequest request) {
         return supplierService.reactivate(id, request);
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Void> delete(@PathVariable Long id) {
         supplierService.delete(id);
         return ResponseEntity.noContent().build();
     }
 
     @PostMapping("/{id}/groups/{groupId}")
+    @PreAuthorize("hasRole('ADMIN')")
     public SupplierResponse addToGroup(@PathVariable Long id, @PathVariable Long groupId) {
         return supplierService.addToGroup(id, groupId);
     }
 
     @DeleteMapping("/{id}/groups/{groupId}")
+    @PreAuthorize("hasRole('ADMIN')")
     public SupplierResponse removeFromGroup(@PathVariable Long id, @PathVariable Long groupId) {
         return supplierService.removeFromGroup(id, groupId);
     }

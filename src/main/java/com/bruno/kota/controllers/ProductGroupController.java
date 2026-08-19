@@ -4,6 +4,7 @@ import java.util.List;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -42,27 +43,32 @@ public class ProductGroupController {
     }
 
     @PostMapping
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ProductGroupResponse> create(@Valid @RequestBody ProductGroupRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(productGroupService.create(request));
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ProductGroupResponse update(@PathVariable Long id, @Valid @RequestBody ProductGroupRequest request) {
         return productGroupService.update(id, request);
     }
 
     @PostMapping("/{id}/reactivate")
+    @PreAuthorize("hasRole('ADMIN')")
     public ProductGroupResponse reactivate(@PathVariable Long id) {
         return productGroupService.reactivate(id);
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Void> delete(@PathVariable Long id) {
         productGroupService.delete(id);
         return ResponseEntity.noContent().build();
     }
 
     @PostMapping("/{id}/products")
+    @PreAuthorize("hasRole('ADMIN')")
     public AddProductsToGroupResult addProducts(@PathVariable Long id, @RequestBody AddProductsToGroupRequest request) {
         return productService.addManyToGroup(id, request.productIds());
     }

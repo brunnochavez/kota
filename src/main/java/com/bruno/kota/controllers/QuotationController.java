@@ -8,6 +8,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -36,6 +38,7 @@ import com.bruno.kota.dtos.RepresentativePerformance;
 import com.bruno.kota.dtos.QuotationFillRate;
 import com.bruno.kota.dtos.ReviewBatchUpdateRequest;
 import com.bruno.kota.dtos.WonQuotationSummary;
+import com.bruno.kota.security.AuthPrincipal;
 import com.bruno.kota.services.QuotationImportService;
 import com.bruno.kota.services.QuotationPdfService;
 import com.bruno.kota.services.QuotationService;
@@ -60,26 +63,28 @@ public class QuotationController {
     // Path literal ("representative-fill-rate") sempre vence sobre /{id} no roteamento do
     // Spring, mesmo declarado depois — mas deixei antes por clareza pra quem for ler.
     @GetMapping("/representative-fill-rate")
+    @PreAuthorize("hasRole('ADMIN')")
     public List<QuotationFillRate> getRepresentativeFillRate() {
         return quotationService.getRepresentativeFillRate();
     }
 
     @GetMapping("/won")
-    public List<WonQuotationSummary> findWonQuotations(@RequestParam Long supplierId) {
-        return quotationService.findWonQuotations(supplierId);
+    public List<WonQuotationSummary> findWonQuotations(@AuthenticationPrincipal AuthPrincipal principal, @RequestParam Long supplierId) {
+        return quotationService.findWonQuotations(supplierId, repIdOrNull(principal));
     }
 
     @GetMapping("/pending-fulfillment")
-    public List<WonQuotationSummary> findPendingFulfillmentResults(@RequestParam Long supplierId) {
-        return quotationService.findPendingFulfillmentResults(supplierId);
+    public List<WonQuotationSummary> findPendingFulfillmentResults(@AuthenticationPrincipal AuthPrincipal principal, @RequestParam Long supplierId) {
+        return quotationService.findPendingFulfillmentResults(supplierId, repIdOrNull(principal));
     }
 
     @GetMapping("/performance")
-    public RepresentativePerformance getRepresentativePerformance(@RequestParam Long supplierId) {
-        return quotationService.getRepresentativePerformance(supplierId);
+    public RepresentativePerformance getRepresentativePerformance(@AuthenticationPrincipal AuthPrincipal principal, @RequestParam Long supplierId) {
+        return quotationService.getRepresentativePerformance(supplierId, repIdOrNull(principal));
     }
 
     @GetMapping("/report")
+    @PreAuthorize("hasRole('ADMIN')")
     public List<QuotationReportRow> getQuotationReport(
             @RequestParam(required = false) String from,
             @RequestParam(required = false) String to,
@@ -94,19 +99,19 @@ public class QuotationController {
     }
 
     @GetMapping("/{id}/my-bids")
-    public List<QuotationReportRow> getMyBidsForQuotation(@PathVariable Long id, @RequestParam Long supplierId) {
-        return quotationService.getMyBidsForQuotation(id, supplierId);
+    public List<QuotationReportRow> getMyBidsForQuotation(@AuthenticationPrincipal AuthPrincipal principal, @PathVariable Long id, @RequestParam Long supplierId) {
+        return quotationService.getMyBidsForQuotation(id, supplierId, repIdOrNull(principal));
     }
 
     @PostMapping("/{id}/items/{itemId}/cut")
-    public ResponseEntity<Void> cutFulfillmentItem(@PathVariable Long id, @PathVariable Long itemId) {
-        quotationService.cutFulfillmentItem(id, itemId);
+    public ResponseEntity<Void> cutFulfillmentItem(@AuthenticationPrincipal AuthPrincipal principal, @PathVariable Long id, @PathVariable Long itemId) {
+        quotationService.cutFulfillmentItem(id, itemId, repIdOrNull(principal));
         return ResponseEntity.noContent().build();
     }
 
     @PostMapping("/{id}/finalize-fulfillment")
-    public ResponseEntity<Void> finalizeFulfillment(@PathVariable Long id, @RequestParam Long supplierId) {
-        quotationService.finalizeFulfillment(id, supplierId);
+    public ResponseEntity<Void> finalizeFulfillment(@AuthenticationPrincipal AuthPrincipal principal, @PathVariable Long id, @RequestParam Long supplierId) {
+        quotationService.finalizeFulfillment(id, supplierId, repIdOrNull(principal));
         return ResponseEntity.noContent().build();
     }
 
@@ -121,27 +126,32 @@ public class QuotationController {
     }
 
     @PostMapping
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<QuotationResponse> createManually(@Valid @RequestBody QuotationCreateRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(quotationService.createManually(request));
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     public QuotationResponse update(@PathVariable Long id, @Valid @RequestBody QuotationUpdateRequest request) {
         return quotationService.update(id, request);
     }
 
     @PostMapping("/{id}/publish")
+    @PreAuthorize("hasRole('ADMIN')")
     public QuotationResponse publish(@PathVariable Long id) {
         return quotationService.publish(id);
     }
 
     @PostMapping("/{id}/close")
+    @PreAuthorize("hasRole('ADMIN')")
     public QuotationCloseResult close(@PathVariable Long id, @RequestBody(required = false) QuotationCloseRequest request) {
         QuotationCloseRequest safeRequest = request != null ? request : new QuotationCloseRequest(null, null, null);
         return quotationService.close(id, safeRequest);
     }
 
     @PostMapping("/{id}/confirm-close")
+    @PreAuthorize("hasRole('ADMIN')")
     public QuotationCloseResult confirmClose(@PathVariable Long id, @RequestBody(required = false) ConfirmCloseRequest request) {
         return quotationService.confirmClose(id, request);
     }
@@ -158,6 +168,7 @@ public class QuotationController {
     }
 
     @PostMapping(value = "/import", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("hasRole('ADMIN')")
     public QuotationImportResult importFile(
             @RequestParam("file") MultipartFile file,
             @RequestParam String name,
@@ -171,35 +182,41 @@ public class QuotationController {
     }
 
     @PostMapping("/{id}/items")
+    @PreAuthorize("hasRole('ADMIN')")
     public QuotationItemResponse addItem(@PathVariable Long id, @Valid @RequestBody QuotationItemCreateRequest request) {
         return quotationService.addItem(id, request);
     }
 
     @PutMapping("/{id}/items/{itemId}")
+    @PreAuthorize("hasRole('ADMIN')")
     public QuotationItemResponse updateItem(
             @PathVariable Long id, @PathVariable Long itemId, @Valid @RequestBody QuotationItemUpdateRequest request) {
         return quotationService.updateItemQuantity(id, itemId, request.quantity());
     }
 
     @DeleteMapping("/{id}/items/{itemId}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Void> removeItem(@PathVariable Long id, @PathVariable Long itemId) {
         quotationService.removeItem(id, itemId);
         return ResponseEntity.noContent().build();
     }
 
     @PostMapping("/{id}/items/{itemId}/assign-winner")
+    @PreAuthorize("hasRole('ADMIN')")
     public QuotationItemResponse assignManualWinner(
             @PathVariable Long id, @PathVariable Long itemId, @Valid @RequestBody ManualWinnerAssignRequest request) {
         return quotationService.assignManualWinner(id, itemId, request);
     }
 
     @PostMapping("/{id}/items/add-with-winner")
+    @PreAuthorize("hasRole('ADMIN')")
     public QuotationItemResponse addItemWithWinner(
             @PathVariable Long id, @Valid @RequestBody AddItemWithWinnerRequest request) {
         return quotationService.addItemWithWinner(id, request);
     }
 
     @PostMapping("/{id}/review-batch-update")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Void> applyReviewBatchUpdate(
             @PathVariable Long id, @RequestBody ReviewBatchUpdateRequest request) {
         int attempts = 0;
@@ -220,5 +237,11 @@ public class QuotationController {
                 }
             }
         }
+    }
+
+    // null = admin (sem restrição de posse); id do representante = restringe aos
+    // fornecedores que ele de fato representa, validado dentro do service.
+    private Long repIdOrNull(AuthPrincipal principal) {
+        return (principal != null && !principal.isAdmin()) ? principal.representativeId() : null;
     }
 }

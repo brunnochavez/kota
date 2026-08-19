@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>kota · Entrar</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #f5f8fc; --surface: #ffffff; --surface-2: #eef2f9;
+    --border: #dbe3f0; --text: #16213a; --text-dim: #5c6b85; --text-faint: #94a1ba;
+    --accent: #2f6fed; --accent-hover: #2558c4;
+    --danger: #c0362c; --danger-bg: #fdeeec; --danger-border: #f3b8b1;
+    --shadow: 0 1px 2px rgba(20,30,60,0.05), 0 1px 8px rgba(20,30,60,0.04);
+    --sans: 'Inter', -apple-system, 'Segoe UI', Roboto, sans-serif;
+  }
+  html[data-theme="dark"] {
+    --bg: #0c1220; --surface: #131a2c; --surface-2: #1a2338;
+    --border: #283252; --text: #e7ecf7; --text-dim: #8e9bbd; --text-faint: #5a6688;
+    --accent: #5b93ff; --accent-hover: #7aa6ff;
+    --danger: #f28b82; --danger-bg: #35191a; --danger-border: #5c2c2c;
+    --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 4px 16px rgba(0,0,0,0.28);
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; min-height: 100vh; background: var(--bg); color: var(--text);
+    font-family: var(--sans); font-size: 14px; line-height: 1.5;
+    display: flex; align-items: center; justify-content: center; padding: 20px;
+    transition: background 0.15s, color 0.15s;
+  }
+  .card {
+    width: 100%; max-width: 380px; background: var(--surface); border: 1px solid var(--border);
+    border-radius: 16px; padding: 32px 28px; box-shadow: var(--shadow);
+  }
+  .brand { display: flex; align-items: center; gap: 10px; margin-bottom: 4px; }
+  .brand svg { width: 26px; height: 26px; color: var(--accent); flex-shrink: 0; }
+  .brand span { font-weight: 700; font-size: 20px; }
+  .subtitle { color: var(--text-dim); font-size: 13px; margin: 0 0 26px; }
+  label { display: block; font-size: 12.5px; font-weight: 600; color: var(--text-dim); margin-bottom: 6px; }
+  input {
+    width: 100%; padding: 11px 13px; border-radius: 10px; border: 1px solid var(--border);
+    background: var(--surface); color: var(--text); font-size: 14px; font-family: var(--sans);
+    margin-bottom: 16px;
+  }
+  .password-field { position: relative; }
+  .password-field input { padding-right: 42px; }
+  .password-toggle {
+    position: absolute; right: 2px; top: 0; bottom: 16px; width: 38px; height: auto;
+    display: flex; align-items: center; justify-content: center;
+    background: none; border: none; padding: 0; margin: 0; cursor: pointer; color: var(--text-faint);
+  }
+  .password-toggle:hover { color: var(--text-dim); background: none; }
+  .password-toggle svg { width: 18px; height: 18px; }
+  input:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+  button {
+    width: 100%; padding: 12px; border-radius: 10px; border: none; background: var(--accent);
+    color: #fff; font-size: 14.5px; font-weight: 700; cursor: pointer; font-family: var(--sans);
+  }
+  button:hover { background: var(--accent-hover); }
+  button:disabled { opacity: 0.6; cursor: default; }
+  .error-box {
+    background: var(--danger-bg); border: 1px solid var(--danger-border); color: var(--danger);
+    border-radius: 10px; padding: 10px 12px; font-size: 13px; margin-bottom: 16px; display: none;
+  }
+</style>
+</head>
+<body>
+
+<div class="card" id="login-card">
+  <div class="brand">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 11l9-8 9 8"/><path d="M5 10v10a1 1 0 001 1h4v-6h4v6h4a1 1 0 001-1V10"/></svg>
+    <span>kota</span>
+  </div>
+  <div class="subtitle">Entre com seu e-mail e senha.</div>
+
+  <div class="error-box" id="error-box"></div>
+
+  <form id="login-form">
+    <label for="email">E-mail</label>
+    <input type="email" id="email" autocomplete="username" required>
+
+    <label for="password">Senha</label>
+    <div class="password-field">
+      <input type="password" id="password" autocomplete="current-password" required>
+      <button type="button" class="password-toggle" onclick="togglePasswordVisibility('password', this)" title="Mostrar senha">
+        <svg class="eye-open" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg>
+        <svg class="eye-closed" style="display:none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M17.94 17.94A10.94 10.94 0 0112 19c-7 0-11-7-11-7a21.8 21.8 0 015.06-5.94M9.9 4.24A10.94 10.94 0 0112 4c7 0 11 7 11 7a21.8 21.8 0 01-2.16 3.19M14.12 14.12a3 3 0 11-4.24-4.24"/><path d="M1 1l22 22"/></svg>
+      </button>
+    </div>
+
+    <button type="submit" id="submit-btn">Entrar</button>
+  </form>
+</div>
+
+<div class="card" id="change-password-card" style="display:none">
+  <div class="brand">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 11l9-8 9 8"/><path d="M5 10v10a1 1 0 001 1h4v-6h4v6h4a1 1 0 001-1V10"/></svg>
+    <span>kota</span>
+  </div>
+  <div class="subtitle">Essa senha foi definida por outra pessoa — defina uma nova, que só você vai saber, antes de continuar.</div>
+
+  <div class="error-box" id="change-error-box"></div>
+
+  <form id="change-password-form">
+    <label for="new-password">Nova senha</label>
+    <div class="password-field">
+      <input type="password" id="new-password" autocomplete="new-password" minlength="6" required>
+      <button type="button" class="password-toggle" onclick="togglePasswordVisibility('new-password', this)" title="Mostrar senha">
+        <svg class="eye-open" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg>
+        <svg class="eye-closed" style="display:none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M17.94 17.94A10.94 10.94 0 0112 19c-7 0-11-7-11-7a21.8 21.8 0 015.06-5.94M9.9 4.24A10.94 10.94 0 0112 4c7 0 11 7 11 7a21.8 21.8 0 01-2.16 3.19M14.12 14.12a3 3 0 11-4.24-4.24"/><path d="M1 1l22 22"/></svg>
+      </button>
+    </div>
+
+    <label for="confirm-password">Confirmar nova senha</label>
+    <div class="password-field">
+      <input type="password" id="confirm-password" autocomplete="new-password" minlength="6" required>
+      <button type="button" class="password-toggle" onclick="togglePasswordVisibility('confirm-password', this)" title="Mostrar senha">
+        <svg class="eye-open" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg>
+        <svg class="eye-closed" style="display:none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M17.94 17.94A10.94 10.94 0 0112 19c-7 0-11-7-11-7a21.8 21.8 0 015.06-5.94M9.9 4.24A10.94 10.94 0 0112 4c7 0 11 7 11 7a21.8 21.8 0 01-2.16 3.19M14.12 14.12a3 3 0 11-4.24-4.24"/><path d="M1 1l22 22"/></svg>
+      </button>
+    </div>
+
+    <button type="submit" id="change-submit-btn">Definir senha e entrar</button>
+  </form>
+</div>
+
+<script>
+applyTheme(window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+function applyTheme(theme) { document.documentElement.setAttribute('data-theme', theme); }
+
+// Se já tem token guardado, não faz sentido mostrar login de novo — manda direto pro
+// app certo. Não valida o token aqui (isso é trabalho do backend na primeira chamada);
+// se estiver expirado, o próprio app vai jogar de volta pro login sozinho.
+(function redirectIfLoggedIn() {
+  const token = localStorage.getItem('kota-token');
+  const role = localStorage.getItem('kota-role');
+  if (token && role) {
+    window.location.href = role === 'ADMIN' ? '/admin.html' : '/representante.html';
+  }
+})();
+
+// Dados da troca de senha obrigatória ficam só em memória (nunca em localStorage)
+// enquanto pendente — se a pessoa atualizar a página nesse meio-tempo, ela cai de volta
+// no login puro, sem token nenhum guardado. É proposital: assim não existe brecha de
+// pular a troca de senha com um F5 na hora certa.
+let pendingLogin = null;
+
+// Reaproveitado nos três campos de senha da página (login, nova senha, confirmar) — só
+// alterna o type do input entre password/text e troca qual dos dois ícones (olho aberto/
+// fechado) fica visível.
+function togglePasswordVisibility(inputId, buttonEl) {
+  const input = document.getElementById(inputId);
+  const isHidden = input.type === 'password';
+  input.type = isHidden ? 'text' : 'password';
+  buttonEl.querySelector('.eye-open').style.display = isHidden ? 'none' : 'block';
+  buttonEl.querySelector('.eye-closed').style.display = isHidden ? 'block' : 'none';
+  buttonEl.title = isHidden ? 'Esconder senha' : 'Mostrar senha';
+}
+
+function goToApp(role) {
+  window.location.href = role === 'ADMIN' ? '/admin.html' : '/representante.html';
+}
+
+document.getElementById('login-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const errorBox = document.getElementById('error-box');
+  const submitBtn = document.getElementById('submit-btn');
+  errorBox.style.display = 'none';
+  submitBtn.disabled = true;
+  submitBtn.textContent = 'Entrando...';
+
+  const password = document.getElementById('password').value;
+
+  try {
+    const res = await fetch('/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: document.getElementById('email').value.trim(), password })
+    });
+    const data = await res.json();
+
+    if (!res.ok) {
+      throw new Error(data.message || 'Não foi possível entrar.');
+    }
+
+    if (data.mustChangePassword) {
+      pendingLogin = { ...data, currentPassword: password };
+      document.getElementById('login-card').style.display = 'none';
+      document.getElementById('change-password-card').style.display = 'block';
+      return;
+    }
+
+    localStorage.setItem('kota-token', data.token);
+    localStorage.setItem('kota-role', data.role);
+    localStorage.setItem('kota-name', data.name);
+    if (data.representativeId) {
+      localStorage.setItem('kota-representative-id', data.representativeId);
+    } else {
+      localStorage.removeItem('kota-representative-id');
+    }
+
+    goToApp(data.role);
+  } catch (err) {
+    errorBox.textContent = err.message;
+    errorBox.style.display = 'block';
+    submitBtn.disabled = false;
+    submitBtn.textContent = 'Entrar';
+  }
+});
+
+document.getElementById('change-password-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const errorBox = document.getElementById('change-error-box');
+  const submitBtn = document.getElementById('change-submit-btn');
+  errorBox.style.display = 'none';
+
+  const newPassword = document.getElementById('new-password').value;
+  const confirmPassword = document.getElementById('confirm-password').value;
+
+  if (newPassword !== confirmPassword) {
+    errorBox.textContent = 'As duas senhas precisam ser iguais.';
+    errorBox.style.display = 'block';
+    return;
+  }
+
+  submitBtn.disabled = true;
+  submitBtn.textContent = 'Salvando...';
+
+  try {
+    const res = await fetch('/auth/change-password', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + pendingLogin.token
+      },
+      body: JSON.stringify({ currentPassword: pendingLogin.currentPassword, newPassword })
+    });
+
+    if (!res.ok) {
+      const data = await res.json();
+      throw new Error(data.message || 'Não foi possível trocar a senha.');
+    }
+
+    // Só agora, com a senha já trocada de verdade, o token vira sessão persistida.
+    localStorage.setItem('kota-token', pendingLogin.token);
+    localStorage.setItem('kota-role', pendingLogin.role);
+    localStorage.setItem('kota-name', pendingLogin.name);
+    if (pendingLogin.representativeId) {
+      localStorage.setItem('kota-representative-id', pendingLogin.representativeId);
+    } else {
+      localStorage.removeItem('kota-representative-id');
+    }
+
+    goToApp(pendingLogin.role);
+  } catch (err) {
+    errorBox.textContent = err.message;
+    errorBox.style.display = 'block';
+    submitBtn.disabled = false;
+    submitBtn.textContent = 'Definir senha e entrar';
+  }
+});
+</script>
+
+</body>
+</html>

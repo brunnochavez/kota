@@ -45,11 +45,18 @@
     position: sticky; top: 0; height: 100vh; overflow-y: auto;
     display: flex; flex-direction: column;
   }
-  .brand { padding: 4px 20px 18px; border-bottom: 1px solid var(--border); margin-bottom: 10px; display: flex; align-items: center; justify-content: space-between; }
-  .brand-home-btn { display: flex; align-items: center; gap: 10px; background: none; border: none; padding: 0; cursor: pointer; text-align: left; font-family: var(--sans); }
+  .brand { padding: 4px 20px 18px; border-bottom: 1px solid var(--border); margin-bottom: 10px; background: var(--surface); }
+  .brand-home-btn { display: flex; align-items: center; gap: 10px; background: none; border: none; padding: 0; cursor: pointer; text-align: left; font-family: var(--sans); width: 100%; min-width: 0; }
   .brand-home-btn svg { width: 22px; height: 22px; color: var(--accent); flex-shrink: 0; }
-  .brand .name { font-weight: 700; font-size: 18px; letter-spacing: -0.02em; }
+  #brand-logo-slot img { width: 32px; height: 32px; object-fit: contain; border-radius: 6px; flex-shrink: 0; }
+  .brand-text { min-width: 0; flex: 1; }
+  .brand .name {
+    font-weight: 700; font-size: 18px; letter-spacing: -0.02em; color: var(--text);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
   .brand .tag { color: var(--text-dim); font-size: 11.5px; margin-top: 1px; }
+
+  .theme-switch-floating { position: fixed; top: 18px; right: 18px; z-index: 50; }
   .theme-switch {
     display: flex; align-items: center; background: var(--surface-2); border: 1px solid var(--border);
     border-radius: 9px; padding: 2px; gap: 2px; flex-shrink: 0;
@@ -61,6 +68,36 @@
   .theme-switch button.active { background: var(--surface); color: var(--accent); box-shadow: var(--shadow); }
   .theme-switch button:hover:not(.active) { color: var(--text-dim); }
   .theme-switch svg { width: 14px; height: 14px; }
+
+  .sidebar-account {
+    margin-top: auto; padding: 10px; border-top: 1px solid var(--border); position: relative;
+  }
+  .account-trigger {
+    width: 100%; display: flex; align-items: center; gap: 10px; background: none; border: none;
+    padding: 8px 10px; border-radius: 10px; cursor: pointer; font-family: var(--sans); text-align: left;
+  }
+  .account-trigger:hover { background: var(--surface-2); }
+  .account-avatar {
+    width: 28px; height: 28px; border-radius: 50%; background: var(--accent); color: #fff;
+    display: flex; align-items: center; justify-content: center; font-size: 12.5px; font-weight: 700; flex-shrink: 0;
+  }
+  .admin-identity-label { font-size: 12.5px; color: var(--text); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; }
+  .account-chevron { width: 15px; height: 15px; color: var(--text-faint); flex-shrink: 0; }
+  .account-menu {
+    position: absolute; bottom: calc(100% + 4px); left: 10px; right: 10px; background: var(--surface);
+    border: 1px solid var(--border); border-radius: 10px; box-shadow: var(--shadow); padding: 6px; z-index: 30;
+  }
+  .account-menu button {
+    width: 100%; display: flex; align-items: center; gap: 9px; background: none; border: none;
+    padding: 9px 10px; border-radius: 7px; cursor: pointer; font-family: var(--sans); font-size: 13px;
+    color: var(--text); text-align: left;
+  }
+  .account-menu button:hover { background: var(--surface-2); }
+  .account-menu button svg { width: 16px; height: 16px; flex-shrink: 0; color: var(--text-dim); }
+  .account-menu-divider { border: none; border-top: 1px solid var(--border); margin: 6px 2px; }
+  .account-menu-danger { color: var(--danger); }
+  .account-menu-danger svg { color: var(--danger); }
+  .account-menu-danger:hover { background: var(--danger-bg); }
 
   .nav-group-label {
     padding: 16px 20px 6px; font-size: 10.5px; font-weight: 700; color: var(--text-faint);
@@ -180,6 +217,40 @@
   .empty { color: var(--text-faint); font-size: 13px; padding: 22px 10px; text-align: center; }
   .item-row { display: grid; grid-template-columns: 2fr 1fr auto; gap: 10px; align-items: end; margin-bottom: 8px; }
   .divider { border: none; border-top: 1px solid var(--border); margin: 18px 0; }
+
+  /* Stepper de etapas — Rascunho > Disponível > Em Revisão > Fechada */
+  .qd-stepper { margin: 4px 0 18px; }
+  .qd-stepper-track { display: flex; align-items: flex-start; }
+  .qd-step { display: flex; flex-direction: column; align-items: center; gap: 6px; flex-shrink: 0; width: 84px; }
+  .qd-step-dot {
+    width: 26px; height: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+    font-size: 11.5px; font-weight: 700; border: 2px solid var(--border); color: var(--text-faint); background: var(--surface);
+    transition: all 0.15s;
+  }
+  .qd-step-dot svg { width: 13px; height: 13px; }
+  .qd-step-label { font-size: 11px; color: var(--text-faint); font-weight: 600; text-align: center; }
+  .qd-step.done .qd-step-dot { background: var(--success); border-color: var(--success); color: #fff; }
+  .qd-step.done .qd-step-label { color: var(--success); }
+  .qd-step.current .qd-step-dot { background: var(--accent); border-color: var(--accent); color: #fff; box-shadow: 0 0 0 4px var(--accent-soft); }
+  .qd-step.current .qd-step-label { color: var(--accent); }
+  .qd-step.expired-at .qd-step-dot { background: var(--danger); border-color: var(--danger); color: #fff; }
+  .qd-step.expired-at .qd-step-label { color: var(--danger); }
+  .qd-step-line { flex: 1; height: 2px; background: var(--border); margin: 12px -20px 0; }
+  .qd-step-line.done { background: var(--success); }
+  .qd-expired-note {
+    margin-top: 10px; font-size: 12px; font-weight: 600; color: var(--danger); background: var(--danger-bg);
+    border: 1px solid var(--danger-border); border-radius: 8px; padding: 8px 12px; display: inline-block;
+  }
+
+  /* Barra de estatísticas rápidas do detalhe da cotação */
+  .qd-info-bar { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 18px; }
+  .qd-stat {
+    background: var(--surface-2); border: 1px solid var(--border); border-radius: 10px;
+    padding: 9px 14px; min-width: 90px;
+  }
+  .qd-stat-value { font-size: 15px; font-weight: 700; color: var(--text); line-height: 1.2; }
+  .qd-stat-label { font-size: 10.5px; color: var(--text-dim); margin-top: 2px; text-transform: uppercase; letter-spacing: 0.03em; }
+
   .inline-form { display: flex; gap: 8px; align-items: end; flex-wrap: wrap; }
   .tabs { display: flex; gap: 4px; margin-bottom: 18px; border-bottom: 1px solid var(--border); }
   .tab { padding: 9px 16px; cursor: pointer; color: var(--text-dim); font-size: 13px; font-weight: 500; border-bottom: 2px solid transparent; }
@@ -248,19 +319,20 @@
 </div>
 
 
+<div class="theme-switch theme-switch-floating">
+  <button data-theme-option="light" onclick="setTheme('light')" title="Modo claro"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg></button>
+  <button data-theme-option="dark" onclick="setTheme('dark')" title="Modo escuro"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M20 14.5A8.5 8.5 0 119.5 4a7 7 0 0010.5 10.5z"/></svg></button>
+</div>
+
 <nav class="sidebar">
   <div class="brand">
     <button class="brand-home-btn" onclick="goToSection('dashboard')" title="Página inicial">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 11l9-8 9 8"/><path d="M5 10v10a1 1 0 001 1h4v-6h4v6h4a1 1 0 001-1V10"/></svg>
-      <div>
-        <div class="name">kota</div>
+      <span id="brand-logo-slot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 11l9-8 9 8"/><path d="M5 10v10a1 1 0 001 1h4v-6h4v6h4a1 1 0 001-1V10"/></svg></span>
+      <div class="brand-text">
+        <div class="name" id="brand-name" title="kota">kota</div>
         <div class="tag">Painel Administrativo</div>
       </div>
     </button>
-    <div class="theme-switch">
-      <button data-theme-option="light" onclick="setTheme('light')" title="Modo claro"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg></button>
-      <button data-theme-option="dark" onclick="setTheme('dark')" title="Modo escuro"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M20 14.5A8.5 8.5 0 119.5 4a7 7 0 0010.5 10.5z"/></svg></button>
-    </div>
   </div>
   <div class="nav-item active" data-section="dashboard">
     <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg></span>
@@ -305,6 +377,29 @@
   <div class="nav-item nav-sub" data-section="groups">
     <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="8" cy="9" r="3"/><circle cx="17" cy="9" r="3"/><path d="M2 20c0-3.3 2.7-6 6-6s6 2.7 6 6M12 20c0-3.3 2.7-6 6-6"/></svg></span>
     Grupos de Fornecedores
+  </div>
+
+  <div class="sidebar-account">
+    <button class="account-trigger" onclick="toggleAccountMenu(event)">
+      <span class="account-avatar" id="account-avatar">A</span>
+      <span id="admin-identity" class="admin-identity-label"></span>
+      <svg class="account-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+    </button>
+    <div class="account-menu" id="account-menu" style="display:none">
+      <button onclick="goToSection('company-settings'); closeAccountMenu();">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="7" width="18" height="14" rx="1.5"/><path d="M8 7V5a2 2 0 012-2h4a2 2 0 012 2v2"/><path d="M12 12v4"/></svg>
+        Dados da Empresa
+      </button>
+      <button onclick="openChangePasswordModal(); closeAccountMenu();">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 018 0v4"/></svg>
+        Trocar minha senha
+      </button>
+      <hr class="account-menu-divider">
+      <button class="account-menu-danger" onclick="logout()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><path d="M16 17l5-5-5-5M21 12H9"/></svg>
+        Sair
+      </button>
+    </div>
   </div>
 </nav>
 
@@ -368,6 +463,59 @@
       <div class="kpi-card secondary">
         <div class="kpi-value" id="kpi-groups">—</div>
         <div class="kpi-label">Grupos</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- COMPANY SETTINGS -->
+  <section class="section" id="section-company-settings">
+    <h1>Dados da Empresa</h1>
+    <div class="subtitle">Essas informações aparecem no PDF de resultado das cotações e nas mensagens de WhatsApp.</div>
+
+    <div class="card">
+      <h2>Logo</h2>
+      <div id="company-logo-preview" style="margin-bottom:14px; min-height:60px; display:flex; align-items:center">
+        <span class="subtitle" id="company-logo-empty">Nenhuma logo enviada ainda.</span>
+        <img id="company-logo-img" style="max-height:70px; max-width:220px; display:none; border-radius:8px; border:1px solid var(--border)">
+      </div>
+      <input type="file" id="company-logo-input" accept="image/*" onchange="uploadCompanyLogo()">
+    </div>
+
+    <div class="card">
+      <h2>Informações</h2>
+      <div class="field-grid">
+        <div><label>Nome da empresa</label><input id="company-name" placeholder="Ex: Oliveira Distribuidora"></div>
+        <div><label>CNPJ</label><input id="company-cnpj" placeholder="12.345.678/0001-99" oninput="this.value = maskCnpj(this.value)"></div>
+        <div><label>Inscrição Estadual</label><input id="company-state-registration" placeholder="Ex: 123.456.789"></div>
+      </div>
+      <div class="field-grid" style="margin-top:14px">
+        <div><label>E-mail</label><input type="email" id="company-email" placeholder="contato@empresa.com"></div>
+        <div><label>Telefone</label><input id="company-phone" placeholder="(27) 99999-9999" oninput="this.value = maskPhone(this.value)"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Endereço</h2>
+      <div style="margin-bottom:14px"><label>Rua e número</label><input id="company-address" style="width:100%" placeholder="Rua Montevideo, 640"></div>
+      <div class="field-grid">
+        <div><label>Bairro</label><input id="company-neighborhood" placeholder="Ex: Centro"></div>
+        <div><label>Cidade</label><input id="company-city" placeholder="Ex: Vila Velha"></div>
+        <div>
+          <label>UF</label>
+          <select id="company-state">
+            <option value="">—</option>
+            <option>AC</option><option>AL</option><option>AP</option><option>AM</option><option>BA</option>
+            <option>CE</option><option>DF</option><option>ES</option><option>GO</option><option>MA</option>
+            <option>MT</option><option>MS</option><option>MG</option><option>PA</option><option>PB</option>
+            <option>PR</option><option>PE</option><option>PI</option><option>RJ</option><option>RN</option>
+            <option>RS</option><option>RO</option><option>RR</option><option>SC</option><option>SP</option>
+            <option>SE</option><option>TO</option>
+          </select>
+        </div>
+        <div><label>CEP</label><input id="company-zip" placeholder="29100-000" oninput="this.value = maskCep(this.value)"></div>
+      </div>
+      <div class="btn-row" style="margin-top:16px">
+        <button onclick="saveCompanySettings()">Salvar</button>
       </div>
     </div>
   </section>
@@ -663,7 +811,9 @@ function toast(msg, isErr) {
 }
 
 async function api(method, path, body, isFormData) {
+  const token = localStorage.getItem('kota-token');
   const opts = { method, headers: {} };
+  if (token) opts.headers['Authorization'] = 'Bearer ' + token;
   if (body !== undefined) {
     if (isFormData) {
       opts.body = body;
@@ -673,6 +823,17 @@ async function api(method, path, body, isFormData) {
     }
   }
   const res = await fetch(API + path, opts);
+
+  // Token ausente/expirado/inválido — limpa e manda de volta pro login, sem tentar
+  // mostrar um erro genérico pra quem só precisa logar de novo.
+  if (res.status === 401) {
+    localStorage.removeItem('kota-token');
+    localStorage.removeItem('kota-role');
+    localStorage.removeItem('kota-name');
+    window.location.href = '/login.html';
+    throw new Error('Sessão expirada.');
+  }
+
   if (res.status === 204) return null;
 
   const contentType = res.headers.get('content-type') || '';
@@ -690,6 +851,22 @@ async function api(method, path, body, isFormData) {
 async function safeCall(fn) {
   try { return await fn(); }
   catch (e) { toast(e.message, true); throw e; }
+}
+
+// Link/navegação direta (href, window.open) não manda cabeçalho Authorization — o
+// navegador não anexa header customizado numa navegação normal. Por isso todo PDF agora
+// baixa via fetch autenticado, vira blob, e só então dispara o download.
+async function downloadPdfWithAuth(url, filename) {
+  const token = localStorage.getItem('kota-token');
+  const res = await fetch(url, { headers: token ? { 'Authorization': 'Bearer ' + token } : {} });
+  if (!res.ok) { toast('Não foi possível baixar o PDF.', true); return; }
+  const blob = await res.blob();
+  const blobUrl = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = blobUrl;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(blobUrl);
 }
 
 function openModal(html, wide) {
@@ -808,6 +985,10 @@ function maskPhone(raw) {
 function unmaskDigits(value) {
   return (value || '').replace(/\D/g, '');
 }
+function maskCep(raw) {
+  const d = (raw || '').replace(/\D/g, '').slice(0, 8);
+  return d.length > 5 ? d.slice(0, 5) + '-' + d.slice(5) : d;
+}
 function maskCurrencyInput(raw) {
   let d = (raw || '').replace(/\D/g, '');
   if (!d) return '';
@@ -904,18 +1085,23 @@ function confirmExpirationField(inputId) {
 
 // ---------- navigation ----------
 document.querySelectorAll('.nav-item').forEach(item => {
-  item.addEventListener('click', () => {
-    document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
-    document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
-    item.classList.add('active');
-    document.getElementById('section-' + item.dataset.section).classList.add('active');
-    loadSectionData(item.dataset.section);
-    localStorage.setItem('kota-admin-section', item.dataset.section);
-  });
+  item.addEventListener('click', () => switchToSection(item.dataset.section));
 });
 
+// Fonte única de verdade pra trocar de seção — reaproveitada pelo clique nos itens de
+// menu E por goToSection(), que agora também precisa funcionar pra seções sem item
+// correspondente na nav principal (ex: "Dados da Empresa", que só é acessível pelo
+// menu de conta).
+function switchToSection(section) {
+  document.querySelectorAll('.nav-item').forEach(i => i.classList.toggle('active', i.dataset.section === section));
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  document.getElementById('section-' + section).classList.add('active');
+  loadSectionData(section);
+  localStorage.setItem('kota-admin-section', section);
+}
+
 function goToSection(section) {
-  document.querySelector(`.nav-item[data-section="${section}"]`).click();
+  switchToSection(section);
 }
 
 document.querySelectorAll('#status-filter-tabs .tab').forEach(tab => {
@@ -945,6 +1131,7 @@ function loadSectionData(section) {
   if (section === 'quotation-start') { loadGroupsForSelects(); loadProductsForManualItems(); }
   if (section === 'quotation-reports') loadQuotations();
   if (section === 'reports') loadReportsFilters();
+  if (section === 'company-settings') loadCompanySettingsForm();
 }
 
 function goToQuotationsFiltered(status) {
@@ -956,6 +1143,108 @@ function goToQuotationsFiltered(status) {
 // ============================================================
 // DASHBOARD
 // ============================================================
+// ============================================================
+// DADOS DA EMPRESA — singleton, sem lista, sem criar/desativar. Só existe uma empresa
+// usando o sistema, então é formulário direto, não CRUD.
+// ============================================================
+async function loadCompanySettingsForm() {
+  const company = await safeCall(() => api('GET', '/company-settings'));
+  document.getElementById('company-name').value = company.name || '';
+  document.getElementById('company-cnpj').value = company.cnpj ? maskCnpj(company.cnpj) : '';
+  document.getElementById('company-state-registration').value = company.stateRegistration || '';
+  document.getElementById('company-email').value = company.email || '';
+  document.getElementById('company-phone').value = company.phone ? maskPhone(company.phone) : '';
+  document.getElementById('company-address').value = company.address || '';
+  document.getElementById('company-neighborhood').value = company.neighborhood || '';
+  document.getElementById('company-city').value = company.city || '';
+  document.getElementById('company-state').value = company.state || '';
+  document.getElementById('company-zip').value = company.zipCode ? maskCep(company.zipCode) : '';
+  renderCompanyLogoPreview(company.logoUrl);
+}
+
+function renderCompanyLogoPreview(logoUrl) {
+  const img = document.getElementById('company-logo-img');
+  const empty = document.getElementById('company-logo-empty');
+  if (logoUrl) {
+    // Cache-busting: sem isso, trocar a logo e recarregar a tela mostraria a antiga —
+    // o navegador não sabe que o conteúdo por trás dessa mesma URL mudou.
+    img.src = logoUrl + '?t=' + Date.now();
+    img.style.display = 'block';
+    empty.style.display = 'none';
+  } else {
+    img.style.display = 'none';
+    empty.style.display = 'block';
+  }
+}
+
+async function saveCompanySettings() {
+  const body = {
+    name: document.getElementById('company-name').value.trim(),
+    cnpj: unmaskDigits(document.getElementById('company-cnpj').value),
+    stateRegistration: document.getElementById('company-state-registration').value.trim(),
+    email: document.getElementById('company-email').value.trim(),
+    phone: unmaskDigits(document.getElementById('company-phone').value),
+    address: document.getElementById('company-address').value.trim(),
+    neighborhood: document.getElementById('company-neighborhood').value.trim(),
+    city: document.getElementById('company-city').value.trim(),
+    state: document.getElementById('company-state').value,
+    zipCode: unmaskDigits(document.getElementById('company-zip').value)
+  };
+  if (!body.name) { toast('Nome é obrigatório.', true); return; }
+
+  await safeCall(() => api('PUT', '/company-settings', body));
+  toast('Dados da empresa salvos.');
+  applyCompanyBranding();
+}
+
+// Upload de arquivo não passa pelo api() (que sempre monta JSON) — precisa de
+// FormData/multipart, então monta a chamada à parte aqui, só reaproveitando o token.
+async function uploadCompanyLogo() {
+  const input = document.getElementById('company-logo-input');
+  const file = input.files[0];
+  if (!file) return;
+
+  const formData = new FormData();
+  formData.append('file', file);
+
+  const token = localStorage.getItem('kota-token');
+  const res = await fetch(API + '/company-settings/logo', {
+    method: 'POST',
+    headers: token ? { 'Authorization': 'Bearer ' + token } : {},
+    body: formData
+  });
+  const data = await res.json();
+
+  if (!res.ok) {
+    toast(data.message || 'Não foi possível enviar a logo.', true);
+    return;
+  }
+
+  toast('Logo atualizada.');
+  renderCompanyLogoPreview(data.logoUrl);
+  input.value = '';
+  applyCompanyBranding();
+}
+
+// Aplica nome/logo no cabeçalho da barra lateral — chamado no carregamento da página e
+// de novo sempre que os dados da empresa mudam, pra não precisar recarregar a página
+// pra ver o efeito.
+async function applyCompanyBranding() {
+  const company = await safeCall(() => api('GET', '/company-settings'));
+  const nameEl = document.getElementById('brand-name');
+  if (nameEl && company.name) {
+    nameEl.textContent = company.name;
+    nameEl.title = company.name;
+  }
+
+  const logoSlot = document.getElementById('brand-logo-slot');
+  if (logoSlot) {
+    logoSlot.innerHTML = company.logoUrl
+      ? `<img src="${company.logoUrl}?t=${Date.now()}" alt="">`
+      : `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 11l9-8 9 8"/><path d="M5 10v10a1 1 0 001 1h4v-6h4v6h4a1 1 0 001-1V10"/></svg>`;
+  }
+}
+
 async function loadDashboard() {
   const [quotations, products, reps, suppliers, groups, fillRates] = await Promise.all([
     safeCall(() => api('GET', '/quotations')),
@@ -1327,6 +1616,7 @@ function renderRepsList() {
     const tr = document.createElement('tr');
     const actions = currentRepListFilter === 'active'
       ? `<button class="secondary small" onclick="openRepModal(${r.id})">Editar</button>
+         <button class="secondary small" onclick="openRepAccessModal(${r.id})">Acesso</button>
          <button class="danger small" onclick="deactivateRep(${r.id})">Desativar</button>`
       : `<button class="success small" onclick="reactivateRepModal(${r.id})">Reativar</button>`;
     tr.innerHTML = `<td>${r.id}</td><td class="mono">${r.cpf}</td><td>${r.name}</td><td>${r.phone}</td><td>${r.email}</td>
@@ -1339,6 +1629,83 @@ function renderRepsList() {
 
 function findRepById(id) {
   return repsCache.find(r => r.id === id) || repsInactiveCache.find(r => r.id === id);
+}
+
+// Cadastro do representante (nome, CPF, telefone) e o login dele (email/senha) são coisas
+// separadas de propósito — nem todo representante precisa logar direto no sistema. Esse
+// modal só cuida do login: criar do zero, resetar senha, ou ativar/desativar o acesso.
+async function openRepAccessModal(id) {
+  const rep = findRepById(id);
+  openModal2(`<h2>Acesso de "${escapeHtml(rep.name)}"</h2><div id="rep-access-body">Carregando...</div>`);
+  await refreshRepAccessModal(id);
+}
+
+async function refreshRepAccessModal(id) {
+  const status = await safeCall(() => api('GET', `/representatives/${id}/access`));
+  const body = document.getElementById('rep-access-body');
+  if (!body) return;
+
+  if (!status.hasAccess) {
+    body.innerHTML = `
+      <div class="subtitle" style="margin-bottom:16px">Esse representante ainda não tem login criado — ele não consegue entrar no sistema até isso ser feito.</div>
+      <div class="field-grid">
+        <div><label>E-mail</label><input type="email" id="rep-access-email" placeholder="representante@empresa.com"></div>
+        <div><label>Senha</label><input type="password" id="rep-access-password" placeholder="Mínimo 6 caracteres"></div>
+      </div>
+      <div class="btn-row" style="margin-top:16px">
+        <button onclick="createRepAccess(${id})">Criar acesso</button>
+        <button class="secondary" onclick="closeModal2()">Fechar</button>
+      </div>`;
+    return;
+  }
+
+  const statusBadge = status.enabled
+    ? '<span class="badge badge-available">Ativo</span>'
+    : '<span class="badge badge-expired">Desativado</span>';
+
+  body.innerHTML = `
+    <div class="subtitle" style="margin-bottom:6px">E-mail de login</div>
+    <div style="font-weight:700; margin-bottom:16px">${escapeHtml(status.email)} ${statusBadge}</div>
+
+    <hr class="divider">
+    <h3 style="margin-top:14px">Redefinir senha</h3>
+    <div class="inline-form">
+      <div style="flex:1"><input type="password" id="rep-access-new-password" placeholder="Nova senha (mínimo 6 caracteres)"></div>
+      <button onclick="resetRepAccessPassword(${id})">Redefinir</button>
+    </div>
+
+    <div class="btn-row" style="margin-top:20px">
+      ${status.enabled
+        ? `<button class="danger" onclick="setRepAccessEnabled(${id}, false)">Desativar acesso</button>`
+        : `<button class="success" onclick="setRepAccessEnabled(${id}, true)">Reativar acesso</button>`}
+      <button class="secondary" onclick="closeModal2()">Fechar</button>
+    </div>`;
+}
+
+async function createRepAccess(id) {
+  const email = document.getElementById('rep-access-email').value.trim();
+  const password = document.getElementById('rep-access-password').value;
+  if (!email || !password) { toast('Preencha e-mail e senha.', true); return; }
+  if (password.length < 6) { toast('Senha deve ter pelo menos 6 caracteres.', true); return; }
+
+  await safeCall(() => api('POST', `/representatives/${id}/access`, { email, password }));
+  toast('Acesso criado — já pode passar o e-mail e a senha pro representante.');
+  await refreshRepAccessModal(id);
+}
+
+async function resetRepAccessPassword(id) {
+  const newPassword = document.getElementById('rep-access-new-password').value;
+  if (!newPassword || newPassword.length < 6) { toast('Senha deve ter pelo menos 6 caracteres.', true); return; }
+
+  await safeCall(() => api('PUT', `/representatives/${id}/access/password?newPassword=${encodeURIComponent(newPassword)}`));
+  toast('Senha redefinida.');
+  await refreshRepAccessModal(id);
+}
+
+async function setRepAccessEnabled(id, enabled) {
+  await safeCall(() => api('PUT', `/representatives/${id}/access/enabled?enabled=${enabled}`));
+  toast(enabled ? 'Acesso reativado.' : 'Acesso desativado.');
+  await refreshRepAccessModal(id);
 }
 
 function openRepModal(id) {
@@ -2389,7 +2756,9 @@ async function abrirDetalheCotacao(id) {
   openModal(`
     <h2 id="qd-title">Detalhe da cotação</h2>
 
-    <h3>Editar (nome / grupo / prazo)</h3>
+    <div class="qd-info-bar" id="qd-info-bar"></div>
+    <div class="qd-stepper" id="qd-stepper"></div>
+
     <div class="inline-form">
       <div><label>Nome</label><input id="qd-name" placeholder="Ex: Cotação de Bebidas"></div>
       <div><label>Grupo</label><select id="qd-group"></select></div>
@@ -2404,7 +2773,7 @@ async function abrirDetalheCotacao(id) {
       <button id="qd-whatsapp-btn" class="secondary" onclick="copyPublishMessage(this)" style="display:none">Copiar mensagem para WhatsApp</button>
       <button id="qd-review-bids-btn" class="secondary" onclick="openReviewBidsModal()" style="display:none">Revisar Cotações Enviadas</button>
       <button id="qd-confirm-close-btn" class="success" onclick="confirmCloseQuotation()" style="display:none">Confirmar Fechamento (gerar PDF)</button>
-      <a id="qd-pdf-link" href="#" target="_blank" style="display:none"><button class="secondary">Baixar PDF do resultado</button></a>
+      <button id="qd-pdf-link" class="secondary" style="display:none" onclick="downloadPdfWithAuth('/quotations/' + currentQuotationId + '/result-pdf', 'cotacao-' + currentQuotationId + '.pdf')">Baixar PDF do resultado</button>
     </div>
 
     <div id="close-flow"></div>
@@ -2444,6 +2813,10 @@ async function abrirDetalheCotacao(id) {
     <div class="btn-row" id="qd-save-quantities-row" style="display:none; justify-content:flex-end; margin-top:12px">
       <button onclick="saveAllQuotationItemQuantities()">Salvar quantidades</button>
     </div>
+
+    <div class="btn-row" style="justify-content:flex-start; margin-top:20px">
+      <button class="secondary" onclick="closeModal()">Fechar</button>
+    </div>
   `, true);
 
   const groups = await safeCall(() => api('GET', '/supplier-groups'));
@@ -2451,21 +2824,94 @@ async function abrirDetalheCotacao(id) {
     groups.map(g => `<option value="${g.id}">${g.name}</option>`).join('');
 
   const q = await safeCall(() => api('GET', `/quotations/${id}`));
-  document.getElementById('qd-title').innerHTML = `Cotação #${q.id} — ${escapeHtml(q.name)} ${statusBadge(q.status)}`;
+  document.getElementById('qd-title').innerHTML = `Cotação Nº ${formatQuotationNumber(q.id)} - ${escapeHtml(q.name)} ${statusBadge(q.status)}`;
   document.getElementById('qd-name').value = q.name;
   document.getElementById('qd-group').value = q.supplierGroupId || '';
   document.getElementById('qd-expiration').value = toDatetimeLocal(q.expirationDate);
 
   const pdfLink = document.getElementById('qd-pdf-link');
-  if (q.status === 'CLOSED') {
-    pdfLink.href = `/quotations/${id}/result-pdf`;
-    pdfLink.style.display = 'inline-block';
-  } else {
-    pdfLink.style.display = 'none';
-  }
+  pdfLink.style.display = q.status === 'CLOSED' ? 'inline-block' : 'none';
 
+  renderQdStepper(q.status);
   applyQdEditLock(q.status);
   await loadQuotationItemsDetail(id, q.status);
+  renderQdInfoBar(q);
+}
+
+// Rascunho > Disponível > Em Revisão > Fechada — dá pro admin bater o olho e saber
+// exatamente em que ponto do ciclo aquela cotação está e o que falta pra chegar no fim,
+// sem precisar decorar o que cada status "quer dizer". Expirada é tratada à parte: não é
+// uma etapa normal do caminho, é o que acontece quando ninguém fecha a tempo — trava
+// visualmente logo depois de "Disponível" (foi até ali que ela chegou de verdade) com um
+// aviso vermelho, em vez de inventar uma 5ª bolinha só pra ela.
+function renderQdStepper(status) {
+  const steps = [
+    { key: 'DRAFT', label: 'Rascunho' },
+    { key: 'AVAILABLE', label: 'Disponível' },
+    { key: 'REVIEWING', label: 'Em Revisão' },
+    { key: 'CLOSED', label: 'Fechada' }
+  ];
+  const order = ['DRAFT', 'AVAILABLE', 'REVIEWING', 'CLOSED'];
+  const isExpired = status === 'EXPIRED';
+  const effectiveIndex = isExpired ? 1 : order.indexOf(status);
+
+  const CHECK_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 12l4 4L19 7"/></svg>';
+
+  const stepsHtml = steps.map((step, idx) => {
+    let stateClass = 'upcoming';
+    if (idx < effectiveIndex) stateClass = 'done';
+    else if (idx === effectiveIndex) stateClass = isExpired ? 'expired-at' : 'current';
+
+    const dotContent = stateClass === 'done' ? CHECK_SVG : (idx + 1);
+    const lineClass = idx < effectiveIndex ? 'done' : '';
+    const line = idx < steps.length - 1 ? `<div class="qd-step-line ${lineClass}"></div>` : '';
+
+    return `<div class="qd-step ${stateClass}">
+      <div class="qd-step-dot">${dotContent}</div>
+      <div class="qd-step-label">${step.label}</div>
+    </div>${line}`;
+  }).join('');
+
+  const expiredNote = isExpired
+    ? '<div class="qd-expired-note">⚠ Expirou antes de ser fechada — o prazo passou sem ninguém confirmar o resultado.</div>'
+    : '';
+
+  document.getElementById('qd-stepper').innerHTML = `<div class="qd-stepper-track">${stepsHtml}</div>${expiredNote}`;
+}
+
+// Resumo rápido — datas relevantes conforme a etapa (não faz sentido mostrar "Fechada em"
+// pra quem ainda tá em Rascunho), quantidade de itens, e quantos fornecedores do grupo já
+// responderam. Fill rate busca de novo aqui porque o modal pode ser aberto de qualquer
+// tela (Dashboard, Cotações, Relatórios) — nem todas já tinham esse dado em cache.
+async function renderQdInfoBar(q) {
+  const fillRates = await safeCall(() => api('GET', '/quotations/representative-fill-rate'));
+  const fillRate = fillRates.find(f => f.quotationId === q.id);
+
+  const stats = [
+    { label: 'Grupo', value: q.supplierGroupName || 'sem grupo' },
+    { label: 'Itens', value: qdCurrentItems.length }
+  ];
+
+  if (q.status === 'DRAFT') {
+    stats.push({ label: 'Criada em', value: fmtDate(q.createdAt) });
+  } else if (q.status === 'CLOSED') {
+    stats.push({ label: 'Fechada em', value: fmtDate(q.updatedAt) });
+  } else if (q.status === 'EXPIRED') {
+    stats.push({ label: 'Expirou em', value: fmtDate(q.expirationDate) });
+  } else {
+    stats.push({ label: 'Expira em', value: fmtDate(q.expirationDate) });
+  }
+
+  if (fillRate) {
+    stats.push({ label: 'Responderam', value: `${fillRate.filledCount}/${fillRate.eligibleCount}` });
+  }
+
+  document.getElementById('qd-info-bar').innerHTML = stats.map(s => `
+    <div class="qd-stat">
+      <div class="qd-stat-value">${s.value}</div>
+      <div class="qd-stat-label">${s.label}</div>
+    </div>
+  `).join('');
 }
 
 // Fora de Rascunho, nome/grupo/prazo/publicar/gerenciar grupo ficam travados. "Fechar"
@@ -3063,9 +3509,13 @@ function closeConfirmPopover() {
 // do representante.html: navigator.clipboard só funciona em contexto seguro (HTTPS ou
 // localhost), então cai pra document.execCommand('copy') se não estiver disponível.
 async function copyPublishMessage(buttonEl) {
-  const q = await safeCall(() => api('GET', `/quotations/${currentQuotationId}`));
+  const [q, company] = await Promise.all([
+    safeCall(() => api('GET', `/quotations/${currentQuotationId}`)),
+    safeCall(() => api('GET', '/company-settings'))
+  ]);
   const link = `${window.location.origin}/representante.html?cotacao=${currentQuotationId}`;
-  const message = `Olá! A cotação "${q.name}" já está disponível para envio de preços.\n`
+  const signature = company.name ? `Aqui é da ${company.name}! ` : '';
+  const message = `${signature}A cotação "${q.name}" já está disponível para envio de preços.\n`
       + `Prazo: ${fmtDate(q.expirationDate)}\n`
       + `Acesse e informe seus preços: ${link}`;
 
@@ -3469,6 +3919,87 @@ async function importFile(withMapping) {
     fileInput.value = '';
     goToSection('quotation-reports');
   }
+}
+
+// ---------- auth ----------
+// Sem token, nem adianta tentar carregar nada — manda direto pro login antes de
+// disparar qualquer chamada que ia falhar com 401 de qualquer jeito.
+(function checkAuth() {
+  const token = localStorage.getItem('kota-token');
+  if (!token) {
+    window.location.href = '/login.html';
+    return;
+  }
+  // Espelho da mesma guarda do representante.html — representante não deve conseguir
+  // acessar o painel administrativo direto pela URL.
+  if (localStorage.getItem('kota-role') !== 'ADMIN') {
+    window.location.href = '/representante.html';
+    return;
+  }
+  const name = localStorage.getItem('kota-name') || '';
+  document.getElementById('admin-identity').textContent = name;
+  document.getElementById('account-avatar').textContent = name.trim().charAt(0).toUpperCase() || 'A';
+  applyCompanyBranding();
+})();
+
+function logout() {
+  localStorage.removeItem('kota-token');
+  localStorage.removeItem('kota-role');
+  localStorage.removeItem('kota-name');
+  localStorage.removeItem('kota-admin-section');
+  window.location.href = '/login.html';
+}
+
+// ---------- menu de conta ----------
+function toggleAccountMenu(e) {
+  e.stopPropagation();
+  const menu = document.getElementById('account-menu');
+  menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
+}
+
+function closeAccountMenu() {
+  document.getElementById('account-menu').style.display = 'none';
+}
+
+// Fecha ao clicar em qualquer lugar fora do menu — padrão de qualquer dropdown de conta.
+document.addEventListener('click', (e) => {
+  const wrap = document.getElementById('account-menu');
+  const trigger = document.querySelector('.account-trigger');
+  if (wrap && wrap.style.display !== 'none' && !wrap.contains(e.target) && e.target !== trigger && !trigger.contains(e.target)) {
+    closeAccountMenu();
+  }
+});
+
+// Troca voluntária de senha — diferente da obrigatória do login.html (essa é sempre
+// opcional, o admin decide quando quer trocar, não é forçado). Reaproveita o mesmo
+// endpoint (/auth/change-password), que já exige a senha atual pra confirmar.
+function openChangePasswordModal() {
+  openModal(`
+    <h2>Trocar minha senha</h2>
+    <div class="field-grid">
+      <div><label>Senha atual</label><input type="password" id="cp-current"></div>
+      <div><label>Nova senha</label><input type="password" id="cp-new" placeholder="Mínimo 6 caracteres"></div>
+      <div><label>Confirmar nova senha</label><input type="password" id="cp-confirm"></div>
+    </div>
+    <div class="btn-row" style="margin-top:16px">
+      <button onclick="submitChangePassword()">Salvar nova senha</button>
+      <button class="secondary" onclick="closeModal()">Cancelar</button>
+    </div>
+  `);
+}
+
+async function submitChangePassword() {
+  const currentPassword = document.getElementById('cp-current').value;
+  const newPassword = document.getElementById('cp-new').value;
+  const confirmPassword = document.getElementById('cp-confirm').value;
+
+  if (!currentPassword || !newPassword) { toast('Preencha todos os campos.', true); return; }
+  if (newPassword.length < 6) { toast('Nova senha deve ter pelo menos 6 caracteres.', true); return; }
+  if (newPassword !== confirmPassword) { toast('As duas senhas novas precisam ser iguais.', true); return; }
+
+  await safeCall(() => api('POST', '/auth/change-password', { currentPassword, newPassword }));
+  toast('Senha trocada com sucesso.');
+  closeModal();
 }
 
 // ---------- init ----------
