@@ -64,6 +64,13 @@ public class Supplier {
     @JoinColumn(name = "representative_id")
     private Representative representative;
 
+    // Prazo de entrega típico desse fornecedor, cadastrado pelo admin — usado como
+    // referência geral (ex: relatório de Ponto de Compra) quando um lance específico não
+    // tiver o próprio prazo informado. O prazo real de cada lance (Bid.deliveryDeadlineDays,
+    // informado pelo representante) continua tendo prioridade quando existir.
+    @Column(name = "default_delivery_deadline_days")
+    private Integer defaultDeliveryDeadlineDays;
+
     @ManyToMany(fetch = FetchType.LAZY)
     @BatchSize(size = 20)
     @JoinTable(

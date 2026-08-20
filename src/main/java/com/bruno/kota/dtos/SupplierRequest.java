@@ -26,5 +26,10 @@ public record SupplierRequest(
         @Positive(message = "Pedido mínimo deve ser maior que zero")
         BigDecimal minimumOrderValue,
 
-        Long representativeId
+        Long representativeId,
+
+        // Sem @NotNull/@Positive aqui de propósito — é opcional no cadastro (nem todo
+        // fornecedor precisa ter isso definido de cara). Quando informado, a validação
+        // de "maior que zero" fica no service, mesmo padrão da projeção de venda.
+        Integer defaultDeliveryDeadlineDays
 ) {}

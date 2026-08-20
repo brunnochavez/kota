@@ -52,6 +52,12 @@ public class Quotation {
     @Column(name = "expiration_date")
     private LocalDateTime expirationDate;
 
+    // Padrão aplicado a todo item novo da cotação (herdado enquanto o item não tiver
+    // sobrescrita própria — ver QuotationItem.salesProjectionDaysOverride). Puramente
+    // informativo/planejamento pro admin, não interfere em nada do fluxo de lance/fechamento.
+    @Column(name = "default_sales_projection_days")
+    private Integer defaultSalesProjectionDays;
+
     @UpdateTimestamp
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;

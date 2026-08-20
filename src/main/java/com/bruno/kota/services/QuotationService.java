@@ -87,6 +87,7 @@ public class QuotationService {
                 .name(request.name())
                 .supplierGroup(resolveSupplierGroup(request.supplierGroupId()))
                 .expirationDate(request.expirationDate())
+                .defaultSalesProjectionDays(request.defaultSalesProjectionDays())
                 .build();
         quotation = quotationRepository.save(quotation);
 
@@ -125,6 +126,7 @@ public class QuotationService {
         quotation.setName(request.name());
         quotation.setSupplierGroup(resolveSupplierGroup(request.supplierGroupId()));
         quotation.setExpirationDate(request.expirationDate());
+        quotation.setDefaultSalesProjectionDays(request.defaultSalesProjectionDays());
         return toResponse(quotationRepository.save(quotation));
     }
 
@@ -503,6 +505,28 @@ public class QuotationService {
         return toItemResponse(quotationItemRepository.save(item));
     }
 
+    // Sem ensureEditable/invalidateReviewIfNeeded de propósito: projeção de venda é só
+    // anotação de planejamento do admin (quanto tempo ele acha que vai levar pra vender
+    // esse produto), não interfere em lance, vencedor ou fechamento — então pode ser
+    // ajustada a qualquer momento, mesmo com a cotação já fechada.
+    @Transactional
+    public QuotationItemResponse updateItemSalesProjection(Long quotationId, Long itemId, Integer salesProjectionDays) {
+        findEntityById(quotationId);
+
+        QuotationItem item = quotationItemRepository.findById(itemId)
+                .orElseThrow(() -> new ResourceNotFoundException("Item não encontrado: id " + itemId));
+
+        if (!item.getQuotation().getId().equals(quotationId)) {
+            throw new BusinessRuleException("Esse item não pertence a essa cotação.");
+        }
+        if (salesProjectionDays != null && salesProjectionDays <= 0) {
+            throw new BusinessRuleException("Projeção de venda deve ser maior que zero.");
+        }
+
+        item.setSalesProjectionDaysOverride(salesProjectionDays);
+        return toItemResponse(quotationItemRepository.save(item));
+    }
+
     @Transactional
     public void removeItem(Long quotationId, Long itemId) {
         Quotation quotation = findEntityById(quotationId);
@@ -840,6 +864,74 @@ public class QuotationService {
         return rows;
     }
 
+    // Relatório de "ponto de compra" — quando reabrir pedido de cada produto pra não
+    // ficar sem estoque. Só entram itens com vencedor definido e não cortados (sem
+    // isso, não tem o que repor), e só quando dá pra calcular de verdade: precisa do
+    // prazo de entrega (do lance vencedor, ou o padrão cadastrado no fornecedor quando
+    // o lance não tiver o próprio prazo) e da projeção de venda efetiva do item.
+    //
+    // A conta, em 3 passos:
+    //   chegada estimada   = fechamento da cotação + prazo de entrega
+    //   esgotamento estimado = chegada + projeção de venda
+    //   ponto de compra    = esgotamento − prazo de entrega (a folga pro PRÓXIMO pedido
+    //                         chegar a tempo, assumindo prazo de entrega parecido)
+    //
+    // Ordenado por urgência (ponto de compra mais próximo primeiro) — é uma lista de
+    // ação, não um extrato neutro.
+    @Transactional(readOnly = true)
+    public List<ReorderPointRow> getReorderPointReport() {
+        List<Quotation> closedQuotations = quotationRepository.findByStatus(QuotationStatus.CLOSED);
+        List<ReorderPointRow> rows = new ArrayList<>();
+
+        for (Quotation quotation : closedQuotations) {
+            LocalDateTime closedAt = quotation.getUpdatedAt();
+            if (closedAt == null) continue;
+
+            List<QuotationItem> items = quotationItemRepository.findByQuotationId(quotation.getId());
+            for (QuotationItem item : items) {
+                if (item.isFulfillmentCut()) continue;
+
+                Bid winningBid = item.getWinningBid();
+                if (winningBid == null) continue;
+
+                Integer deliveryDeadlineDays = winningBid.getDeliveryDeadlineDays() != null
+                        ? winningBid.getDeliveryDeadlineDays()
+                        : winningBid.getSupplier().getDefaultDeliveryDeadlineDays();
+                Integer projectionDays = item.getSalesProjectionDaysOverride() != null
+                        ? item.getSalesProjectionDaysOverride()
+                        : quotation.getDefaultSalesProjectionDays();
+                if (deliveryDeadlineDays == null || projectionDays == null) continue;
+
+                LocalDateTime estimatedArrivalDate = closedAt.plusDays(deliveryDeadlineDays);
+                LocalDateTime estimatedDepletionDate = estimatedArrivalDate.plusDays(projectionDays);
+                LocalDateTime reorderDate = estimatedDepletionDate.minusDays(deliveryDeadlineDays);
+                long daysUntilReorder = java.time.temporal.ChronoUnit.DAYS.between(LocalDateTime.now(), reorderDate);
+
+                rows.add(new ReorderPointRow(
+                        quotation.getId(),
+                        quotation.getName(),
+                        closedAt,
+                        item.getId(),
+                        item.getProduct().getId(),
+                        item.getProduct().getName(),
+                        item.getProduct().getBarcode(),
+                        winningBid.getSupplier().getName(),
+                        winningBid.getSubmittedBy() != null ? winningBid.getSubmittedBy().getName() : "—",
+                        item.getQuantity(),
+                        deliveryDeadlineDays,
+                        projectionDays,
+                        estimatedArrivalDate,
+                        estimatedDepletionDate,
+                        reorderDate,
+                        daysUntilReorder
+                ));
+            }
+        }
+
+        rows.sort(Comparator.comparing(ReorderPointRow::reorderDate));
+        return rows;
+    }
+
     // Mesma ideia de linha-por-lance do relatório do admin, só que escopado a UMA
     // cotação e UM fornecedor — é o que o representante vê ao abrir o detalhe de uma
     // cotação em "Anteriores". Funciona pra CLOSED (mostra won) e EXPIRED (nunca teve
@@ -989,11 +1081,14 @@ public class QuotationService {
                 quotation.getCreatedAt(),
                 quotation.getPublishedAt(),
                 quotation.getExpirationDate(),
-                quotation.getUpdatedAt()
+                quotation.getUpdatedAt(),
+                quotation.getDefaultSalesProjectionDays()
         );
     }
 
     private QuotationItemResponse toItemResponse(QuotationItem item) {
+        Integer override = item.getSalesProjectionDaysOverride();
+        Integer effective = override != null ? override : item.getQuotation().getDefaultSalesProjectionDays();
         return new QuotationItemResponse(
                 item.getId(),
                 item.getQuotation().getId(),
@@ -1002,7 +1097,9 @@ public class QuotationService {
                 item.getProduct().getBarcode(),
                 item.getQuantity(),
                 item.getWinningBid() != null ? item.getWinningBid().getId() : null,
-                item.isFulfillmentCut()
+                item.isFulfillmentCut(),
+                override,
+                effective
         );
     }
 

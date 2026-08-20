@@ -7,5 +7,6 @@ public record QuotationUpdateRequest(
         String name,
 
         Long supplierGroupId,
-        LocalDateTime expirationDate
+        LocalDateTime expirationDate,
+        Integer defaultSalesProjectionDays
 ) {}

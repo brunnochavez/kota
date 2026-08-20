@@ -13,5 +13,6 @@ public record QuotationResponse(
         LocalDateTime createdAt,
         LocalDateTime publishedAt,
         LocalDateTime expirationDate,
-        LocalDateTime updatedAt
+        LocalDateTime updatedAt,
+        Integer defaultSalesProjectionDays
 ) {}

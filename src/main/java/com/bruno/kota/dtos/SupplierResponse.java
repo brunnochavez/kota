@@ -13,5 +13,6 @@ public record SupplierResponse(
         Long representativeId,
         String representativeName,
         List<Long> groupIds,
-        List<String> groupNames
+        List<String> groupNames,
+        Integer defaultDeliveryDeadlineDays
 ) {}

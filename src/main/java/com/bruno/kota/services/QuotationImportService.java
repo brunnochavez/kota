@@ -49,6 +49,7 @@ public class QuotationImportService {
             String name,
             Long supplierGroupId,
             String expirationDate,
+            Integer defaultSalesProjectionDays,
             Integer descriptionColumnOverride,
             Integer barcodeColumnOverride,
             Integer quantityColumnOverride) {
@@ -119,6 +120,7 @@ public class QuotationImportService {
                 .name(name)
                 .supplierGroup(supplierGroup)
                 .expirationDate(parsedExpirationDate)
+                .defaultSalesProjectionDays(defaultSalesProjectionDays)
                 .build();
         quotation = quotationRepository.save(quotation);
 
@@ -214,7 +216,8 @@ public class QuotationImportService {
                 quotation.getCreatedAt(),
                 quotation.getPublishedAt(),
                 quotation.getExpirationDate(),
-                quotation.getUpdatedAt()
+                quotation.getUpdatedAt(),
+                quotation.getDefaultSalesProjectionDays()
         );
     }
 }

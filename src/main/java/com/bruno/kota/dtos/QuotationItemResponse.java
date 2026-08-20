@@ -10,5 +10,7 @@ public record QuotationItemResponse(
         String productBarcode,
         BigDecimal quantity,
         Long winningBidId,
-        boolean fulfillmentCut
+        boolean fulfillmentCut,
+        Integer salesProjectionDaysOverride,
+        Integer effectiveSalesProjectionDays
 ) {}

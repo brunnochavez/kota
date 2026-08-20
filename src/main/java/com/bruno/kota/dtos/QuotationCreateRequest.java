@@ -13,6 +13,7 @@ public record QuotationCreateRequest(
 
         Long supplierGroupId,
         LocalDateTime expirationDate,
+        Integer defaultSalesProjectionDays,
 
         @NotEmpty(message = "A cotação precisa de pelo menos um item")
         @Valid

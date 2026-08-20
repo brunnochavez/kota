@@ -52,4 +52,11 @@ public class QuotationItem {
     @Column(nullable = false)
     @Builder.Default
     private boolean fulfillmentCut = false;
+
+    // Sobrescrita individual da projeção de venda desse item — null significa "usa o
+    // padrão da cotação" (Quotation.defaultSalesProjectionDays). Editável a qualquer
+    // momento, mesmo com a cotação já fechada, porque é só anotação de planejamento do
+    // admin, não afeta lance, vencedor nem fechamento.
+    @Column(name = "sales_projection_days_override")
+    private Integer salesProjectionDaysOverride;
 }

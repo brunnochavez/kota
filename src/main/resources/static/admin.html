@@ -356,6 +356,10 @@
     <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 3v18h18"/><path d="M7 15l4-6 3 4 5-7"/></svg></span>
     Relatórios
   </div>
+  <div class="nav-item" data-section="reorder-points">
+    <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 8v5l3 3"/><circle cx="12" cy="13" r="8"/><path d="M12 2v3M5 5l1.5 1.5M19 5l-1.5 1.5"/></svg></span>
+    Ponto de Compra
+  </div>
 
   <div class="nav-group-label">Produtos</div>
   <div class="nav-item" data-section="products">
@@ -607,7 +611,7 @@
 
     <div class="card">
       <h2 id="supplier-list-title">Fornecedores ativos</h2>
-      <table><thead><tr><th>ID</th><th>Nome</th><th>CNPJ</th><th>Pedido mín.</th><th>Representante</th><th></th></tr></thead>
+      <table><thead><tr><th>ID</th><th>Nome</th><th>CNPJ</th><th>Pedido mín.</th><th>Prazo entrega</th><th>Representante</th><th></th></tr></thead>
         <tbody id="suppliers-tbody"></tbody></table>
       <div class="btn-row" id="suppliers-pagination" style="justify-content:space-between; margin-top:10px; display:none">
         <div style="color:var(--text-dim); font-size:12px" id="suppliers-page-info">—</div>
@@ -689,6 +693,7 @@
             <button type="button" class="secondary small" onclick="confirmExpirationField('import-expiration')">OK</button>
           </div>
         </div>
+        <div style="width:170px"><label>Projeção de venda padrão (dias)</label><input type="number" min="1" step="1" id="import-sales-projection" placeholder="Ex: 30"></div>
       </div>
       <input type="file" id="import-file" accept=".csv" style="margin-top:14px">
       <div class="btn-row" style="margin-top:12px">
@@ -713,6 +718,7 @@
             <button type="button" class="secondary small" onclick="confirmExpirationField('mq-expiration')">OK</button>
           </div>
         </div>
+        <div style="width:170px"><label>Projeção de venda padrão (dias)</label><input type="number" min="1" step="1" id="mq-sales-projection" placeholder="Ex: 30"></div>
       </div>
       <h3 style="margin-top:14px">Itens</h3>
       <div id="mq-items"></div>
@@ -787,6 +793,33 @@
         </div>
       </div>
       <div class="empty" id="report-empty" style="display:none">Nenhum resultado com esses filtros.</div>
+    </div>
+  </section>
+
+  <!-- REORDER POINT REPORT -->
+  <section class="section" id="section-reorder-points">
+    <h1>Ponto de Compra</h1>
+    <div class="subtitle">Quando reabrir o pedido de cada produto pra não ficar sem estoque — calculado a partir da projeção de venda e do prazo de entrega do fornecedor vencedor. Só entram itens de cotações fechadas, com vencedor definido e não cortados, que tenham os dois números preenchidos.</div>
+
+    <div class="card">
+      <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap">
+        <h2 style="margin:0">Produtos a repor</h2>
+        <button class="secondary small" onclick="loadReorderPointReport()">Atualizar</button>
+      </div>
+      <div class="subtitle" id="reorder-points-summary" style="margin-bottom:12px">Carregando...</div>
+      <table id="reorder-points-table" style="display:none"><thead><tr>
+        <th>Produto</th><th>Cotação</th><th>Fornecedor</th><th style="text-align:center">Qtd.</th>
+        <th>Chegada estimada</th><th>Esgota em</th><th>Ponto de compra</th><th></th>
+      </tr></thead>
+        <tbody id="reorder-points-tbody"></tbody></table>
+      <div class="btn-row" id="reorder-points-pagination" style="justify-content:space-between; margin-top:10px; display:none">
+        <div style="color:var(--text-dim); font-size:12px" id="reorder-points-page-info">—</div>
+        <div class="btn-row">
+          <button class="secondary small" onclick="changeReorderPointsPage(-1)" id="reorder-points-prev-btn">← Anterior</button>
+          <button class="secondary small" onclick="changeReorderPointsPage(1)" id="reorder-points-next-btn">Próxima →</button>
+        </div>
+      </div>
+      <div class="empty" id="reorder-points-empty" style="display:none">Nenhum produto precisa de reposição calculável no momento — cadastre a projeção de venda nas cotações fechadas pra esse relatório funcionar.</div>
     </div>
   </section>
 </main>
@@ -1135,6 +1168,7 @@ function loadSectionData(section) {
   if (section === 'quotation-start') { loadGroupsForSelects(); loadProductsForManualItems(); }
   if (section === 'quotation-reports') loadQuotations();
   if (section === 'reports') loadReportsFilters();
+  if (section === 'reorder-points') loadReorderPointReport();
   if (section === 'company-settings') loadCompanySettingsForm();
 }
 
@@ -1868,6 +1902,7 @@ function renderSuppliersList() {
       : `<button class="success small" onclick="reactivateSupplierModal(${s.id})">Reativar</button>`;
     tr.innerHTML = `<td>${s.id}</td><td>${s.name}</td><td class="mono">${s.cnpj}</td>
       <td class="num">${s.minimumOrderValue != null ? 'R$ ' + s.minimumOrderValue : '—'}</td>
+      <td>${s.defaultDeliveryDeadlineDays != null ? s.defaultDeliveryDeadlineDays + ' dias' : '—'}</td>
       <td>${s.representativeName || '—'}</td>
       <td><div class="row-actions">${actions}</div></td>`;
     tbody.appendChild(tr);
@@ -1891,6 +1926,7 @@ async function openSupplierModal(id) {
       <div><label>Telefone</label><input id="modal-supplier-phone" value="${s ? maskPhone(s.phone) : ''}" placeholder="(27) 99999-9999" oninput="this.value = maskPhone(this.value)"></div>
       <div><label>Endereço</label><input id="modal-supplier-address" value="${s ? escapeHtml(s.address) : ''}" placeholder="Rua, número, cidade"></div>
       <div><label>Pedido mínimo (R$)</label><input id="modal-supplier-minorder" type="text" inputmode="decimal" value="${s && s.minimumOrderValue != null ? formatCurrencyFromNumber(s.minimumOrderValue) : ''}" placeholder="0,00" oninput="this.value = maskCurrencyInput(this.value)"></div>
+      <div><label>Prazo de entrega padrão (dias)</label><input id="modal-supplier-deadline" type="number" min="1" step="1" value="${s && s.defaultDeliveryDeadlineDays != null ? s.defaultDeliveryDeadlineDays : ''}" placeholder="Ex: 5"></div>
       <div><label>Representante</label><select id="modal-supplier-representative"><option value="">— nenhum —</option></select></div>
     </div>
     <div class="btn-row" style="margin-top:16px">
@@ -1919,7 +1955,8 @@ async function submitSupplierModal() {
     phone: unmaskDigits(document.getElementById('modal-supplier-phone').value) || null,
     address: document.getElementById('modal-supplier-address').value.trim() || null,
     minimumOrderValue: unmaskCurrencyToNumber(minOrder),
-    representativeId: repId ? parseInt(repId) : null
+    representativeId: repId ? parseInt(repId) : null,
+    defaultDeliveryDeadlineDays: document.getElementById('modal-supplier-deadline').value || null
   };
   const ok = await saveWithReactivation(
     () => api(id ? 'PUT' : 'POST', id ? `/suppliers/${id}` : '/suppliers', body),
@@ -1947,6 +1984,7 @@ async function reactivateSupplierModal(id) {
       <div><label>Telefone</label><input id="modal-supplier-phone" value="${maskPhone(s.phone)}" oninput="this.value = maskPhone(this.value)"></div>
       <div><label>Endereço</label><input id="modal-supplier-address" value="${escapeHtml(s.address)}"></div>
       <div><label>Pedido mínimo (R$)</label><input id="modal-supplier-minorder" type="text" inputmode="decimal" value="${s.minimumOrderValue != null ? formatCurrencyFromNumber(s.minimumOrderValue) : ''}" oninput="this.value = maskCurrencyInput(this.value)"></div>
+      <div><label>Prazo de entrega padrão (dias)</label><input id="modal-supplier-deadline" type="number" min="1" step="1" value="${s.defaultDeliveryDeadlineDays != null ? s.defaultDeliveryDeadlineDays : ''}" placeholder="Ex: 5"></div>
       <div><label>Representante</label><select id="modal-supplier-representative"><option value="">— nenhum —</option></select></div>
     </div>
     <div class="btn-row" style="margin-top:16px">
@@ -1967,7 +2005,8 @@ async function submitReactivateSupplier() {
     phone: unmaskDigits(document.getElementById('modal-supplier-phone').value) || null,
     address: document.getElementById('modal-supplier-address').value.trim() || null,
     minimumOrderValue: unmaskCurrencyToNumber(minOrder),
-    representativeId: repId ? parseInt(repId) : null
+    representativeId: repId ? parseInt(repId) : null,
+    defaultDeliveryDeadlineDays: document.getElementById('modal-supplier-deadline').value || null
   };
   await safeCall(() => api('POST', `/suppliers/${id}/reactivate`, body));
   toast('Fornecedor reativado.');
@@ -2698,6 +2737,81 @@ function changeReportPage(delta) {
   renderReportTable();
 }
 
+let reorderPointsCache = [];
+let reorderPointsPage = 0;
+const REORDER_POINTS_PAGE_SIZE = 10;
+
+async function loadReorderPointReport() {
+  document.getElementById('reorder-points-summary').textContent = 'Carregando...';
+  document.getElementById('reorder-points-table').style.display = 'none';
+  document.getElementById('reorder-points-empty').style.display = 'none';
+
+  reorderPointsCache = await safeCall(() => api('GET', '/quotations/reorder-points'));
+  reorderPointsPage = 0;
+  renderReorderPointsTable();
+}
+
+// Selo de urgência é só client-side, em cima de daysUntilReorder que já vem calculado
+// do backend — evita duplicar a conta dos dois lados. Negativo = já passou do ponto de
+// compra ideal (atrasado); até 7 dias = urgente; o resto é só informativo.
+function reorderUrgencyBadge(daysUntilReorder) {
+  if (daysUntilReorder < 0) {
+    return `<span class="badge badge-expired">Atrasado (${Math.abs(daysUntilReorder)}d)</span>`;
+  }
+  if (daysUntilReorder <= 7) {
+    return `<span class="badge badge-reviewing">Em ${daysUntilReorder}d</span>`;
+  }
+  return `<span class="badge badge-available">Em ${daysUntilReorder}d</span>`;
+}
+
+function renderReorderPointsTable() {
+  const table = document.getElementById('reorder-points-table');
+  const tbody = document.getElementById('reorder-points-tbody');
+  const emptyEl = document.getElementById('reorder-points-empty');
+  const paginationEl = document.getElementById('reorder-points-pagination');
+  const summaryEl = document.getElementById('reorder-points-summary');
+
+  const totalPages = Math.max(Math.ceil(reorderPointsCache.length / REORDER_POINTS_PAGE_SIZE), 1);
+  if (reorderPointsPage >= totalPages) reorderPointsPage = totalPages - 1;
+  if (reorderPointsPage < 0) reorderPointsPage = 0;
+  const pageStart = reorderPointsPage * REORDER_POINTS_PAGE_SIZE;
+  const pageItems = reorderPointsCache.slice(pageStart, pageStart + REORDER_POINTS_PAGE_SIZE);
+
+  table.style.display = reorderPointsCache.length ? 'table' : 'none';
+  emptyEl.style.display = reorderPointsCache.length ? 'none' : 'block';
+  paginationEl.style.display = reorderPointsCache.length ? 'flex' : 'none';
+
+  const overdueCount = reorderPointsCache.filter(r => r.daysUntilReorder < 0).length;
+  summaryEl.textContent = reorderPointsCache.length
+    ? `${reorderPointsCache.length} produto${reorderPointsCache.length > 1 ? 's' : ''} com ponto de compra calculado`
+      + (overdueCount ? ` — ${overdueCount} já ${overdueCount > 1 ? 'passaram' : 'passou'} do ponto ideal` : '')
+    : 'Nenhum produto precisa de reposição calculável no momento.';
+
+  tbody.innerHTML = '';
+  pageItems.forEach(r => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${escapeHtml(r.productName)}<span class="mono" style="display:block; color:var(--text-dim); font-size:11px">${escapeHtml(r.productBarcode)}</span></td>
+      <td><a href="#" onclick="abrirDetalheCotacao(${r.quotationId}); return false;">${escapeHtml(r.quotationName)}</a></td>
+      <td>${escapeHtml(r.supplierName)}</td>
+      <td style="text-align:center">${r.quantity}</td>
+      <td>${fmtDate(r.estimatedArrivalDate)}</td>
+      <td>${fmtDate(r.estimatedDepletionDate)}</td>
+      <td style="font-weight:700">${fmtDate(r.reorderDate)}</td>
+      <td>${reorderUrgencyBadge(r.daysUntilReorder)}</td>`;
+    tbody.appendChild(tr);
+  });
+
+  document.getElementById('reorder-points-page-info').textContent = `Página ${reorderPointsPage + 1} de ${totalPages}`;
+  document.getElementById('reorder-points-prev-btn').disabled = reorderPointsPage === 0;
+  document.getElementById('reorder-points-next-btn').disabled = reorderPointsPage >= totalPages - 1;
+}
+
+function changeReorderPointsPage(delta) {
+  reorderPointsPage += delta;
+  renderReorderPointsTable();
+}
+
 // Tela focada só nos dados desse grupo (cotação + fornecedor) — não é o modal de edição
 // da cotação (abrirDetalheCotacao), que tem formulário, botão de publicar/fechar etc.
 // Aqui é só leitura: produto, quantidade, preço, subtotal e resultado de cada lance.
@@ -2767,6 +2881,7 @@ async function abrirDetalheCotacao(id) {
       <div><label>Nome</label><input id="qd-name" placeholder="Ex: Cotação de Bebidas"></div>
       <div><label>Grupo</label><select id="qd-group"></select></div>
       <div><label>Prazo de expiração</label><input type="datetime-local" id="qd-expiration"></div>
+      <div style="width:170px"><label>Projeção de venda padrão (dias)</label><input type="number" min="1" step="1" id="qd-sales-projection" placeholder="Ex: 30"></div>
       <button id="qd-save-btn" onclick="updateQuotation()">Salvar edição</button>
       <button id="qd-group-suppliers-btn" class="secondary" onclick="manageQdGroupSuppliers()">Fornecedores do Grupo</button>
     </div>
@@ -2836,6 +2951,7 @@ async function abrirDetalheCotacao(id) {
   document.getElementById('qd-name').value = q.name;
   document.getElementById('qd-group').value = q.supplierGroupId || '';
   document.getElementById('qd-expiration').value = toDatetimeLocal(q.expirationDate);
+  document.getElementById('qd-sales-projection').value = q.defaultSalesProjectionDays ?? '';
 
   const pdfLink = document.getElementById('qd-pdf-link');
   pdfLink.style.display = q.status === 'CLOSED' ? 'inline-block' : 'none';
@@ -2933,7 +3049,7 @@ function applyQdEditLock(status) {
   const isReviewing = status === 'REVIEWING';
   const canClose = status === 'AVAILABLE' || status === 'EXPIRED';
 
-  ['qd-name', 'qd-group', 'qd-expiration'].forEach(id => {
+  ['qd-name', 'qd-group', 'qd-expiration', 'qd-sales-projection'].forEach(id => {
     document.getElementById(id).disabled = !isDraft;
   });
   document.getElementById('qd-save-btn').disabled = !isDraft;
@@ -2964,8 +3080,8 @@ async function loadQuotationItemsDetail(id, status) {
   qdPendingQuantityEdits = {};
 
   document.getElementById('qd-items-thead').innerHTML = qdCurrentItemsIsDraft
-    ? '<th>Cód. de Barras</th><th>Produto</th><th style="text-align:center">Quantidade</th><th></th>'
-    : '<th>Cód. de Barras</th><th>Produto</th><th style="text-align:center">Quantidade</th>';
+    ? '<th>Cód. de Barras</th><th>Produto</th><th style="text-align:center">Quantidade</th><th style="text-align:center">Projeção de venda (dias)</th><th></th>'
+    : '<th>Cód. de Barras</th><th>Produto</th><th style="text-align:center">Quantidade</th><th style="text-align:center">Projeção de venda (dias)</th>';
 
   document.getElementById('qd-items-filter').value = '';
   renderQdItemsRows(items);
@@ -3397,8 +3513,27 @@ function renderQdItemsRows(items) {
   const pageItems = items.slice(qdItemsPage * QD_ITEMS_PAGE_SIZE, (qdItemsPage + 1) * QD_ITEMS_PAGE_SIZE);
 
   if (!items.length) {
-    tbody.innerHTML = `<tr><td colspan="${qdCurrentItemsIsDraft ? 4 : 3}" class="empty">Nenhum item encontrado.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="${qdCurrentItemsIsDraft ? 5 : 4}" class="empty">Nenhum item encontrado.</td></tr>`;
   }
+
+  // Célula da projeção de venda: mostra o valor efetivo (sobrescrita do item, ou o
+  // padrão da cotação quando o item não tem sobrescrita própria). Mudou o número →
+  // vira sobrescrita explícita desse item. O "×" só aparece quando já existe
+  // sobrescrita, e serve pra voltar a herdar o padrão da cotação.
+  const projectionCell = (it) => {
+    const isOverridden = it.salesProjectionDaysOverride !== null && it.salesProjectionDaysOverride !== undefined;
+    const value = it.effectiveSalesProjectionDays != null ? it.effectiveSalesProjectionDays : '';
+    const tag = !isOverridden && value !== ''
+      ? ' <span style="font-size:10px; color:var(--text-faint); white-space:nowrap">(padrão)</span>'
+      : '';
+    const resetBtn = isOverridden
+      ? `<button type="button" class="icon-btn" title="Voltar a usar o padrão da cotação" onclick="resetItemSalesProjection(${it.id})" style="width:22px; height:22px; padding:0; margin-left:4px; font-size:14px; line-height:1">×</button>`
+      : '';
+    return `<td style="text-align:center; white-space:nowrap">
+        <input type="number" min="1" step="1" value="${value}" id="qd-item-projection-${it.id}"
+          style="width:64px; text-align:center" onchange="saveItemSalesProjection(${it.id}, this)">${tag}${resetBtn}
+      </td>`;
+  };
 
   pageItems.forEach(it => {
     const tr = document.createElement('tr');
@@ -3407,6 +3542,7 @@ function renderQdItemsRows(items) {
       tr.innerHTML = `<td class="mono">${it.productBarcode}</td><td>${it.productName}</td>
         <td style="text-align:center"><input type="number" step="0.001" value="${currentValue}" id="qd-item-qty-${it.id}"
           style="width:80px; text-align:center" oninput="onQdItemQtyInput(${it.id}, this.value)"></td>
+        ${projectionCell(it)}
         <td style="text-align:center">
           <button class="icon-btn danger" onclick="removeQuotationItem(${it.id}, this)" title="Remover item" aria-label="Remover item">${QD_TRASH_ICON}</button>
         </td>`;
@@ -3415,7 +3551,8 @@ function renderQdItemsRows(items) {
         ? ' <span style="color:var(--danger); background:var(--danger-bg); border:1px solid var(--danger-border); font-size:10.5px; font-weight:700; padding:2px 7px; border-radius:20px; margin-left:6px; white-space:nowrap">Cortado — sem estoque</span>'
         : '';
       tr.innerHTML = `<td class="mono">${it.productBarcode}</td><td>${it.productName}${cutBadge}</td>
-        <td style="text-align:center">${it.quantity}</td>`;
+        <td style="text-align:center">${it.quantity}</td>
+        ${projectionCell(it)}`;
     }
     tbody.appendChild(tr);
   });
@@ -3424,6 +3561,27 @@ function renderQdItemsRows(items) {
   document.getElementById('qd-items-page-info').textContent = `Página ${qdItemsPage + 1} de ${totalPages}`;
   document.getElementById('qd-items-prev-btn').disabled = qdItemsPage === 0;
   document.getElementById('qd-items-next-btn').disabled = qdItemsPage >= totalPages - 1;
+}
+
+// Salva a sobrescrita de projeção de venda desse item. Campo vazio = remove a
+// sobrescrita e volta a herdar o padrão da cotação (mesmo endpoint, valor null).
+async function saveItemSalesProjection(itemId, inputEl) {
+  const raw = (inputEl.value || '').trim();
+  const value = raw === '' ? null : parseInt(raw, 10);
+  if (value !== null && (isNaN(value) || value <= 0)) {
+    toast('Projeção de venda deve ser um número maior que zero.', true);
+    renderQdItemsRows(getQdFilteredItems());
+    return;
+  }
+  const updated = await safeCall(() => api('PUT', `/quotations/${currentQuotationId}/items/${itemId}/sales-projection`, { salesProjectionDays: value }));
+  const idx = qdCurrentItems.findIndex(i => i.id === itemId);
+  if (idx !== -1) qdCurrentItems[idx] = updated;
+  toast('Projeção de venda atualizada.');
+  renderQdItemsRows(getQdFilteredItems());
+}
+
+function resetItemSalesProjection(itemId) {
+  saveItemSalesProjection(itemId, { value: '' });
 }
 
 function getQdFilteredItems() {
@@ -3631,7 +3789,8 @@ async function updateQuotation() {
   const body = {
     name: document.getElementById('qd-name').value.trim(),
     supplierGroupId: document.getElementById('qd-group').value || null,
-    expirationDate: document.getElementById('qd-expiration').value || null
+    expirationDate: document.getElementById('qd-expiration').value || null,
+    defaultSalesProjectionDays: document.getElementById('qd-sales-projection').value || null
   };
   await safeCall(() => api('PUT', `/quotations/${currentQuotationId}`, body));
   toast('Cotação atualizada.');
@@ -3930,11 +4089,13 @@ async function createQuotationManually() {
     name,
     supplierGroupId: document.getElementById('mq-group').value || null,
     expirationDate: document.getElementById('mq-expiration').value || null,
+    defaultSalesProjectionDays: document.getElementById('mq-sales-projection').value || null,
     items
   };
   const q = await safeCall(() => api('POST', '/quotations', body));
   toast('Cotação #' + q.id + ' criada em DRAFT.');
   document.getElementById('mq-name').value = '';
+  document.getElementById('mq-sales-projection').value = '';
   document.getElementById('mq-items').innerHTML = '';
   goToSection('quotation-reports');
 }
@@ -3947,6 +4108,7 @@ async function importFile(withMapping) {
   if (!name) { toast('Informe um nome para a cotação.', true); return; }
   const groupId = document.getElementById('import-group').value;
   const expiration = document.getElementById('import-expiration').value;
+  const salesProjection = document.getElementById('import-sales-projection').value;
 
   const formData = new FormData();
   formData.append('file', fileInput.files[0]);
@@ -3954,6 +4116,7 @@ async function importFile(withMapping) {
   let url = `/quotations/import?name=${encodeURIComponent(name)}`;
   if (groupId) url += `&supplierGroupId=${groupId}`;
   if (expiration) url += `&expirationDate=${encodeURIComponent(expiration)}`;
+  if (salesProjection) url += `&defaultSalesProjectionDays=${salesProjection}`;
   if (withMapping) {
     const desc = document.getElementById('map-description').value;
     const barcode = document.getElementById('map-barcode').value;
@@ -3977,6 +4140,7 @@ async function importFile(withMapping) {
     document.getElementById('import-name').value = '';
     document.getElementById('import-group').value = '';
     document.getElementById('import-expiration').value = '';
+    document.getElementById('import-sales-projection').value = '';
     fileInput.value = '';
     goToSection('quotation-reports');
   }

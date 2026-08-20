@@ -36,7 +36,9 @@ import com.bruno.kota.dtos.QuotationReportRow;
 import com.bruno.kota.dtos.QuotationUpdateRequest;
 import com.bruno.kota.dtos.RepresentativePerformance;
 import com.bruno.kota.dtos.QuotationFillRate;
+import com.bruno.kota.dtos.ReorderPointRow;
 import com.bruno.kota.dtos.ReviewBatchUpdateRequest;
+import com.bruno.kota.dtos.SalesProjectionUpdateRequest;
 import com.bruno.kota.dtos.WonQuotationSummary;
 import com.bruno.kota.security.AuthPrincipal;
 import com.bruno.kota.services.QuotationImportService;
@@ -96,6 +98,12 @@ public class QuotationController {
         LocalDateTime fromDt = (from != null && !from.isBlank()) ? LocalDate.parse(from).atStartOfDay() : null;
         LocalDateTime toDt = (to != null && !to.isBlank()) ? LocalDate.parse(to).atTime(23, 59, 59) : null;
         return quotationService.getQuotationReport(fromDt, toDt, supplierId, representativeId, product, onlyWinners);
+    }
+
+    @GetMapping("/reorder-points")
+    @PreAuthorize("hasRole('ADMIN')")
+    public List<ReorderPointRow> getReorderPointReport() {
+        return quotationService.getReorderPointReport();
     }
 
     @GetMapping("/{id}/my-bids")
@@ -180,11 +188,13 @@ public class QuotationController {
             @RequestParam String name,
             @RequestParam(required = false) Long supplierGroupId,
             @RequestParam(required = false) String expirationDate,
+            @RequestParam(required = false) Integer defaultSalesProjectionDays,
             @RequestParam(required = false) Integer descriptionColumn,
             @RequestParam(required = false) Integer barcodeColumn,
             @RequestParam(required = false) Integer quantityColumn) {
         return quotationImportService.importFile(
-                file, name, supplierGroupId, expirationDate, descriptionColumn, barcodeColumn, quantityColumn);
+                file, name, supplierGroupId, expirationDate, defaultSalesProjectionDays,
+                descriptionColumn, barcodeColumn, quantityColumn);
     }
 
     @PostMapping("/{id}/items")
@@ -198,6 +208,13 @@ public class QuotationController {
     public QuotationItemResponse updateItem(
             @PathVariable Long id, @PathVariable Long itemId, @Valid @RequestBody QuotationItemUpdateRequest request) {
         return quotationService.updateItemQuantity(id, itemId, request.quantity());
+    }
+
+    @PutMapping("/{id}/items/{itemId}/sales-projection")
+    @PreAuthorize("hasRole('ADMIN')")
+    public QuotationItemResponse updateItemSalesProjection(
+            @PathVariable Long id, @PathVariable Long itemId, @RequestBody SalesProjectionUpdateRequest request) {
+        return quotationService.updateItemSalesProjection(id, itemId, request.salesProjectionDays());
     }
 
     @DeleteMapping("/{id}/items/{itemId}")

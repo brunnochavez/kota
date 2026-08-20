@@ -10,6 +10,7 @@ import com.bruno.kota.entities.SupplierGroup;
 import com.bruno.kota.exceptions.DuplicateResourceException;
 import com.bruno.kota.exceptions.InactiveResourceException;
 import com.bruno.kota.exceptions.ResourceNotFoundException;
+import com.bruno.kota.exceptions.BusinessRuleException;
 import com.bruno.kota.repositories.RepresentativeRepository;
 import com.bruno.kota.repositories.SupplierGroupRepository;
 import com.bruno.kota.repositories.SupplierRepository;
@@ -66,6 +67,8 @@ public class SupplierService {
             throw new DuplicateResourceException("Já existe um fornecedor com o CNPJ " + request.cnpj());
         }
 
+        validateDeliveryDeadline(request.defaultDeliveryDeadlineDays());
+
         Supplier supplier = Supplier.builder()
                 .name(request.name())
                 .cnpj(request.cnpj())
@@ -73,6 +76,7 @@ public class SupplierService {
                 .address(request.address())
                 .minimumOrderValue(request.minimumOrderValue())
                 .representative(resolveRepresentative(request.representativeId()))
+                .defaultDeliveryDeadlineDays(request.defaultDeliveryDeadlineDays())
                 .build();
 
         return toResponse(supplierRepository.save(supplier));
@@ -80,6 +84,8 @@ public class SupplierService {
 
     @Transactional
     public SupplierResponse update(Long id, SupplierRequest request) {
+        validateDeliveryDeadline(request.defaultDeliveryDeadlineDays());
+
         Supplier supplier = findEntityById(id);
         supplier.setName(request.name());
         supplier.setCnpj(request.cnpj());
@@ -87,11 +93,14 @@ public class SupplierService {
         supplier.setAddress(request.address());
         supplier.setMinimumOrderValue(request.minimumOrderValue());
         supplier.setRepresentative(resolveRepresentative(request.representativeId()));
+        supplier.setDefaultDeliveryDeadlineDays(request.defaultDeliveryDeadlineDays());
         return toResponse(supplierRepository.save(supplier));
     }
 
     @Transactional
     public SupplierResponse reactivate(Long id, SupplierRequest request) {
+        validateDeliveryDeadline(request.defaultDeliveryDeadlineDays());
+
         Supplier supplier = supplierRepository.findByIdIncludingDeleted(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Fornecedor não encontrado: id " + id));
         supplier.setDeleted(false);
@@ -100,6 +109,7 @@ public class SupplierService {
         supplier.setAddress(request.address());
         supplier.setMinimumOrderValue(request.minimumOrderValue());
         supplier.setRepresentative(resolveRepresentative(request.representativeId()));
+        supplier.setDefaultDeliveryDeadlineDays(request.defaultDeliveryDeadlineDays());
         return toResponse(supplierRepository.save(supplier));
     }
 
@@ -132,6 +142,12 @@ public class SupplierService {
                 .orElseThrow(() -> new ResourceNotFoundException("Representante não encontrado: id " + representativeId));
     }
 
+    private void validateDeliveryDeadline(Integer defaultDeliveryDeadlineDays) {
+        if (defaultDeliveryDeadlineDays != null && defaultDeliveryDeadlineDays <= 0) {
+            throw new BusinessRuleException("Prazo de entrega deve ser maior que zero.");
+        }
+    }
+
     private Supplier findEntityById(Long id) {
         return supplierRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Fornecedor não encontrado: id " + id));
@@ -151,7 +167,8 @@ public class SupplierService {
                 rep != null ? rep.getId() : null,
                 rep != null ? rep.getName() : null,
                 groupIds,
-                groupNames
+                groupNames,
+                supplier.getDefaultDeliveryDeadlineDays()
         );
     }
 }
