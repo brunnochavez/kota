@@ -157,6 +157,12 @@ public class QuotationController {
         return quotationService.publish(id);
     }
 
+    @PostMapping("/{id}/duplicate")
+    @PreAuthorize("hasRole('ADMIN')")
+    public QuotationResponse duplicate(@PathVariable Long id) {
+        return quotationService.duplicate(id);
+    }
+
     @PostMapping("/{id}/close")
     @PreAuthorize("hasRole('ADMIN')")
     public QuotationCloseResult close(@PathVariable Long id, @RequestBody(required = false) QuotationCloseRequest request) {

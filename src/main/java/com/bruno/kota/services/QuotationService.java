@@ -106,6 +106,36 @@ public class QuotationService {
         return toResponse(quotation);
     }
 
+    // Clona nome/grupo/projeção padrão/itens (produto + quantidade) pra uma nova
+    // cotação em DRAFT — sem prazo de expiração (o admin define de novo) e sem nada
+    // de vencedor/corte/sobrescrita de projeção por item, já que é uma cotação nova,
+    // não uma continuação da antiga. Pensado principalmente pra cotação EXPIRED que o
+    // admin quer refazer do zero sem redigitar produto por produto, mas funciona a
+    // partir de qualquer status — o "gerador" é sempre a lista de itens atual.
+    @Transactional
+    public QuotationResponse duplicate(Long id) {
+        Quotation original = findEntityById(id);
+        List<QuotationItem> originalItems = quotationItemRepository.findByQuotationId(id);
+
+        Quotation copy = Quotation.builder()
+                .name(original.getName() + " (cópia)")
+                .supplierGroup(original.getSupplierGroup())
+                .defaultSalesProjectionDays(original.getDefaultSalesProjectionDays())
+                .build();
+        copy = quotationRepository.save(copy);
+
+        for (QuotationItem item : originalItems) {
+            QuotationItem newItem = QuotationItem.builder()
+                    .quotation(copy)
+                    .product(item.getProduct())
+                    .quantity(item.getQuantity())
+                    .build();
+            quotationItemRepository.save(newItem);
+        }
+
+        return toResponse(copy);
+    }
+
     @Transactional
     public QuotationResponse update(Long id, QuotationUpdateRequest request) {
         Quotation quotation = findEntityById(id);
