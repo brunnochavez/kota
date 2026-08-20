@@ -235,6 +235,15 @@
   .entry-topbar { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
   .entry-topbar h1 { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
+  /* fixado, então precisa saber a altura real do cabeçalho global (que varia quando o
+     nome da empresa/usuário quebra em 2 linhas) — --app-header-h é atualizado via JS
+     (updateAppHeaderHeightVar), 58px aqui é só o fallback antes do JS rodar a 1ª vez. */
+  #entry-sticky-head {
+    position: sticky; top: var(--app-header-h, 58px); z-index: 25;
+    background: var(--bg); padding: 14px 0 10px; margin-bottom: 4px;
+  }
+  #entry-items-card { padding-top: 14px; }
+
   #sticky-submit-bar {
     display: none; position: fixed; left: 0; right: 0; bottom: 0; z-index: 41;
     background: var(--surface); border-top: 1px solid var(--border);
@@ -394,17 +403,18 @@
 
   <!-- ---------- tela de lançamento (tela cheia, sem tab bar) ---------- -->
   <div class="view" id="view-entry">
-    <div class="entry-topbar">
-      <button class="ghost" onclick="closeItemsView()" title="Voltar" aria-label="Voltar">
-        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>
-      </button>
-      <h1 id="items-title">Itens da cotação</h1>
-    </div>
-
-    <div class="card">
+    <div id="entry-sticky-head">
+      <div class="entry-topbar">
+        <button class="ghost" onclick="closeItemsView()" title="Voltar" aria-label="Voltar">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>
+        </button>
+        <h1 id="items-title">Itens da cotação</h1>
+      </div>
       <div id="quotation-deadline-info"></div>
       <div id="rep-supplier-info"></div>
+    </div>
 
+    <div class="card" id="entry-items-card">
       <div id="items-list"></div>
     </div>
   </div>
@@ -698,6 +708,7 @@ async function init() {
   myRepresentativeId = parseInt(localStorage.getItem('kota-representative-id'));
   myRepresentativeName = localStorage.getItem('kota-name') || '';
   document.getElementById('my-identity').textContent = myRepresentativeName;
+  updateAppHeaderHeightVar();
 
   suppliersCache = await safeCall(() => api('GET', '/suppliers'));
   companySettingsCache = await safeCall(() => api('GET', '/company-settings'));
@@ -1052,7 +1063,22 @@ function applyCompanyBrandingToHeader() {
     document.getElementById('brand-logo-slot').innerHTML =
       `<img src="${companySettingsCache.logoUrl}?t=${Date.now()}" alt="">`;
   }
+  updateAppHeaderHeightVar();
 }
+
+// A tela de lançamento tem um sub-cabeçalho fixo (voltar/título + prazo + fornecedor)
+// que gruda logo abaixo do cabeçalho global — mas a altura desse cabeçalho global varia
+// (nome de empresa/usuário comprido quebra pra 2 linhas), então não dá pra cravar um
+// valor fixo no CSS. Isso mede a altura de verdade e atualiza a variável que o CSS usa
+// (--app-header-h). Chamado sempre que o conteúdo do cabeçalho muda, e no resize —
+// texto que cabia numa linha na tela cheia pode quebrar quando o navegador redimensiona.
+function updateAppHeaderHeightVar() {
+  const header = document.querySelector('header');
+  if (header) {
+    document.documentElement.style.setProperty('--app-header-h', header.offsetHeight + 'px');
+  }
+}
+window.addEventListener('resize', updateAppHeaderHeightVar);
 
 function goHome() {
   if (document.getElementById('view-fulfillment').classList.contains('active')) {
@@ -1079,14 +1105,23 @@ const CLOCK_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" s
 // Rótulo estático (não precisa ficar contando segundo a segundo aqui, é só uma visão
 // geral da lista) — cor muda pela urgência, pra dar pra bater o olho e saber o que
 // precisa de atenção primeiro sem entrar em cada cotação.
+//
+// Só vira contagem em minutos "crus" quando falta MENOS de 1 hora — a partir daí (e até
+// 24h), mostra "Xh:YYm" (ex: "2h:38m"), que é bem mais fácil de ler de relance do que um
+// número solto de minutos tipo "158min".
 function relativeDeadlineLabel(expirationDate) {
   if (!expirationDate) return null;
   const diffMs = new Date(expirationDate) - new Date();
   if (diffMs <= 0) return { text: 'Prazo encerrado', level: 'urgent' };
 
   const hours = diffMs / (1000 * 60 * 60);
-  if (hours < 3) return { text: `Fecha em ${Math.max(1, Math.round(hours * 60))}min`, level: 'urgent' };
-  if (hours < 24) return { text: `Fecha em ${Math.round(hours)}h`, level: 'soon' };
+  if (hours < 1) return { text: `Fecha em ${Math.max(1, Math.round(diffMs / 60000))}min`, level: 'urgent' };
+  if (hours < 24) {
+    const totalMinutes = Math.round(diffMs / 60000);
+    const h = Math.floor(totalMinutes / 60);
+    const m = totalMinutes % 60;
+    return { text: `Fecha em ${h}h:${String(m).padStart(2, '0')}m`, level: hours < 3 ? 'urgent' : 'soon' };
+  }
   const days = Math.round(hours / 24);
   return { text: `Fecha em ${days} dia${days > 1 ? 's' : ''}`, level: 'plenty' };
 }
@@ -1614,6 +1649,7 @@ async function openItemsView(id) {
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
   document.getElementById('view-entry').classList.add('active');
   hideBottomChrome();
+  updateAppHeaderHeightVar();
 
   const btn = document.getElementById('sticky-main-btn');
   btn.textContent = 'Salvar Cotação';

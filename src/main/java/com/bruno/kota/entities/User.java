@@ -1,5 +1,7 @@
 package com.bruno.kota.entities;
 
+import java.time.LocalDateTime;
+
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -48,4 +50,19 @@ public class User {
     @Column(name = "must_change_password", nullable = false)
     @Builder.Default
     private Boolean mustChangePassword = true;
+
+    // Contador de senha errada seguida — zera a cada login bem-sucedido. Junto com
+    // lockedUntil, é o mecanismo de bloqueio contra força bruta (ver AuthService.login).
+    // columnDefinition com DEFAULT 0 explícito é necessário aqui: users já tem linhas
+    // existentes em produção, e o MySQL em modo estrito recusa ALTER TABLE ADD COLUMN
+    // NOT NULL sem um valor padrão pra preencher as linhas que já existem.
+    @Column(name = "failed_login_attempts", nullable = false, columnDefinition = "INTEGER NOT NULL DEFAULT 0")
+    @Builder.Default
+    private Integer failedLoginAttempts = 0;
+
+    // Null enquanto a conta não está bloqueada. Quando failedLoginAttempts bate o limite,
+    // isso vira "agora + N minutos" — login fica recusado até passar dessa data, mesmo
+    // com a senha certa, sem precisar apagar o histórico de tentativas antes da hora.
+    @Column(name = "locked_until")
+    private LocalDateTime lockedUntil;
 }

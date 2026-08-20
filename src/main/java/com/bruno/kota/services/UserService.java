@@ -72,6 +72,11 @@ public class UserService {
         }
         user.setPasswordHash(passwordEncoder.encode(newPassword));
         user.setMustChangePassword(true);
+        // Reset de senha pelo admin também limpa o bloqueio por força bruta — senão o
+        // representante fica travado com a senha NOVA até o bloqueio antigo expirar
+        // sozinho, o que não faz sentido nenhum (o motivo do bloqueio já não existe mais).
+        user.setFailedLoginAttempts(0);
+        user.setLockedUntil(null);
         userRepository.save(user);
         return toResponse(representativeId, user);
     }

@@ -23,7 +23,10 @@ public record AddItemWithWinnerRequest(
         @Positive(message = "Valor deve ser maior que zero")
         BigDecimal value,
 
-        @NotNull(message = "Prazo de entrega é obrigatório")
+        // Não é mais obrigatório aqui — prazo de entrega agora é um dado do CADASTRO do
+        // fornecedor (Supplier.defaultDeliveryDeadlineDays), não algo digitado item a
+        // item nessa tela. Sem @NotNull de propósito; quando vier preenchido mesmo assim
+        // (compatibilidade com quem ainda manda), continua validando "maior que zero".
         @Positive(message = "Prazo de entrega deve ser maior que zero")
         Integer deliveryDeadlineDays
 ) {}

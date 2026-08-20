@@ -3116,7 +3116,8 @@ function renderQdFulfillmentIssues(items, status) {
     <div style="margin-bottom:${cutItems.length ? '14px' : '0'}">
       <div style="font-weight:700; color:var(--warning); font-size:13px">Sem nenhum lance (${noWinnerItems.length})</div>
       <div style="font-size:12px; color:var(--text-dim); margin-bottom:6px">Nenhum representante ofertou esses produtos — a cotação fechou sem vencedor pra eles.</div>
-      <ul style="margin:0; padding-left:18px; font-size:13px">${noWinnerItems.map(itemLine).join('')}</ul>
+      <ul style="margin:0 0 8px; padding-left:18px; font-size:13px">${noWinnerItems.map(itemLine).join('')}</ul>
+      <button class="secondary small" onclick="duplicateUnquotedItems()">Gerar Outra Cotação</button>
     </div>` : '';
 
   const cutBlock = cutItems.length ? `
@@ -3331,7 +3332,6 @@ async function renderAddProductPanel(repId) {
       </div>
       <div style="width:90px"><label>Quantidade</label><input type="number" step="0.001" id="review-add-product-qty" placeholder="se novo"></div>
       <div style="width:100px"><label>Preço (R$)</label><input type="text" inputmode="decimal" id="review-add-product-price" placeholder="0,00" oninput="this.value = maskCurrencyInput(this.value)"></div>
-      <div style="width:90px"><label>Prazo (dias)</label><input type="number" step="1" min="1" id="review-add-product-deadline" placeholder="dias"></div>
       <button class="secondary small" id="review-add-product-btn" onclick="addProductToRep(${repId})">+ Adicionar</button>
     </div>
     <div id="review-add-product-hint" style="margin-top:6px; font-size:12px; color:var(--text-dim)"></div>
@@ -3365,11 +3365,9 @@ function searchReviewAddProduct() {
 function resetReviewAddProductFields() {
   const qtyInput = document.getElementById('review-add-product-qty');
   const priceInput = document.getElementById('review-add-product-price');
-  const deadlineInput = document.getElementById('review-add-product-deadline');
   const addBtn = document.getElementById('review-add-product-btn');
   if (qtyInput) { qtyInput.value = ''; qtyInput.disabled = false; }
   if (priceInput) { priceInput.value = ''; priceInput.disabled = false; }
-  if (deadlineInput) { deadlineInput.value = ''; deadlineInput.disabled = false; }
   if (addBtn) addBtn.disabled = false;
 }
 
@@ -3389,7 +3387,6 @@ function selectReviewAddProduct(productId) {
   if (existing) {
     document.getElementById('review-add-product-qty').disabled = true;
     document.getElementById('review-add-product-price').disabled = true;
-    document.getElementById('review-add-product-deadline').disabled = true;
     document.getElementById('review-add-product-btn').disabled = true;
     hint.innerHTML = '<span style="color:var(--success); font-weight:600">Esse produto já está na cotação!</span>';
   } else {
@@ -3405,11 +3402,9 @@ async function addProductToRep(repId) {
   const productId = document.getElementById('review-add-product-id').value;
   const qty = document.getElementById('review-add-product-qty').value;
   const price = unmaskCurrencyToNumber(document.getElementById('review-add-product-price').value);
-  const deadline = document.getElementById('review-add-product-deadline').value;
   if (!productId) { toast('Busque e selecione um produto.', true); return; }
   if (!qty) { toast('Informe a quantidade.', true); return; }
   if (!price) { toast('Informe o preço.', true); return; }
-  if (!deadline) { toast('Informe o prazo de entrega (dias).', true); return; }
 
   const suppliers = await safeCall(() => api('GET', '/suppliers'));
   const supplier = suppliers.find(s => s.representativeId === repId);
@@ -3426,8 +3421,7 @@ async function addProductToRep(repId) {
     quantity: parseFloat(qty),
     supplierId: supplier.id,
     representativeId: repId,
-    value: price,
-    deliveryDeadlineDays: parseInt(deadline)
+    value: price
   }));
 
   toast('Produto adicionado ao pedido desse representante.');
@@ -3815,6 +3809,16 @@ async function publishQuotation() {
 async function duplicateQuotation() {
   const q = await safeCall(() => api('POST', `/quotations/${currentQuotationId}/duplicate`));
   toast('Cotação #' + q.id + ' criada em Rascunho, a partir desta.');
+  closeModal();
+  loadQuotations();
+  abrirDetalheCotacao(q.id);
+}
+
+// Mesma ideia, mas só pros itens que fecharam sem vencedor — pra tentar de novo com
+// outros fornecedores/representantes sem carregar junto o que já foi bem atendido.
+async function duplicateUnquotedItems() {
+  const q = await safeCall(() => api('POST', `/quotations/${currentQuotationId}/duplicate-unquoted-items`));
+  toast('Cotação #' + q.id + ' criada em Rascunho, só com os itens sem lance.');
   closeModal();
   loadQuotations();
   abrirDetalheCotacao(q.id);

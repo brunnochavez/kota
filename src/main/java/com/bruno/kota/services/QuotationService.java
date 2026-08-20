@@ -116,15 +116,34 @@ public class QuotationService {
     public QuotationResponse duplicate(Long id) {
         Quotation original = findEntityById(id);
         List<QuotationItem> originalItems = quotationItemRepository.findByQuotationId(id);
+        return duplicateInternal(original, originalItems, " (cópia)");
+    }
 
+    // Mesma ideia do duplicate() normal, mas só clona os itens que fecharam SEM
+    // vencedor (ninguém ofertou) — o caso de uso é gerar rapidinho uma cotação nova só
+    // com o que sobrou pra tentar de novo com outros fornecedores/representantes, sem
+    // arrastar junto os itens que já foram bem atendidos na cotação original.
+    @Transactional
+    public QuotationResponse duplicateUnquotedItems(Long id) {
+        Quotation original = findEntityById(id);
+        List<QuotationItem> unquotedItems = quotationItemRepository.findByQuotationId(id).stream()
+                .filter(item -> item.getWinningBid() == null)
+                .toList();
+        if (unquotedItems.isEmpty()) {
+            throw new BusinessRuleException("Não há itens sem lance nessa cotação.");
+        }
+        return duplicateInternal(original, unquotedItems, " (sem cotação)");
+    }
+
+    private QuotationResponse duplicateInternal(Quotation original, List<QuotationItem> itemsToClone, String nameSuffix) {
         Quotation copy = Quotation.builder()
-                .name(original.getName() + " (cópia)")
+                .name(original.getName() + nameSuffix)
                 .supplierGroup(original.getSupplierGroup())
                 .defaultSalesProjectionDays(original.getDefaultSalesProjectionDays())
                 .build();
         copy = quotationRepository.save(copy);
 
-        for (QuotationItem item : originalItems) {
+        for (QuotationItem item : itemsToClone) {
             QuotationItem newItem = QuotationItem.builder()
                     .quotation(copy)
                     .product(item.getProduct())
