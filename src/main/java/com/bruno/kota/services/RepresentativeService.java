@@ -8,10 +8,16 @@ import org.springframework.transaction.annotation.Transactional;
 import com.bruno.kota.dtos.RepresentativeRequest;
 import com.bruno.kota.dtos.RepresentativeResponse;
 import com.bruno.kota.entities.Representative;
+import com.bruno.kota.entities.User;
+import com.bruno.kota.exceptions.BusinessRuleException;
 import com.bruno.kota.exceptions.DuplicateResourceException;
 import com.bruno.kota.exceptions.InactiveResourceException;
 import com.bruno.kota.exceptions.ResourceNotFoundException;
+import com.bruno.kota.repositories.BidRepository;
+import com.bruno.kota.repositories.QuotationDeclineRepository;
 import com.bruno.kota.repositories.RepresentativeRepository;
+import com.bruno.kota.repositories.SupplierRepository;
+import com.bruno.kota.repositories.UserRepository;
 
 import lombok.RequiredArgsConstructor;
 
@@ -20,6 +26,10 @@ import lombok.RequiredArgsConstructor;
 public class RepresentativeService {
 
     private final RepresentativeRepository representativeRepository;
+    private final BidRepository bidRepository;
+    private final QuotationDeclineRepository quotationDeclineRepository;
+    private final SupplierRepository supplierRepository;
+    private final UserRepository userRepository;
 
     @Transactional(readOnly = true)
     public List<RepresentativeResponse> findAll() {
@@ -81,6 +91,33 @@ public class RepresentativeService {
     @Transactional
     public void delete(Long id) {
         representativeRepository.delete(findEntityById(id));
+    }
+
+    // Exclusão DE VERDADE — só permitida quando o representante nunca participou de
+    // nada (nenhum lance enviado, nenhuma cotação recusada) e não está vinculado como
+    // contato de nenhum fornecedor no momento. Também limpa o User (login) associado,
+    // já que um acesso sem representante nenhum apontando pra ele é lixo — o User em si
+    // não tem @SQLDelete, então esse delete aqui já é de verdade sem precisar de bypass.
+    @Transactional
+    public void hardDelete(Long id) {
+        Representative representative = representativeRepository.findByIdIncludingDeleted(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Representante não encontrado: id " + id));
+
+        boolean used = bidRepository.existsBySubmittedById(id) || quotationDeclineRepository.existsByDeclinedById(id);
+        if (used) {
+            throw new BusinessRuleException(
+                    "Não é possível excluir — esse representante já tem histórico de participação em cotações. Desative em vez de excluir.");
+        }
+        if (supplierRepository.existsByRepresentativeId(id)) {
+            throw new BusinessRuleException(
+                    "Esse representante ainda está vinculado como contato de um fornecedor. Desvincule antes de excluir.");
+        }
+
+        User user = representative.getUser();
+        representativeRepository.hardDeleteById(id);
+        if (user != null) {
+            userRepository.delete(user);
+        }
     }
 
     private Representative findEntityById(Long id) {

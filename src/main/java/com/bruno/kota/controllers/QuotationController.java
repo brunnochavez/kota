@@ -151,6 +151,13 @@ public class QuotationController {
         return quotationService.update(id, request);
     }
 
+    @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<Void> delete(@PathVariable Long id) {
+        quotationService.delete(id);
+        return ResponseEntity.noContent().build();
+    }
+
     @PostMapping("/{id}/publish")
     @PreAuthorize("hasRole('ADMIN')")
     public QuotationResponse publish(@PathVariable Long id) {

@@ -70,6 +70,15 @@ public class SupplierController {
         return ResponseEntity.noContent().build();
     }
 
+    // Diferente do delete() acima (que só desativa) — esse exclui de verdade, e só
+    // funciona quando o fornecedor nunca foi usado. Ver SupplierService.hardDelete.
+    @DeleteMapping("/{id}/permanent")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<Void> hardDelete(@PathVariable Long id) {
+        supplierService.hardDelete(id);
+        return ResponseEntity.noContent().build();
+    }
+
     @PostMapping("/{id}/groups/{groupId}")
     @PreAuthorize("hasRole('ADMIN')")
     public SupplierResponse addToGroup(@PathVariable Long id, @PathVariable Long groupId) {

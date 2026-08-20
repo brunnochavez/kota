@@ -33,9 +33,11 @@
     width: 100%; max-width: 380px; background: var(--surface); border: 1px solid var(--border);
     border-radius: 16px; padding: 32px 28px; box-shadow: var(--shadow);
   }
+  .login-wrap { display: flex; flex-direction: column; align-items: center; width: 100%; max-width: 380px; }
+  .login-brand-banner { width: 100%; max-width: 260px; height: auto; margin-bottom: 26px; }
   .brand { display: flex; align-items: center; gap: 10px; margin-bottom: 4px; }
   .brand svg { width: 26px; height: 26px; color: var(--accent); flex-shrink: 0; }
-  .brand-logo-slot img { width: 32px; height: 32px; object-fit: contain; border-radius: 6px; flex-shrink: 0; }
+  .brand-logo-slot img { width: 34px; height: 34px; object-fit: contain; flex-shrink: 0; }
   .brand-name { font-weight: 700; font-size: 20px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .subtitle { color: var(--text-dim); font-size: 13px; margin: 0 0 26px; }
   label { display: block; font-size: 12.5px; font-weight: 600; color: var(--text-dim); margin-bottom: 6px; }
@@ -68,9 +70,12 @@
 </head>
 <body>
 
-<div class="card" id="login-card">
+<div class="login-wrap">
+  <img src="/img/kota-wordmark.png" alt="kota" class="login-brand-banner">
+
+  <div class="card" id="login-card">
   <div class="brand">
-    <span class="brand-logo-slot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 11l9-8 9 8"/><path d="M5 10v10a1 1 0 001 1h4v-6h4v6h4a1 1 0 001-1V10"/></svg></span>
+    <span class="brand-logo-slot"><img src="/img/kota-logo.png" alt="kota"></span>
     <span class="brand-name">kota</span>
   </div>
   <div class="subtitle">Entre com seu e-mail e senha.</div>
@@ -96,7 +101,7 @@
 
 <div class="card" id="change-password-card" style="display:none">
   <div class="brand">
-    <span class="brand-logo-slot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 11l9-8 9 8"/><path d="M5 10v10a1 1 0 001 1h4v-6h4v6h4a1 1 0 001-1V10"/></svg></span>
+    <span class="brand-logo-slot"><img src="/img/kota-logo.png" alt="kota"></span>
     <span class="brand-name">kota</span>
   </div>
   <div class="subtitle">Essa senha foi definida por outra pessoa — defina uma nova, que só você vai saber, antes de continuar.</div>
@@ -124,6 +129,8 @@
 
     <button type="submit" id="change-submit-btn">Definir senha e entrar</button>
   </form>
+</div>
+
 </div>
 
 <script>

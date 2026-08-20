@@ -11,4 +11,8 @@ public interface QuotationDeclineRepository extends JpaRepository<QuotationDecli
     List<QuotationDecline> findByQuotationId(Long quotationId);
 
     boolean existsByQuotationIdAndSupplierId(Long quotationId, Long supplierId);
+
+    boolean existsBySupplierId(Long supplierId);
+
+    boolean existsByDeclinedById(Long representativeId);
 }

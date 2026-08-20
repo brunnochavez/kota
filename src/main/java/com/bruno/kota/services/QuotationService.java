@@ -179,6 +179,22 @@ public class QuotationService {
         return toResponse(quotationRepository.save(quotation));
     }
 
+    // Exclusão DE VERDADE, só permitida em Rascunho — a partir de Disponível, já foi
+    // publicada e representantes já podem ter visto/respondido; nesse ponto "excluir"
+    // deixaria de ser seguro (perderia participação real). Cotação nunca tem @SQLDelete
+    // (não existe conceito de "desativar" cotação), então isso já é um DELETE de verdade
+    // desde sempre — só precisa apagar os itens primeiro por causa da FK.
+    @Transactional
+    public void delete(Long id) {
+        Quotation quotation = findEntityById(id);
+        if (quotation.getStatus() != QuotationStatus.DRAFT) {
+            throw new BusinessRuleException(
+                    "Só é possível excluir cotações em Rascunho — publicada, ela já foi disponibilizada para representantes.");
+        }
+        quotationItemRepository.deleteAll(quotationItemRepository.findByQuotationId(id));
+        quotationRepository.delete(quotation);
+    }
+
     @Transactional
     public QuotationResponse publish(Long id) {
         Quotation quotation = findEntityById(id);
@@ -868,6 +884,10 @@ public class QuotationService {
         List<Quotation> closedQuotations = quotationRepository.findByStatus(QuotationStatus.CLOSED);
         List<QuotationReportRow> rows = new ArrayList<>();
         String normalizedProductQuery = productQuery != null ? productQuery.trim().toLowerCase() : null;
+        // Evita repetir a mesma consulta de confirmação pra cada item — todo item de um
+        // mesmo (cotação, fornecedor) compartilha a MESMA resposta de "pedido enviado?",
+        // então cacheia por combinação dentro dessa geração de relatório só.
+        Map<String, Boolean> orderConfirmedCache = new HashMap<>();
 
         for (Quotation quotation : closedQuotations) {
             LocalDateTime closedAt = quotation.getUpdatedAt();
@@ -890,6 +910,10 @@ public class QuotationService {
                 if (normalizedProductQuery != null && !normalizedProductQuery.isEmpty()
                         && !productName.toLowerCase().contains(normalizedProductQuery)) continue;
 
+                String cacheKey = quotation.getId() + ":" + supplier.getId();
+                boolean orderConfirmed = orderConfirmedCache.computeIfAbsent(cacheKey,
+                        k -> orderFulfillmentConfirmationRepository.existsByQuotationIdAndSupplierId(quotation.getId(), supplier.getId()));
+
                 rows.add(new QuotationReportRow(
                         quotation.getId(),
                         quotation.getName(),
@@ -900,7 +924,8 @@ public class QuotationService {
                         item.getQuantity(),
                         bid.getValue(),
                         bid.getValue().multiply(item.getQuantity()),
-                        won
+                        won,
+                        orderConfirmed
                 ));
             }
         }
@@ -1009,7 +1034,8 @@ public class QuotationService {
                     item.getQuantity(),
                     bid.getValue(),
                     bid.getValue().multiply(item.getQuantity()),
-                    won
+                    won,
+                    orderFulfillmentConfirmationRepository.existsByQuotationIdAndSupplierId(quotationId, supplierId)
             ));
         }
         return rows;

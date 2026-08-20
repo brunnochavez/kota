@@ -63,6 +63,15 @@ public class RepresentativeController {
         return ResponseEntity.noContent().build();
     }
 
+    // Diferente do delete() acima (que só desativa) — esse exclui de verdade, e só
+    // funciona quando o representante nunca foi usado. Ver RepresentativeService.hardDelete.
+    @DeleteMapping("/{id}/permanent")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<Void> hardDelete(@PathVariable Long id) {
+        representativeService.hardDelete(id);
+        return ResponseEntity.noContent().build();
+    }
+
     @GetMapping("/inactive")
     @PreAuthorize("hasRole('ADMIN')")
     public List<RepresentativeResponse> findAllInactive() {

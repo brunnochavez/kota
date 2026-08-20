@@ -12,5 +12,6 @@ public record QuotationReportRow(
         BigDecimal quantity,
         BigDecimal unitValue,
         BigDecimal subtotal,
-        boolean won
+        boolean won,
+        boolean orderConfirmed
 ) {}

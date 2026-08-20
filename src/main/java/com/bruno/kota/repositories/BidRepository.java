@@ -15,4 +15,8 @@ public interface BidRepository extends JpaRepository<Bid, Long> {
     List<Bid> findByQuotationItem_QuotationId(Long quotationId);
 
     List<Bid> findBySupplierId(Long supplierId);
+
+    boolean existsBySupplierId(Long supplierId);
+
+    boolean existsBySubmittedById(Long representativeId);
 }

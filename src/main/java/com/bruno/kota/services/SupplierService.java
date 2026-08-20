@@ -11,6 +11,9 @@ import com.bruno.kota.exceptions.DuplicateResourceException;
 import com.bruno.kota.exceptions.InactiveResourceException;
 import com.bruno.kota.exceptions.ResourceNotFoundException;
 import com.bruno.kota.exceptions.BusinessRuleException;
+import com.bruno.kota.repositories.BidRepository;
+import com.bruno.kota.repositories.OrderFulfillmentConfirmationRepository;
+import com.bruno.kota.repositories.QuotationDeclineRepository;
 import com.bruno.kota.repositories.RepresentativeRepository;
 import com.bruno.kota.repositories.SupplierGroupRepository;
 import com.bruno.kota.repositories.SupplierRepository;
@@ -24,6 +27,9 @@ public class SupplierService {
     private final SupplierRepository supplierRepository;
     private final RepresentativeRepository representativeRepository;
     private final SupplierGroupRepository supplierGroupRepository;
+    private final BidRepository bidRepository;
+    private final QuotationDeclineRepository quotationDeclineRepository;
+    private final OrderFulfillmentConfirmationRepository orderFulfillmentConfirmationRepository;
 
     @Transactional(readOnly = true)
     public List<SupplierResponse> findAll() {
@@ -116,6 +122,26 @@ public class SupplierService {
     @Transactional
     public void delete(Long id) {
         supplierRepository.delete(findEntityById(id));
+    }
+
+    // Exclusão DE VERDADE (não é desativar) — só permitida quando o fornecedor nunca
+    // participou de nada: nenhum lance enviado, nenhuma cotação recusada ("Não Cotar"),
+    // nenhuma confirmação de pedido. Cobre tanto ativo quanto inativo (findByIdIncludingDeleted),
+    // já que faz sentido limpar um fornecedor inativo que nunca chegou a ser usado.
+    @Transactional
+    public void hardDelete(Long id) {
+        supplierRepository.findByIdIncludingDeleted(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Fornecedor não encontrado: id " + id));
+
+        boolean used = bidRepository.existsBySupplierId(id)
+                || quotationDeclineRepository.existsBySupplierId(id)
+                || orderFulfillmentConfirmationRepository.existsBySupplierId(id);
+        if (used) {
+            throw new BusinessRuleException(
+                    "Não é possível excluir — esse fornecedor já tem histórico de participação em cotações. Desative em vez de excluir.");
+        }
+
+        supplierRepository.hardDeleteById(id);
     }
 
     @Transactional

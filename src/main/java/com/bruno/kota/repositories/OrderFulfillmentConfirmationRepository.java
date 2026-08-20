@@ -10,4 +10,6 @@ public interface OrderFulfillmentConfirmationRepository extends JpaRepository<Or
     Optional<OrderFulfillmentConfirmation> findByQuotationIdAndSupplierId(Long quotationId, Long supplierId);
 
     boolean existsByQuotationIdAndSupplierId(Long quotationId, Long supplierId);
+
+    boolean existsBySupplierId(Long supplierId);
 }
