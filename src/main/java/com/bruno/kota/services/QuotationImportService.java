@@ -59,13 +59,30 @@ public class QuotationImportService {
         try (var reader = new InputStreamReader(file.getInputStream(), StandardCharsets.UTF_8)) {
             CSVParser parser = CSVFormat.DEFAULT.builder()
                     .setDelimiter(';')
-                    .setHeader()
-                    .setSkipHeaderRecord(true)
                     .build()
                     .parse(reader);
 
-            headers = new ArrayList<>(parser.getHeaderNames());
-            rows = parser.getRecords();
+            // Cabeçalho é lido "na mão" em vez de deixar o Commons CSV detectar
+            // automaticamente (.setHeader()) — o parser automático explode com
+            // IllegalArgumentException assim que encontra uma célula de cabeçalho
+            // vazia (duas colunas sem nome colidem como "nome duplicado: \"\"").
+            // Como o resto do código já lê cada linha por índice de coluna
+            // (row.get(descriptionColumn), não por nome), não precisamos do
+            // cabeçalho nomeado do Commons CSV pra nada além de exibir a lista de
+            // colunas na tela de mapeamento — então uma coluna sem descrição vira
+            // só um rótulo genérico "Coluna N", sem travar a importação.
+            List<CSVRecord> allRecords = parser.getRecords();
+            if (allRecords.isEmpty()) {
+                throw new BusinessRuleException("Arquivo CSV vazio.");
+            }
+
+            CSVRecord headerRecord = allRecords.get(0);
+            headers = new ArrayList<>();
+            for (int i = 0; i < headerRecord.size(); i++) {
+                String headerValue = headerRecord.get(i).trim();
+                headers.add(headerValue.isEmpty() ? "Coluna " + (i + 1) : headerValue);
+            }
+            rows = allRecords.subList(1, allRecords.size());
         } catch (IOException e) {
             throw new BusinessRuleException("Não foi possível ler o arquivo: " + e.getMessage());
         }
