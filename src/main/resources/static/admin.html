@@ -291,7 +291,11 @@
     border-radius: var(--radius); box-shadow: var(--shadow); padding: 12px 14px; min-width: 240px; max-width: 320px;
   }
   .confirm-popover-msg { font-size: 13px; line-height: 1.4; }
-  .qd-items-table td, .qd-items-table th { padding: 2px 10px; font-size: 12px; }
+  .qd-items-table-wrap { border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+  .qd-items-table { margin: 0; }
+  .qd-items-table td, .qd-items-table th { padding: 10px 14px; font-size: 12.5px; }
+  .qd-items-table thead th { background: var(--surface-2); border-bottom: 1px solid var(--border); }
+  .qd-items-table tbody tr:last-child td { border-bottom: none; }
   .qd-items-table input[type="number"] { padding: 4px 8px; }
   .rep-bid-group { margin-bottom: 14px; }
   .rep-bid-group h4 { margin: 0 0 8px; font-size: 13.5px; }
@@ -2778,6 +2782,8 @@ async function abrirDetalheCotacao(id) {
 
     <div id="close-flow"></div>
 
+    <div id="qd-fulfillment-issues" style="display:none"></div>
+
     <hr class="divider">
     <div id="qd-add-item-panel" style="display:none">
       <h3>Adicionar item</h3>
@@ -2794,15 +2800,17 @@ async function abrirDetalheCotacao(id) {
       <hr class="divider">
     </div>
 
-    <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap">
-      <h3 style="margin:0">Itens do lote</h3>
+    <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:12px">
+      <h3 style="margin:0; font-size:14.5px; font-weight:600">Itens do lote</h3>
       <div style="position:relative; width:220px">
         <svg style="position:absolute; left:9px; top:50%; transform:translateY(-50%); width:14px; height:14px; opacity:0.5; pointer-events:none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
         <input id="qd-items-filter" placeholder="Buscar nos itens..." oninput="filterQdItemsTable()" style="padding-left:30px">
       </div>
     </div>
-    <table class="qd-items-table"><thead><tr id="qd-items-thead"></tr></thead>
-      <tbody id="qd-items-tbody"></tbody></table>
+    <div class="qd-items-table-wrap">
+      <table class="qd-items-table"><thead><tr id="qd-items-thead"></tr></thead>
+        <tbody id="qd-items-tbody"></tbody></table>
+    </div>
     <div class="btn-row" id="qd-items-pagination" style="justify-content:space-between; margin-top:10px">
       <div style="color:var(--text-dim); font-size:12px" id="qd-items-page-info">—</div>
       <div class="btn-row">
@@ -2946,6 +2954,7 @@ const QD_ITEMS_PAGE_SIZE = 10;
 async function loadQuotationItemsDetail(id, status) {
   const items = await safeCall(() => api('GET', `/quotations/${id}/items`));
   qdCurrentItems = items;
+  renderQdFulfillmentIssues(items, status);
   // Editável só em Rascunho. Em Revisão, a tabela geral vira somente leitura — editar
   // quantidade, adicionar ou excluir item aqui derrubaria TODOS os vencedores já calculados
   // (não só o item mexido). Ajustes durante a revisão são feitos por representante, no modal
@@ -2969,6 +2978,43 @@ async function loadQuotationItemsDetail(id, status) {
 }
 
 const QD_TRASH_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" width="15" height="15"><path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m3 0l-1 14a2 2 0 01-2 2H7a2 2 0 01-2-2L4 6h16z"/></svg>';
+
+// Painel de atenção, só pra cotação FECHADA — só nessa fase "sem vencedor" e "cortado"
+// têm sentido (antes disso winningBidId é sempre nulo pra todo mundo, é só o processo
+// normal de ainda não ter fechado). Some sozinho quando não há nenhum caso, pra não virar
+// ruído em toda cotação fechada sem problema nenhum.
+function renderQdFulfillmentIssues(items, status) {
+  const wrap = document.getElementById('qd-fulfillment-issues');
+  if (status !== 'CLOSED') { wrap.style.display = 'none'; wrap.innerHTML = ''; return; }
+
+  const noWinnerItems = items.filter(i => !i.winningBidId);
+  const cutItems = items.filter(i => i.fulfillmentCut);
+  if (!noWinnerItems.length && !cutItems.length) { wrap.style.display = 'none'; wrap.innerHTML = ''; return; }
+
+  const itemLine = i => `<li><strong>${escapeHtml(i.productName)}</strong> <span class="mono" style="color:var(--text-dim); font-size:12px">(${escapeHtml(i.productBarcode)})</span> — ${i.quantity} un.</li>`;
+
+  const noWinnerBlock = noWinnerItems.length ? `
+    <div style="margin-bottom:${cutItems.length ? '14px' : '0'}">
+      <div style="font-weight:700; color:var(--warning); font-size:13px">Sem nenhum lance (${noWinnerItems.length})</div>
+      <div style="font-size:12px; color:var(--text-dim); margin-bottom:6px">Nenhum representante ofertou esses produtos — a cotação fechou sem vencedor pra eles.</div>
+      <ul style="margin:0; padding-left:18px; font-size:13px">${noWinnerItems.map(itemLine).join('')}</ul>
+    </div>` : '';
+
+  const cutBlock = cutItems.length ? `
+    <div>
+      <div style="font-weight:700; color:var(--danger); font-size:13px">Cortados por falta de estoque (${cutItems.length})</div>
+      <div style="font-size:12px; color:var(--text-dim); margin-bottom:6px">O representante venceu, mas depois confirmou que não tem esse item em estoque.</div>
+      <ul style="margin:0; padding-left:18px; font-size:13px">${cutItems.map(itemLine).join('')}</ul>
+    </div>` : '';
+
+  wrap.style.display = 'block';
+  wrap.innerHTML = `
+    <div style="background:var(--warning-bg); border:1px solid var(--warning-border); border-radius:10px; padding:14px 16px; margin-top:14px">
+      <div style="font-weight:700; font-size:14px; margin-bottom:8px">⚠ Produtos sem atendimento</div>
+      ${noWinnerBlock}
+      ${cutBlock}
+    </div>`;
+}
 
 // Revisão em modal separado (segunda camada), sob demanda — só busca lances quando o
 // admin realmente clica no botão, e só monta a lista de UM representante por vez, escolhido
@@ -3166,6 +3212,7 @@ async function renderAddProductPanel(repId) {
       </div>
       <div style="width:90px"><label>Quantidade</label><input type="number" step="0.001" id="review-add-product-qty" placeholder="se novo"></div>
       <div style="width:100px"><label>Preço (R$)</label><input type="text" inputmode="decimal" id="review-add-product-price" placeholder="0,00" oninput="this.value = maskCurrencyInput(this.value)"></div>
+      <div style="width:90px"><label>Prazo (dias)</label><input type="number" step="1" min="1" id="review-add-product-deadline" placeholder="dias"></div>
       <button class="secondary small" id="review-add-product-btn" onclick="addProductToRep(${repId})">+ Adicionar</button>
     </div>
     <div id="review-add-product-hint" style="margin-top:6px; font-size:12px; color:var(--text-dim)"></div>
@@ -3199,9 +3246,11 @@ function searchReviewAddProduct() {
 function resetReviewAddProductFields() {
   const qtyInput = document.getElementById('review-add-product-qty');
   const priceInput = document.getElementById('review-add-product-price');
+  const deadlineInput = document.getElementById('review-add-product-deadline');
   const addBtn = document.getElementById('review-add-product-btn');
   if (qtyInput) { qtyInput.value = ''; qtyInput.disabled = false; }
   if (priceInput) { priceInput.value = ''; priceInput.disabled = false; }
+  if (deadlineInput) { deadlineInput.value = ''; deadlineInput.disabled = false; }
   if (addBtn) addBtn.disabled = false;
 }
 
@@ -3221,6 +3270,7 @@ function selectReviewAddProduct(productId) {
   if (existing) {
     document.getElementById('review-add-product-qty').disabled = true;
     document.getElementById('review-add-product-price').disabled = true;
+    document.getElementById('review-add-product-deadline').disabled = true;
     document.getElementById('review-add-product-btn').disabled = true;
     hint.innerHTML = '<span style="color:var(--success); font-weight:600">Esse produto já está na cotação!</span>';
   } else {
@@ -3236,9 +3286,11 @@ async function addProductToRep(repId) {
   const productId = document.getElementById('review-add-product-id').value;
   const qty = document.getElementById('review-add-product-qty').value;
   const price = unmaskCurrencyToNumber(document.getElementById('review-add-product-price').value);
+  const deadline = document.getElementById('review-add-product-deadline').value;
   if (!productId) { toast('Busque e selecione um produto.', true); return; }
   if (!qty) { toast('Informe a quantidade.', true); return; }
   if (!price) { toast('Informe o preço.', true); return; }
+  if (!deadline) { toast('Informe o prazo de entrega (dias).', true); return; }
 
   const suppliers = await safeCall(() => api('GET', '/suppliers'));
   const supplier = suppliers.find(s => s.representativeId === repId);
@@ -3255,7 +3307,8 @@ async function addProductToRep(repId) {
     quantity: parseFloat(qty),
     supplierId: supplier.id,
     representativeId: repId,
-    value: price
+    value: price,
+    deliveryDeadlineDays: parseInt(deadline)
   }));
 
   toast('Produto adicionado ao pedido desse representante.');
