@@ -3566,11 +3566,19 @@ async function copyPublishMessage(buttonEl) {
     safeCall(() => api('GET', `/quotations/${currentQuotationId}`)),
     safeCall(() => api('GET', '/company-settings'))
   ]);
-  const link = `${window.location.origin}/representante.html?cotacao=${currentQuotationId}`;
-  const signature = company.name ? `Aqui é da ${company.name}! ` : '';
-  const message = `${signature}A cotação "${q.name}" já está disponível para envio de preços.\n`
-      + `Prazo: ${fmtDate(q.expirationDate)}\n`
-      + `Acesse e informe seus preços: ${link}`;
+  // Domínio fixo de produção, de propósito — mesmo se o admin gerar a mensagem
+  // testando local (localhost:8080), o link que vai pro representante precisa
+  // sempre apontar pro site publicado, senão ninguém de fora consegue abrir.
+  const link = `https://easykota.com.br/representante.html?cotacao=${currentQuotationId}`;
+  const itemCount = qdCurrentItems.length;
+  const message = `📋 *Nova cotação disponível — ${company.name || 'Empresa'}*\n\n`
+      + `Cotação: *${q.name}* (Nº ${formatQuotationNumber(q.id)})\n`
+      + `Grupo: ${q.supplierGroupName || '—'}\n`
+      + `Itens: ${itemCount} ${itemCount === 1 ? 'produto' : 'produtos'}\n`
+      + `Prazo para envio dos preços: *${fmtDate(q.expirationDate)}*\n\n`
+      + `Acesse o link abaixo, informe seus preços e envie até o prazo — cotações enviadas depois do prazo não são consideradas.\n\n`
+      + `🔗 ${link}\n\n`
+      + `Qualquer dúvida, é só chamar!`;
 
   const onSuccess = () => {
     const original = buttonEl.textContent;
