@@ -61,7 +61,7 @@ public class QuotationController {
     }
 
     // Path literal ("representative-fill-rate") sempre vence sobre /{id} no roteamento do
-    // Spring, mesmo declarado depois — mas deixei antes por clareza pra quem for ler.
+    // Spring, mesmo declarado depois — mas deixei antes por clareza pra quem for ler.s
     @GetMapping("/representative-fill-rate")
     @PreAuthorize("hasRole('ADMIN')")
     public List<QuotationFillRate> getRepresentativeFillRate() {
