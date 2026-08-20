@@ -944,6 +944,8 @@ async function renderFulfillmentItems() {
         <span class="item-row-barcode">${item.productBarcode}</span>
         <button class="copy-barcode-btn" type="button" title="Copiar código de barras" aria-label="Copiar código de barras" onclick="copyBarcode(this, '${item.productBarcode}')">${COPY_ICON}</button>
         <span class="item-row-qty">Qtd: ${item.quantity}</span>
+        <span class="item-row-qty">Preço: R$ ${formatCurrencyFromNumber(item.value)}</span>
+        <span class="item-row-qty" style="font-weight:700; color:var(--text)">Subtotal: R$ ${formatCurrencyFromNumber(item.subtotal)}</span>
         <button class="cut-badge" type="button" title="Marcar como sem estoque">${TRASH_ICON}Sem estoque</button>
       </div>
     `;
