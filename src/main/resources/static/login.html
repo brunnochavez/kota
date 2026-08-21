@@ -194,6 +194,11 @@ function togglePasswordVisibility(inputId, buttonEl) {
 }
 
 function goToApp(role) {
+  // Limpa a aba lembrada do representante — login sempre deve cair na página inicial
+  // (Disponíveis), mesmo que ele tenha saído numa aba diferente da última vez.
+  // Atualizações de página (F5) durante a mesma sessão continuam restaurando a aba
+  // normalmente, já que essa limpeza só roda aqui, no momento do login.
+  localStorage.removeItem('kota-rep-tab');
   window.location.href = role === 'ADMIN' ? '/admin.html' : '/representante.html';
 }
 
