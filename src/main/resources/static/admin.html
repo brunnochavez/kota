@@ -123,11 +123,17 @@
   .nav-group-label:first-of-type { padding-top: 5px; }
 
   .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 16px; }
+  .dash-section-label {
+    font-size: 11px; font-weight: 700; color: var(--text-faint); text-transform: uppercase;
+    letter-spacing: 0.06em; margin: 22px 0 10px;
+  }
   .kpi-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 15px 18px; box-shadow: var(--shadow); cursor: pointer; }
   .kpi-card:hover { border-color: var(--accent); }
   .kpi-card.secondary { cursor: default; }
   .kpi-card.secondary:hover { border-color: var(--border); }
   .kpi-value { font-size: 25px; font-weight: 700; letter-spacing: -0.02em; }
+  .kpi-value.warn { color: var(--warning); }
+  .kpi-value.danger { color: var(--danger); }
   .kpi-label { font-size: 11.5px; color: var(--text-dim); margin-top: 3px; }
   .dash-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 14px; align-items: start; }
   @media (max-width: 900px) { .dash-grid { grid-template-columns: 1fr; } }
@@ -287,19 +293,18 @@
     padding: 20px 22px; width: 100%; max-width: 560px; max-height: 88vh; overflow-y: auto; box-shadow: var(--shadow);
     position: relative;
   }
-  .modal-box.wide { max-width: 1080px; height: 86vh; }
+  .modal-box.wide { max-width: 1240px; }
+  .modal-box.medium { max-width: 760px; }
 
-  /* Detalhe da cotação — janela de tamanho FIXO (herda o height:86vh acima), com layout
-     em coluna: topo (título/form/botões) e rodapé (paginação/Fechar) ficam com altura
-     natural; quem estica pra preencher o que sobra é só a área da tabela de itens
-     (.qd-modal-items-area, flex:1). Assim o rodapé sempre gruda embaixo da janela, e
-     sobra de espaço vira espaço em branco DENTRO da tabela — nunca abaixo dela, nunca
-     rolagem, nunca janela de tamanho diferente entre cotações. */
-  .modal-box.wide #modal-box-content { height: 100%; display: flex; flex-direction: column; min-height: 0; }
-  .qd-modal-body { display: flex; flex-direction: column; height: 100%; min-height: 0; }
+  /* Detalhe da cotação — layout em coluna, mas SEM esticar a área de itens pra
+     preencher a janela inteira (isso é o que causava espaço em branco desperdiçado
+     quando a página tem poucos itens, tipo os últimos 6 de 90). A janela agora se
+     ajusta ao conteúdo de verdade: topo, tabela (com min-height só pra não pular de
+     tamanho ao filtrar a busca) e rodapé, cada um com sua altura natural, um embaixo do
+     outro. O max-height de .modal-box (88vh) continua como teto de segurança. */
+  .qd-modal-body { display: flex; flex-direction: column; }
   .qd-modal-top { flex-shrink: 0; }
-  .qd-modal-items-area { flex: 1; display: flex; flex-direction: column; min-height: 0; }
-  .qd-modal-items-area .qd-items-table-wrap { flex: 1; min-height: 0; }
+  .qd-modal-items-area { flex-shrink: 0; }
   .qd-modal-footer { flex-shrink: 0; }
 
   /* Detalhe da cotação — escopado só nesse modal (.qd-modal-body), já em cima da base
@@ -480,35 +485,43 @@
   <!-- DASHBOARD -->
   <section class="section active" id="section-dashboard">
     <h1>Visão Geral</h1>
-    <div class="subtitle">Resumo das cotações e cadastros do sistema.</div>
+    <div class="subtitle">O que precisa da sua atenção agora — não só um resumo de cadastros.</div>
 
     <div class="kpi-grid">
-      <div class="kpi-card" onclick="goToQuotationsFiltered('DRAFT')">
-        <div class="kpi-value" id="kpi-draft">—</div>
-        <div class="kpi-label">Rascunhos</div>
-      </div>
       <div class="kpi-card" onclick="goToQuotationsFiltered('AVAILABLE')">
         <div class="kpi-value" id="kpi-available">—</div>
-        <div class="kpi-label">Disponíveis</div>
+        <div class="kpi-label">Disponíveis agora</div>
+      </div>
+      <div class="kpi-card" onclick="goToQuotationsFiltered('AVAILABLE')">
+        <div class="kpi-value" id="kpi-response-rate">—</div>
+        <div class="kpi-label">Taxa média de resposta</div>
       </div>
       <div class="kpi-card" onclick="goToQuotationsFiltered('CLOSED')">
-        <div class="kpi-value" id="kpi-closed">—</div>
-        <div class="kpi-label">Fechadas</div>
+        <div class="kpi-value" id="kpi-closed-30d">—</div>
+        <div class="kpi-label">Fechadas (30 dias)</div>
+      </div>
+      <div class="kpi-card" onclick="goToQuotationsFiltered('DRAFT')">
+        <div class="kpi-value" id="kpi-stale-drafts">—</div>
+        <div class="kpi-label">Rascunhos parados</div>
+      </div>
+      <div class="kpi-card" onclick="goToSection('reorder-points')">
+        <div class="kpi-value" id="kpi-reorder-urgent">—</div>
+        <div class="kpi-label">Ponto de compra urgente</div>
       </div>
       <div class="kpi-card" onclick="goToQuotationsFiltered('EXPIRED')">
-        <div class="kpi-value" id="kpi-expired">—</div>
-        <div class="kpi-label">Expiradas</div>
+        <div class="kpi-value" id="kpi-expired-30d">—</div>
+        <div class="kpi-label">Expiraram sem fechar (30 dias)</div>
       </div>
     </div>
 
     <div class="dash-grid">
       <div class="card">
-        <h2>Distribuição por status</h2>
-        <div id="dash-chart"></div>
-      </div>
-      <div class="card">
         <h2>Expirando nos próximos 3 dias</h2>
         <div id="dash-expiring"></div>
+      </div>
+      <div class="card">
+        <h2>Ponto de compra urgente</h2>
+        <div id="dash-reorder"></div>
       </div>
     </div>
 
@@ -518,7 +531,8 @@
         <tbody id="dash-recent-tbody"></tbody></table>
     </div>
 
-    <div class="kpi-grid" style="margin-top:18px">
+    <div class="dash-section-label">Cadastros</div>
+    <div class="kpi-grid">
       <div class="kpi-card secondary">
         <div class="kpi-value" id="kpi-products">—</div>
         <div class="kpi-label">Produtos cadastrados</div>
@@ -969,18 +983,24 @@ async function downloadPdfWithAuth(url, filename) {
   URL.revokeObjectURL(blobUrl);
 }
 
-function openModal(html, wide) {
+function openModal(html, size) {
   document.getElementById('modal-box-content').innerHTML = html;
-  document.getElementById('modal-box').classList.toggle('wide', !!wide);
+  const box = document.getElementById('modal-box');
+  box.classList.remove('wide', 'medium');
+  if (size === true) box.classList.add('wide');
+  else if (size) box.classList.add(size);
   document.getElementById('modal-overlay').style.display = 'flex';
 }
 function closeModal() {
   document.getElementById('modal-overlay').style.display = 'none';
   document.getElementById('modal-box-content').innerHTML = '';
 }
-function openModal2(html, wide) {
+function openModal2(html, size) {
   document.getElementById('modal-box-2-content').innerHTML = html;
-  document.getElementById('modal-box-2').classList.toggle('wide', !!wide);
+  const box = document.getElementById('modal-box-2');
+  box.classList.remove('wide', 'medium');
+  if (size === true) box.classList.add('wide');
+  else if (size) box.classList.add(size);
   document.getElementById('modal-overlay-2').style.display = 'flex';
 }
 function closeModal2() {
@@ -1177,8 +1197,23 @@ function toDatetimeLocal(iso) {
 // O calendário nativo do navegador (datetime-local) não tem um "OK" próprio — some sozinho
 // ao clicar fora, sem confirmação visual. Esse botão só formaliza isso: fecha o campo e
 // mostra o valor escolhido, pra não ficar na dúvida se "pegou" ou não.
+// step="3600" no HTML já pede horário redondo pro navegador, mas o Chrome nem sempre
+// respeita isso na hora de exibir/deixar escolher minuto no seletor nativo — então essa
+// função garante de vez: qualquer minuto/segundo que tenha passado é zerado assim que o
+// campo muda, então mesmo que o seletor deixe escolher errado, o valor final salvo
+// sempre cai numa hora cheia.
+function roundExpirationToHour(inputEl) {
+  if (!inputEl.value) return;
+  const d = new Date(inputEl.value);
+  if (isNaN(d.getTime())) return;
+  d.setMinutes(0, 0, 0);
+  const pad = n => String(n).padStart(2, '0');
+  inputEl.value = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:00`;
+}
+
 function confirmExpirationField(inputId) {
   const input = document.getElementById(inputId);
+  roundExpirationToHour(input);
   input.blur();
   toast(input.value ? `Prazo definido: ${fmtDate(input.value)}` : 'Prazo de expiração limpo.');
 }
@@ -1346,77 +1381,106 @@ async function applyCompanyBranding() {
   }
 }
 
+// Visão Geral redesenhada com base em como dashboard de procurement/RFQ costuma ser
+// estruturado no mercado (pesquisei referências antes de mexer): poucos KPIs (5-8),
+// cada um ligado a uma ação de verdade — não só contagem de cadastro — com o mais
+// urgente em destaque acima da dobra, e números "de arquivo" (produtos/representantes/
+// fornecedores cadastrados) rebaixados pro rodapé, já que não pedem nenhuma decisão.
+// Tudo calculado em cima de endpoints que já existiam — nenhum backend novo.
 async function loadDashboard() {
-  const [quotations, products, reps, suppliers, groups, fillRates] = await Promise.all([
+  const [quotations, products, reps, suppliers, groups, fillRates, reorderPoints] = await Promise.all([
     safeCall(() => api('GET', '/quotations')),
     safeCall(() => api('GET', '/products')),
     safeCall(() => api('GET', '/representatives')),
     safeCall(() => api('GET', '/suppliers')),
     safeCall(() => api('GET', '/supplier-groups')),
-    safeCall(() => api('GET', '/quotations/representative-fill-rate'))
+    safeCall(() => api('GET', '/quotations/representative-fill-rate')),
+    safeCall(() => api('GET', '/quotations/reorder-points'))
   ]);
 
   quotationsCache = quotations;
   quotationFillRates = new Map(fillRates.map(f => [f.quotationId, f]));
+  dashboardReorderPoints = reorderPoints;
 
-  const counts = { DRAFT: 0, AVAILABLE: 0, CLOSED: 0, EXPIRED: 0 };
-  quotations.forEach(q => { counts[q.status] = (counts[q.status] || 0) + 1; });
+  const now = new Date();
+  const days30Ago = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
 
-  document.getElementById('kpi-draft').textContent = counts.DRAFT;
-  document.getElementById('kpi-available').textContent = counts.AVAILABLE;
-  document.getElementById('kpi-closed').textContent = counts.CLOSED;
-  document.getElementById('kpi-expired').textContent = counts.EXPIRED;
+  const availableCount = quotations.filter(q => q.status === 'AVAILABLE').length;
+  const closed30d = quotations.filter(q => q.status === 'CLOSED' && q.updatedAt && new Date(q.updatedAt) >= days30Ago).length;
+  const expired30d = quotations.filter(q => q.status === 'EXPIRED' && q.expirationDate && new Date(q.expirationDate) >= days30Ago).length;
+  // "Parado" = Rascunho criado há mais de 3 dias e ainda não publicado — cotação criada
+  // ontem não é problema nenhum, é só trabalho em andamento.
+  const staleDrafts = quotations.filter(q => q.status === 'DRAFT' && q.createdAt
+    && (now - new Date(q.createdAt)) > 3 * 24 * 60 * 60 * 1000).length;
+  const urgentReorderCount = reorderPoints.filter(r => r.daysUntilReorder <= 7).length;
+
+  // Taxa média só entre cotações que de fato têm gente elegível pra responder — sem
+  // isso, cotação sem grupo/sem representante puxaria a média pra baixo à toa.
+  const ratesWithEligible = fillRates.filter(f => f.eligibleCount > 0);
+  const avgResponseRate = ratesWithEligible.length
+    ? Math.round(ratesWithEligible.reduce((sum, f) => sum + (f.filledCount / f.eligibleCount), 0) / ratesWithEligible.length * 100)
+    : null;
+
+  document.getElementById('kpi-available').textContent = availableCount;
+  document.getElementById('kpi-response-rate').textContent = avgResponseRate === null ? '—' : avgResponseRate + '%';
+  document.getElementById('kpi-closed-30d').textContent = closed30d;
+  document.getElementById('kpi-stale-drafts').textContent = staleDrafts;
+  document.getElementById('kpi-reorder-urgent').textContent = urgentReorderCount;
+  document.getElementById('kpi-expired-30d').textContent = expired30d;
   document.getElementById('kpi-products').textContent = products.length;
   document.getElementById('kpi-reps').textContent = reps.length;
   document.getElementById('kpi-suppliers').textContent = suppliers.length;
   document.getElementById('kpi-groups').textContent = groups.length;
 
-  renderDashboardChart(counts);
+  // Cor só entra quando o número indica algo que precisa de atenção — zero fica neutro
+  // de propósito, senão a cor perde o sentido de alerta (fica tudo colorido sempre).
+  setKpiSeverity('kpi-stale-drafts', staleDrafts, 'warn');
+  setKpiSeverity('kpi-reorder-urgent', urgentReorderCount, 'danger');
+  setKpiSeverity('kpi-expired-30d', expired30d, 'warn');
+
   renderRecentQuotations(quotations);
   renderExpiringSoon(quotations);
+  renderDashboardReorderPanel(reorderPoints);
 }
 
-function renderDashboardChart(counts) {
-  const segments = [
-    { label: 'Rascunhos', value: counts.DRAFT, color: 'var(--text-faint)' },
-    { label: 'Disponíveis', value: counts.AVAILABLE, color: 'var(--success)' },
-    { label: 'Fechadas', value: counts.CLOSED, color: 'var(--accent)' },
-    { label: 'Expiradas', value: counts.EXPIRED, color: 'var(--danger)' }
-  ];
-  const total = segments.reduce((sum, s) => sum + s.value, 0);
-  const wrap = document.getElementById('dash-chart');
+function setKpiSeverity(elementId, value, severityClass) {
+  const el = document.getElementById(elementId);
+  el.classList.remove('warn', 'danger');
+  if (value > 0) el.classList.add(severityClass);
+}
 
-  if (total === 0) {
-    wrap.innerHTML = '<div class="empty">Nenhuma cotação criada ainda.</div>';
+let dashboardReorderPoints = [];
+
+// Espelha o mesmo painel da tela "Ponto de Compra" (mesmos selos de urgência), só que
+// mostrando os mais urgentes primeiro e limitando a 4 — é um resumo pra puxar atenção,
+// não a lista inteira (isso já tem tela própria pra quando o admin quiser).
+function renderDashboardReorderPanel(reorderPoints) {
+  const wrap = document.getElementById('dash-reorder');
+  const urgent = reorderPoints.filter(r => r.daysUntilReorder <= 7);
+
+  if (!urgent.length) {
+    wrap.innerHTML = '<div class="empty">Nenhum produto com ponto de compra próximo.</div>';
     return;
   }
 
-  const radius = 60, circumference = 2 * Math.PI * radius;
-  let offset = 0;
-  let circles = '';
-  segments.forEach(s => {
-    if (s.value === 0) return;
-    const dash = (s.value / total) * circumference;
-    circles += `<circle cx="80" cy="80" r="${radius}" fill="none" stroke="${s.color}" stroke-width="22"
-      stroke-dasharray="${dash} ${circumference - dash}" stroke-dashoffset="${-offset}" transform="rotate(-90 80 80)" />`;
-    offset += dash;
-  });
-
-  const legend = segments.map(s => `
-    <div style="display:flex; align-items:center; gap:6px; font-size:12px; color:var(--text-dim); margin-top:6px">
-      <span style="width:10px; height:10px; border-radius:50%; background:${s.color}; display:inline-block; flex-shrink:0"></span>
-      ${s.label}: ${s.value}
+  const visible = urgent.slice(0, 4);
+  let html = visible.map(r => `
+    <div class="expiring-item">
+      <div class="expiring-row" onclick="abrirDetalheCotacao(${r.quotationId})">
+        <div>
+          <div class="expiring-row-name">${escapeHtml(r.productName)}</div>
+          <div class="expiring-row-group">${escapeHtml(r.supplierName)} · ${r.quantity} un.</div>
+        </div>
+        <div class="expiring-row-date">${reorderUrgencyBadge(r.daysUntilReorder)}</div>
+      </div>
     </div>`).join('');
 
-  wrap.innerHTML = `
-    <div style="display:flex; align-items:center; gap:24px; flex-wrap:wrap">
-      <svg viewBox="0 0 160 160" width="160" height="160">
-        ${circles}
-        <text x="80" y="76" text-anchor="middle" font-size="24" font-weight="700" fill="var(--text)">${total}</text>
-        <text x="80" y="94" text-anchor="middle" font-size="10" fill="var(--text-dim)">cotações</text>
-      </svg>
-      <div>${legend}</div>
-    </div>`;
+  const remaining = urgent.length - visible.length;
+  if (remaining > 0) {
+    html += `<button class="secondary small" style="margin-top:12px; width:100%" onclick="goToSection('reorder-points')">Ver mais (${remaining})</button>`;
+  }
+
+  wrap.innerHTML = html;
 }
 
 function renderRecentQuotations(quotations) {
@@ -2996,7 +3060,7 @@ async function abrirDetalheCotacao(id) {
     <div class="inline-form">
       <div><label>Nome</label><input id="qd-name" placeholder="Ex: Cotação de Bebidas"></div>
       <div><label>Grupo</label><select id="qd-group"></select></div>
-      <div><label>Prazo de expiração</label><input type="datetime-local" id="qd-expiration" step="3600"></div>
+      <div><label>Prazo de expiração</label><input type="datetime-local" id="qd-expiration" step="3600" onchange="roundExpirationToHour(this)"></div>
       <div style="width:170px"><label>Projeção de venda padrão (dias)</label><input type="number" min="1" step="1" id="qd-sales-projection" placeholder="Ex: 30"></div>
       <button id="qd-save-btn" onclick="updateQuotation()">Salvar edição</button>
       <button id="qd-group-suppliers-btn" class="secondary" onclick="manageQdGroupSuppliers()">Fornecedores do Grupo</button>
@@ -3381,37 +3445,78 @@ async function openRepresentativeStatusModal() {
 // fornecedor com o outro (era exatamente o bug: cotar por UM aparecia duplicado nos
 // dois). É só leitura (sem editar preço/quantidade nem marcar vencedor), diferente do
 // modal de Revisar Lances.
+let vrbEntries = [];
+let vrbPage = 0;
+let vrbRepName = '';
+let vrbSupplierName = '';
+const VRB_PAGE_SIZE = 10;
+
 async function viewRepresentativeBids(representativeId, supplierId, representativeName, supplierName) {
   const perItem = await Promise.all(qdCurrentItems.map(item =>
     safeCall(() => api('GET', `/bids?quotationItemId=${item.id}`)).then(bids => ({ item, bids }))
   ));
 
-  const entries = [];
+  vrbEntries = [];
   perItem.forEach(({ item, bids }) => {
     const bid = bids.find(b => b.submittedById === representativeId && b.supplierId === supplierId);
-    if (bid) entries.push({ item, bid });
+    if (bid) vrbEntries.push({ item, bid });
   });
+  vrbPage = 0;
+  vrbRepName = representativeName;
+  vrbSupplierName = supplierName;
 
-  const rowsHtml = entries.map(({ item, bid }) => `
+  openModal2(`
+    <h2>Itens enviados por ${escapeHtml(representativeName)}</h2>
+    <div class="subtitle" style="margin-bottom:14px" id="vrb-summary"></div>
+    <div class="scroll-box" style="min-height:320px">
+      <table><thead><tr><th>Cód. de Barras</th><th>Produto</th><th style="text-align:center">Qtd.</th><th style="text-align:right">Preço (R$)</th></tr></thead>
+        <tbody id="vrb-tbody"></tbody></table>
+    </div>
+    <div class="btn-row" id="vrb-pagination" style="justify-content:space-between; margin-top:10px; display:none">
+      <div style="color:var(--text-dim); font-size:12px" id="vrb-page-info">—</div>
+      <div class="btn-row">
+        <button class="secondary small" onclick="changeVrbPage(-1)" id="vrb-prev-btn">← Anterior</button>
+        <button class="secondary small" onclick="changeVrbPage(1)" id="vrb-next-btn">Próxima →</button>
+      </div>
+    </div>
+    <div class="btn-row" style="margin-top:16px; justify-content:space-between">
+      <button class="secondary" onclick="openRepresentativeStatusModal()">← Voltar</button>
+      <button class="secondary" onclick="closeModal2()">Fechar</button>
+    </div>
+  `, 'medium');
+
+  renderVrbPage();
+}
+
+function renderVrbPage() {
+  const totalPages = Math.max(Math.ceil(vrbEntries.length / VRB_PAGE_SIZE), 1);
+  if (vrbPage >= totalPages) vrbPage = totalPages - 1;
+  if (vrbPage < 0) vrbPage = 0;
+  const pageStart = vrbPage * VRB_PAGE_SIZE;
+  const pageEntries = vrbEntries.slice(pageStart, pageStart + VRB_PAGE_SIZE);
+
+  document.getElementById('vrb-summary').textContent =
+    `Como ${vrbSupplierName} — ${vrbEntries.length} ${vrbEntries.length === 1 ? 'item cotado' : 'itens cotados'} nessa cotação.`;
+
+  const rowsHtml = pageEntries.map(({ item, bid }) => `
     <tr>
       <td class="mono">${item.productBarcode}</td>
       <td>${escapeHtml(item.productName)}</td>
       <td style="text-align:center">${item.quantity}</td>
       <td style="text-align:right">R$ ${formatCurrencyFromNumber(bid.value)}</td>
     </tr>`).join('');
+  document.getElementById('vrb-tbody').innerHTML = rowsHtml || '<tr><td colspan="4" class="empty">Nenhum item encontrado.</td></tr>';
 
-  openModal2(`
-    <h2>Itens enviados por ${escapeHtml(representativeName)}</h2>
-    <div class="subtitle" style="margin-bottom:14px">Como ${escapeHtml(supplierName)} — ${entries.length} ${entries.length === 1 ? 'item cotado' : 'itens cotados'} nessa cotação.</div>
-    <div class="scroll-box">
-      <table><thead><tr><th>Cód. de Barras</th><th>Produto</th><th style="text-align:center">Qtd.</th><th style="text-align:right">Preço (R$)</th></tr></thead>
-        <tbody>${rowsHtml || '<tr><td colspan="4" class="empty">Nenhum item encontrado.</td></tr>'}</tbody></table>
-    </div>
-    <div class="btn-row" style="margin-top:16px; justify-content:space-between">
-      <button class="secondary" onclick="openRepresentativeStatusModal()">← Voltar</button>
-      <button class="secondary" onclick="closeModal2()">Fechar</button>
-    </div>
-  `);
+  const paginationEl = document.getElementById('vrb-pagination');
+  paginationEl.style.display = vrbEntries.length > VRB_PAGE_SIZE ? 'flex' : 'none';
+  document.getElementById('vrb-page-info').textContent = `Página ${vrbPage + 1} de ${totalPages}`;
+  document.getElementById('vrb-prev-btn').disabled = vrbPage === 0;
+  document.getElementById('vrb-next-btn').disabled = vrbPage >= totalPages - 1;
+}
+
+function changeVrbPage(delta) {
+  vrbPage += delta;
+  renderVrbPage();
 }
 
 async function openReviewBidsModal() {

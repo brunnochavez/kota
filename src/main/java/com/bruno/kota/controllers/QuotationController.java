@@ -142,8 +142,8 @@ public class QuotationController {
     }
 
     @GetMapping("/{id}/items")
-    public List<QuotationItemResponse> findItems(@PathVariable Long id) {
-        return quotationService.findItems(id);
+    public List<QuotationItemResponse> findItems(@PathVariable Long id, @RequestParam(required = false) Long supplierId) {
+        return quotationService.findItems(id, supplierId);
     }
 
     @PostMapping

@@ -71,10 +71,33 @@ public class QuotationService {
 
     @Transactional(readOnly = true)
     public List<QuotationItemResponse> findItems(Long quotationId) {
+        return findItems(quotationId, null);
+    }
+
+    // Com supplierId: busca TODOS os lances desse fornecedor nessa cotação numa consulta
+    // só (não um SELECT por item) e já devolve o preço pré-preenchido junto de cada item.
+    // Isso substitui o padrão antigo do frontend (buscar os itens, depois um GET /bids
+    // por item, em paralelo) — pra uma cotação com 90 itens, eram 90 requisições extra
+    // só pra saber "esse fornecedor já cotou isso?", e era exatamente isso que deixava
+    // o primeiro carregamento da tela de lançamento lento.
+    @Transactional(readOnly = true)
+    public List<QuotationItemResponse> findItems(Long quotationId, Long supplierId) {
         findEntityById(quotationId);
-        return quotationItemRepository.findByQuotationId(quotationId).stream()
-                .map(this::toItemResponse)
-                .toList();
+        List<QuotationItem> items = quotationItemRepository.findByQuotationId(quotationId);
+
+        Map<Long, Bid> myBidByItemId = Map.of();
+        if (supplierId != null) {
+            myBidByItemId = bidRepository.findByQuotationItem_QuotationId(quotationId).stream()
+                    .filter(bid -> bid.getSupplier().getId().equals(supplierId))
+                    .collect(Collectors.toMap(bid -> bid.getQuotationItem().getId(), bid -> bid));
+        }
+
+        List<QuotationItemResponse> result = new ArrayList<>();
+        for (QuotationItem item : items) {
+            Bid myBid = myBidByItemId.get(item.getId());
+            result.add(toItemResponse(item, myBid));
+        }
+        return result;
     }
 
     @Transactional
@@ -211,11 +234,8 @@ public class QuotationService {
 
         quotation.setStatus(QuotationStatus.AVAILABLE);
         quotation.setPublishedAt(LocalDateTime.now());
-        Quotation saved = quotationRepository.save(quotation);
-
-        return toResponse(saved);
+        return toResponse(quotationRepository.save(quotation));
     }
-
 
     @Transactional
     public QuotationCloseResult close(Long id, QuotationCloseRequest request) {
@@ -419,35 +439,7 @@ public class QuotationService {
         }
 
         quotation.setStatus(QuotationStatus.CLOSED);
-        Quotation saved = quotationRepository.save(quotation);
-
-        notifyEligibleRepresentativesOfClose(saved, items);
-
-        return new QuotationCloseResult(true, toResponse(saved), List.of(), List.of());
-    }
-
-    // Manda pra TODO representante elegível do grupo, tenha ele vencido item nenhum ou
-    // não — é o que foi combinado. "Elegível" continua sendo a mesma definição de
-    // sempre: dono de um fornecedor que pertence ao grupo dessa cotação.
-    private void notifyEligibleRepresentativesOfClose(Quotation quotation, List<QuotationItem> items) {
-        SupplierGroup group = quotation.getSupplierGroup();
-        if (group == null) {
-            return;
-        }
-        List<Representative> eligibleReps = supplierRepository.findByGroup(group).stream()
-                .map(Supplier::getRepresentative)
-                .filter(Objects::nonNull)
-                .distinct()
-                .toList();
-
-        for (Representative rep : eligibleReps) {
-            List<QuotationItem> wonItems = items.stream()
-                    .filter(item -> item.getWinningBid() != null
-                            && item.getWinningBid().getSubmittedBy() != null
-                            && item.getWinningBid().getSubmittedBy().getId().equals(rep.getId()))
-                    .toList();
-
-        }
+        return new QuotationCloseResult(true, toResponse(quotationRepository.save(quotation)), List.of(), List.of());
     }
 
     @Transactional
@@ -1237,6 +1229,10 @@ public class QuotationService {
     }
 
     private QuotationItemResponse toItemResponse(QuotationItem item) {
+        return toItemResponse(item, null);
+    }
+
+    private QuotationItemResponse toItemResponse(QuotationItem item, Bid myBid) {
         Integer override = item.getSalesProjectionDaysOverride();
         Integer effective = override != null ? override : item.getQuotation().getDefaultSalesProjectionDays();
         return new QuotationItemResponse(
@@ -1249,7 +1245,9 @@ public class QuotationService {
                 item.getWinningBid() != null ? item.getWinningBid().getId() : null,
                 item.isFulfillmentCut(),
                 override,
-                effective
+                effective,
+                myBid != null ? myBid.getId() : null,
+                myBid != null ? myBid.getValue() : null
         );
     }
 

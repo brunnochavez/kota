@@ -1610,17 +1610,19 @@ async function loadItemsForCurrentQuotation() {
   renderDeadlineInfo(q ? q.expirationDate : null);
 
   const supplierId = resolveSupplierId();
-  const items = await safeCall(() => api('GET', `/quotations/${currentQuotationId}/items`));
 
-  // Busca se já existe lance desse fornecedor pra cada item, pra pré-preencher —
-  // sem isso, o representante não tem como saber se já cotou aquele produto ou não.
-  const rows = await Promise.all(items.map(async item => {
-    let existingBid = null;
-    if (supplierId) {
-      const bids = await safeCall(() => api('GET', `/bids?quotationItemId=${item.id}`));
-      existingBid = bids.find(b => b.supplierId === supplierId) || null;
-    }
-    return { item, existingBid };
+  // Uma chamada só, já com o lance existente de cada item embutido (via ?supplierId=)
+  // — antes disso era 1 requisição pra buscar os itens + 1 requisição EXTRA POR ITEM só
+  // pra saber se esse fornecedor já tinha cotado (90 itens = 90 requisições em paralelo,
+  // e era isso que deixava o primeiro carregamento lento numa cotação grande).
+  const url = supplierId
+    ? `/quotations/${currentQuotationId}/items?supplierId=${supplierId}`
+    : `/quotations/${currentQuotationId}/items`;
+  const items = await safeCall(() => api('GET', url));
+
+  const rows = items.map(item => ({
+    item,
+    existingBid: item.myBidId != null ? { value: item.myBidValue } : null
   }));
 
   entryItemsCache = rows;
@@ -1636,6 +1638,9 @@ function goToEntryItemsPage(page) {
   captureCurrentEntryPricesFromDom();
   entryItemsPage = page;
   renderEntryItemsPage();
+  // Sem isso, trocar de página deixava a rolagem parada no mesmo lugar — o
+  // representante via o FIM da página nova (perto do rodapé), não o começo dela.
+  window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
 function captureCurrentEntryPricesFromDom() {
