@@ -56,6 +56,7 @@ public class QuotationService {
     private final BidRepository bidRepository;
     private final OrderFulfillmentConfirmationRepository orderFulfillmentConfirmationRepository;
     private final QuotationDeclineRepository quotationDeclineRepository;
+    private final EmailService emailService;
 
     @Transactional(readOnly = true)
     public List<QuotationResponse> findAll() {
@@ -234,7 +235,28 @@ public class QuotationService {
 
         quotation.setStatus(QuotationStatus.AVAILABLE);
         quotation.setPublishedAt(LocalDateTime.now());
-        return toResponse(quotationRepository.save(quotation));
+        Quotation saved = quotationRepository.save(quotation);
+
+        notifyEligibleRepresentativesOfPublish(saved);
+
+        return toResponse(saved);
+    }
+
+    // Um e-mail por representante elegível (dono de fornecedor do grupo da cotação) —
+    // mesma lista de "quem deveria responder" usada em getRepresentativeFillRate e
+    // getRepresentativeResponseStatus. EmailService já garante internamente que uma
+    // falha de envio não propaga — a publicação em si nunca é derrubada por causa disso.
+    private void notifyEligibleRepresentativesOfPublish(Quotation quotation) {
+        SupplierGroup group = quotation.getSupplierGroup();
+        if (group == null) {
+            return;
+        }
+        List<Representative> eligibleReps = supplierRepository.findByGroup(group).stream()
+                .map(Supplier::getRepresentative)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+        emailService.notifyQuotationPublished(quotation, eligibleReps);
     }
 
     @Transactional
@@ -439,7 +461,35 @@ public class QuotationService {
         }
 
         quotation.setStatus(QuotationStatus.CLOSED);
-        return new QuotationCloseResult(true, toResponse(quotationRepository.save(quotation)), List.of(), List.of());
+        Quotation saved = quotationRepository.save(quotation);
+
+        notifyEligibleRepresentativesOfClose(saved, items);
+
+        return new QuotationCloseResult(true, toResponse(saved), List.of(), List.of());
+    }
+
+    // Manda pra TODO representante elegível do grupo, tenha ele vencido item nenhum ou
+    // não — é o que foi combinado. "Elegível" continua sendo a mesma definição de
+    // sempre: dono de um fornecedor que pertence ao grupo dessa cotação.
+    private void notifyEligibleRepresentativesOfClose(Quotation quotation, List<QuotationItem> items) {
+        SupplierGroup group = quotation.getSupplierGroup();
+        if (group == null) {
+            return;
+        }
+        List<Representative> eligibleReps = supplierRepository.findByGroup(group).stream()
+                .map(Supplier::getRepresentative)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+
+        for (Representative rep : eligibleReps) {
+            List<QuotationItem> wonItems = items.stream()
+                    .filter(item -> item.getWinningBid() != null
+                            && item.getWinningBid().getSubmittedBy() != null
+                            && item.getWinningBid().getSubmittedBy().getId().equals(rep.getId()))
+                    .toList();
+            emailService.notifyQuotationClosed(quotation, rep, wonItems);
+        }
     }
 
     @Transactional
