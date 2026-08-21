@@ -3349,7 +3349,7 @@ async function openRepresentativeStatusModal() {
           <td>${escapeHtml(r.supplierName)}</td>
           <td>${repResponseStatusBadge(r.status)}</td>
           <td>${r.status === 'SUBMITTED'
-            ? `<button class="secondary small" onclick="viewRepresentativeBids(${r.representativeId}, '${escapeHtml(r.representativeName).replace(/'/g, "\\'")}')">Ver</button>`
+            ? `<button class="secondary small" onclick="viewRepresentativeBids(${r.representativeId}, ${r.supplierId}, '${escapeHtml(r.representativeName).replace(/'/g, "\\'")}', '${escapeHtml(r.supplierName).replace(/'/g, "\\'")}')">Ver</button>`
             : ''}</td>
         </tr>`).join('')
     : '';
@@ -3375,16 +3375,20 @@ async function openRepresentativeStatusModal() {
 }
 
 // Reaproveita GET /bids?quotationItemId=X (já usado na Revisão de Lances) — cruza com
-// os itens da cotação e filtra só as linhas desse representante. É só leitura (sem
-// editar preço/quantidade nem marcar vencedor), diferente do modal de Revisar Lances.
-async function viewRepresentativeBids(representativeId, representativeName) {
+// os itens da cotação e filtra pela dupla (representante + fornecedor), não só pelo
+// representante. Precisa ser assim porque um representante pode estar vinculado a mais
+// de um fornecedor do grupo — filtrar só por representante misturava lance de um
+// fornecedor com o outro (era exatamente o bug: cotar por UM aparecia duplicado nos
+// dois). É só leitura (sem editar preço/quantidade nem marcar vencedor), diferente do
+// modal de Revisar Lances.
+async function viewRepresentativeBids(representativeId, supplierId, representativeName, supplierName) {
   const perItem = await Promise.all(qdCurrentItems.map(item =>
     safeCall(() => api('GET', `/bids?quotationItemId=${item.id}`)).then(bids => ({ item, bids }))
   ));
 
   const entries = [];
   perItem.forEach(({ item, bids }) => {
-    const bid = bids.find(b => b.submittedById === representativeId);
+    const bid = bids.find(b => b.submittedById === representativeId && b.supplierId === supplierId);
     if (bid) entries.push({ item, bid });
   });
 
@@ -3398,7 +3402,7 @@ async function viewRepresentativeBids(representativeId, representativeName) {
 
   openModal2(`
     <h2>Itens enviados por ${escapeHtml(representativeName)}</h2>
-    <div class="subtitle" style="margin-bottom:14px">${entries.length} ${entries.length === 1 ? 'item cotado' : 'itens cotados'} nessa cotação.</div>
+    <div class="subtitle" style="margin-bottom:14px">Como ${escapeHtml(supplierName)} — ${entries.length} ${entries.length === 1 ? 'item cotado' : 'itens cotados'} nessa cotação.</div>
     <div class="scroll-box">
       <table><thead><tr><th>Cód. de Barras</th><th>Produto</th><th style="text-align:center">Qtd.</th><th style="text-align:right">Preço (R$)</th></tr></thead>
         <tbody>${rowsHtml || '<tr><td colspan="4" class="empty">Nenhum item encontrado.</td></tr>'}</tbody></table>

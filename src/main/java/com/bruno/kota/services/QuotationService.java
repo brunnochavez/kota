@@ -211,8 +211,11 @@ public class QuotationService {
 
         quotation.setStatus(QuotationStatus.AVAILABLE);
         quotation.setPublishedAt(LocalDateTime.now());
-        return toResponse(quotationRepository.save(quotation));
+        Quotation saved = quotationRepository.save(quotation);
+
+        return toResponse(saved);
     }
+
 
     @Transactional
     public QuotationCloseResult close(Long id, QuotationCloseRequest request) {
@@ -416,7 +419,35 @@ public class QuotationService {
         }
 
         quotation.setStatus(QuotationStatus.CLOSED);
-        return new QuotationCloseResult(true, toResponse(quotationRepository.save(quotation)), List.of(), List.of());
+        Quotation saved = quotationRepository.save(quotation);
+
+        notifyEligibleRepresentativesOfClose(saved, items);
+
+        return new QuotationCloseResult(true, toResponse(saved), List.of(), List.of());
+    }
+
+    // Manda pra TODO representante elegível do grupo, tenha ele vencido item nenhum ou
+    // não — é o que foi combinado. "Elegível" continua sendo a mesma definição de
+    // sempre: dono de um fornecedor que pertence ao grupo dessa cotação.
+    private void notifyEligibleRepresentativesOfClose(Quotation quotation, List<QuotationItem> items) {
+        SupplierGroup group = quotation.getSupplierGroup();
+        if (group == null) {
+            return;
+        }
+        List<Representative> eligibleReps = supplierRepository.findByGroup(group).stream()
+                .map(Supplier::getRepresentative)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+
+        for (Representative rep : eligibleReps) {
+            List<QuotationItem> wonItems = items.stream()
+                    .filter(item -> item.getWinningBid() != null
+                            && item.getWinningBid().getSubmittedBy() != null
+                            && item.getWinningBid().getSubmittedBy().getId().equals(rep.getId()))
+                    .toList();
+
+        }
     }
 
     @Transactional
@@ -678,6 +709,13 @@ public class QuotationService {
     // só AVAILABLE): depois de fechada, ainda é útil ver quem participou. PENDING vem
     // primeiro na ordenação — é a informação mais acionável pro admin (quem cutucar).
     @Transactional(readOnly = true)
+    // Status é por (fornecedor, representante) — NUNCA só por representante. Antes tinha
+    // um bug aqui: quando o mesmo representante está vinculado a mais de um fornecedor
+    // do grupo (acontece bastante — um representante atende várias empresas), cotar por
+    // UM fornecedor fazia os DOIS aparecerem como "enviou lance", porque a checagem só
+    // olhava o ID do representante, ignorando qual fornecedor ele estava representando
+    // naquele lance específico. Bid e QuotationDecline sempre têm o fornecedor
+    // explícito — é isso que precisa bater, não só quem digitou.
     public List<RepresentativeResponseStatus> getRepresentativeResponseStatus(Long quotationId) {
         Quotation quotation = findEntityById(quotationId);
         SupplierGroup group = quotation.getSupplierGroup();
@@ -685,11 +723,11 @@ public class QuotationService {
             return List.of();
         }
 
-        Set<Long> submittedRepIds = bidRepository.findByQuotationItem_QuotationId(quotationId).stream()
-                .map(bid -> bid.getSubmittedBy().getId())
+        Set<Long> submittedSupplierIds = bidRepository.findByQuotationItem_QuotationId(quotationId).stream()
+                .map(bid -> bid.getSupplier().getId())
                 .collect(Collectors.toSet());
-        Set<Long> declinedRepIds = quotationDeclineRepository.findByQuotationId(quotationId).stream()
-                .map(d -> d.getDeclinedBy().getId())
+        Set<Long> declinedSupplierIds = quotationDeclineRepository.findByQuotationId(quotationId).stream()
+                .map(d -> d.getSupplier().getId())
                 .collect(Collectors.toSet());
 
         List<RepresentativeResponseStatus> result = new ArrayList<>();
@@ -698,10 +736,10 @@ public class QuotationService {
             if (rep == null) {
                 continue;
             }
-            String status = submittedRepIds.contains(rep.getId()) ? "SUBMITTED"
-                    : declinedRepIds.contains(rep.getId()) ? "DECLINED"
+            String status = submittedSupplierIds.contains(supplier.getId()) ? "SUBMITTED"
+                    : declinedSupplierIds.contains(supplier.getId()) ? "DECLINED"
                     : "PENDING";
-            result.add(new RepresentativeResponseStatus(rep.getId(), rep.getName(), supplier.getName(), status));
+            result.add(new RepresentativeResponseStatus(rep.getId(), supplier.getId(), rep.getName(), supplier.getName(), status));
         }
 
         Map<String, Integer> statusOrder = Map.of("PENDING", 0, "DECLINED", 1, "SUBMITTED", 2);

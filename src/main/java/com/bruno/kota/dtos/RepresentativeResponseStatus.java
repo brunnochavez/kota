@@ -5,6 +5,7 @@ package com.bruno.kota.dtos;
 // porque é só pra exibição na tela — não entra em nenhuma regra de negócio.
 public record RepresentativeResponseStatus(
         Long representativeId,
+        Long supplierId,
         String representativeName,
         String supplierName,
         String status
