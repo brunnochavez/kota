@@ -37,6 +37,7 @@ import com.bruno.kota.dtos.QuotationUpdateRequest;
 import com.bruno.kota.dtos.RepresentativePerformance;
 import com.bruno.kota.dtos.QuotationFillRate;
 import com.bruno.kota.dtos.ReorderPointRow;
+import com.bruno.kota.dtos.RepresentativeResponseStatus;
 import com.bruno.kota.dtos.ReviewBatchUpdateRequest;
 import com.bruno.kota.dtos.SalesProjectionUpdateRequest;
 import com.bruno.kota.dtos.WonQuotationSummary;
@@ -68,6 +69,12 @@ public class QuotationController {
     @PreAuthorize("hasRole('ADMIN')")
     public List<QuotationFillRate> getRepresentativeFillRate() {
         return quotationService.getRepresentativeFillRate();
+    }
+
+    @GetMapping("/{id}/representative-status")
+    @PreAuthorize("hasRole('ADMIN')")
+    public List<RepresentativeResponseStatus> getRepresentativeResponseStatus(@PathVariable Long id) {
+        return quotationService.getRepresentativeResponseStatus(id);
     }
 
     @GetMapping("/won")

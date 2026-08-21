@@ -673,6 +673,43 @@ public class QuotationService {
         return rates;
     }
 
+    // Detalhe por trás do "X/Y responderam" — quem exatamente já respondeu (e como) e
+    // quem ainda falta. Diferente do fill rate acima, funciona pra qualquer status (não
+    // só AVAILABLE): depois de fechada, ainda é útil ver quem participou. PENDING vem
+    // primeiro na ordenação — é a informação mais acionável pro admin (quem cutucar).
+    @Transactional(readOnly = true)
+    public List<RepresentativeResponseStatus> getRepresentativeResponseStatus(Long quotationId) {
+        Quotation quotation = findEntityById(quotationId);
+        SupplierGroup group = quotation.getSupplierGroup();
+        if (group == null) {
+            return List.of();
+        }
+
+        Set<Long> submittedRepIds = bidRepository.findByQuotationItem_QuotationId(quotationId).stream()
+                .map(bid -> bid.getSubmittedBy().getId())
+                .collect(Collectors.toSet());
+        Set<Long> declinedRepIds = quotationDeclineRepository.findByQuotationId(quotationId).stream()
+                .map(d -> d.getDeclinedBy().getId())
+                .collect(Collectors.toSet());
+
+        List<RepresentativeResponseStatus> result = new ArrayList<>();
+        for (Supplier supplier : supplierRepository.findByGroup(group)) {
+            Representative rep = supplier.getRepresentative();
+            if (rep == null) {
+                continue;
+            }
+            String status = submittedRepIds.contains(rep.getId()) ? "SUBMITTED"
+                    : declinedRepIds.contains(rep.getId()) ? "DECLINED"
+                    : "PENDING";
+            result.add(new RepresentativeResponseStatus(rep.getId(), rep.getName(), supplier.getName(), status));
+        }
+
+        Map<String, Integer> statusOrder = Map.of("PENDING", 0, "DECLINED", 1, "SUBMITTED", 2);
+        result.sort(Comparator.<RepresentativeResponseStatus>comparingInt(r -> statusOrder.get(r.status()))
+                .thenComparing(RepresentativeResponseStatus::representativeName));
+        return result;
+    }
+
     // Mesmo princípio do BidService.submit(): authenticatedRepresentativeId vem do token,
     // não de nada que o cliente declare. null = quem chamou é admin, sem restrição —
     // admin já tem acesso a qualquer fornecedor. Pra representante, barra na hora se o

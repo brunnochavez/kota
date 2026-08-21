@@ -3,7 +3,11 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>kota · Painel do Representante</title>
+<title>Easy Kota - Gestão de cotações · Painel do Representante</title>
+<link rel="icon" type="image/x-icon" href="/favicon.ico">
+<link rel="icon" type="image/png" sizes="32x32" href="/img/favicon-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="/img/favicon-16.png">
+<link rel="apple-touch-icon" href="/img/apple-touch-icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
@@ -42,12 +46,10 @@
   }
   .brand svg { width: 19px; height: 19px; flex-shrink: 0; }
   #brand-logo-slot img { width: 22px; height: 22px; object-fit: contain; border-radius: 5px; flex-shrink: 0; }
-  #brand-name { white-space: nowrap; flex-shrink: 0; }
   .brand-company-name {
     color: var(--text-dim); font-weight: 500; font-size: 13px;
     white-space: normal; word-break: break-word; line-height: 1.25;
   }
-  .brand-company-name:not(:empty)::before { content: '· '; }
   .whoami { display: flex; align-items: center; gap: 8px; flex: 1 1 auto; min-width: 0; justify-content: flex-end; }
   .my-identity-label { font-size: 13px; font-weight: 600; color: var(--text); white-space: normal; word-break: break-word; text-align: right; line-height: 1.25; }
   .logout-btn { background: none; border: none; padding: 6px; cursor: pointer; color: var(--text-dim); display: flex; border-radius: 8px; }
@@ -70,13 +72,14 @@
   #view-entry { padding-bottom: calc(78px + env(safe-area-inset-bottom, 0px)); }
   h1 { font-size: 19px; margin: 0 0 3px; font-weight: 700; }
   .greeting-banner {
-    display: flex; align-items: center; gap: 14px; padding: 18px 20px; border-radius: 16px;
-    background: linear-gradient(135deg, var(--accent), var(--accent-hover)); color: #fff; margin-bottom: 20px;
+    display: flex; align-items: center; justify-content: center; padding: 6px 20px 18px;
   }
-  .greeting-banner-icon { width: 38px; height: 38px; flex-shrink: 0; opacity: 0.92; }
-  .greeting-banner-icon svg { width: 100%; height: 100%; }
-  .greeting-banner-text { font-size: 15.5px; font-weight: 700; }
-  .greeting-banner-sub { font-size: 11.5px; opacity: 0.85; margin-top: 2px; }
+  .greeting-banner-logo { display: flex; justify-content: center; }
+  .greeting-banner-logo img { width: 100%; max-width: 190px; height: auto; }
+  /* Fundo do PNG já é transparente — no modo claro funciona liso, sem caixa nenhuma
+     por trás. Só no modo escuro precisa de uma "chapinha" clara atrás, senão o texto
+     escuro fixo da logo ("Kota") desaparece contra o fundo quase preto. */
+  html[data-theme="dark"] .greeting-banner-logo img { background: #fff; border-radius: 10px; padding: 10px 16px; box-shadow: var(--shadow); }
   .supplier-tabs-wrap { margin-bottom: 20px; }
   .supplier-tabs-label { font-size: 10.5px; color: var(--text-faint); font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 8px; padding-left: 2px; }
   .supplier-tabs { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 2px; }
@@ -192,6 +195,7 @@
   .item-row {
     display: flex; flex-direction: column; gap: 7px;
     padding: 11px 12px; border: 1px solid var(--border); border-radius: 9px; margin-bottom: 8px;
+    background: var(--surface); box-shadow: 0 1px 2px rgba(20,30,60,0.04);
   }
   .item-row-name { font-weight: 600; font-size: 13.5px; line-height: 1.3; }
   .item-row-meta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
@@ -319,7 +323,6 @@
   <div class="row">
     <button class="brand" onclick="goHome()" title="Página inicial">
       <span id="brand-logo-slot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 11l9-8 9 8"/><path d="M5 10v10a1 1 0 001 1h4v-6h4v6h4a1 1 0 001-1V10"/></svg></span>
-      <span id="brand-name">kota</span>
       <span id="brand-company-name" class="brand-company-name"></span>
     </button>
     <div class="whoami">
@@ -416,6 +419,7 @@
 
     <div class="card" id="entry-items-card">
       <div id="items-list"></div>
+      <div id="entry-items-pagination-slot"></div>
     </div>
   </div>
 
@@ -745,23 +749,12 @@ function logout() {
 const SUN_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="4.5"/><path d="M12 2.5v2.5M12 19v2.5M4.2 4.2l1.8 1.8M18 18l1.8 1.8M2.5 12H5M19 12h2.5M4.2 19.8L6 18M18 6l1.8-1.8"/></svg>';
 const MOON_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M20 14.5A8.5 8.5 0 119.5 4a7 7 0 0010.5 10.5z"/></svg>';
 
-// Saudação muda por horário e usa só o primeiro nome — "Bom dia, Bruno de Oliveira e
-// Silva!" fica formal demais pra um cumprimento; o nome completo já aparece no canto
-// superior, não precisa repetir.
+// Banner de topo agora mostra a marca do kota em vez da saudação por horário — chip
+// branco por trás da logo porque o fundo do banner é um degradê azul e o texto da logo
+// é escuro fixo, senão ficaria ilegível em cima do azul.
 function renderGreeting() {
-  const hour = new Date().getHours();
-  const isNight = hour < 6 || hour >= 18;
-  const greeting = hour < 12 ? 'Bom dia' : hour < 18 ? 'Boa tarde' : 'Boa noite';
-  const firstName = myRepresentativeName.split(' ')[0] || '';
-
-  const today = new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' });
-
   document.getElementById('greeting-banner').innerHTML = `
-    <div class="greeting-banner-icon">${isNight ? MOON_ICON : SUN_ICON}</div>
-    <div>
-      <div class="greeting-banner-text">${greeting}, ${escapeHtml(firstName)}!</div>
-      <div class="greeting-banner-sub">${today}</div>
-    </div>
+    <div class="greeting-banner-logo"><img src="/img/kota-wordmark.png" alt="kota"></div>
   `;
 }
 
@@ -1600,6 +1593,16 @@ function renderDeadlineInfo(expirationDate) {
 // Carrega (ou recarrega) os itens da cotação atualmente aberta — usada tanto ao
 // selecionar a cotação quanto ao trocar de representante/fornecedor, pra garantir que
 // os campos sempre reflitam o contexto certo, nunca o de quem preencheu antes.
+// Paginado de 20 em 20 — cotação grande (200+ itens) travava o navegador carregando
+// tudo de uma vez numa página só. O preço digitado precisa sobreviver à troca de
+// página (e ao pré-preenchido de quem já tinha cotado antes), por isso guarda tudo
+// num Map à parte (entryItemPrices) em vez de confiar só no que está no DOM — o DOM só
+// tem os inputs da página atual, o resto ficaria perdido ao trocar de página.
+let entryItemsCache = [];
+let entryItemsPage = 0;
+let entryItemPrices = {};
+const ENTRY_ITEMS_PAGE_SIZE = 20;
+
 async function loadItemsForCurrentQuotation() {
   if (!currentQuotationId) return;
 
@@ -1620,12 +1623,44 @@ async function loadItemsForCurrentQuotation() {
     return { item, existingBid };
   }));
 
+  entryItemsCache = rows;
+  entryItemsPage = 0;
+  entryItemPrices = {};
+  renderEntryItemsPage();
+}
+
+// Salva o valor digitado no Map ANTES de trocar de página (o oninput já mantém isso
+// atualizado a cada tecla, isso aqui é só uma segunda garantia no exato momento da
+// troca) — e só depois re-renderiza com a página nova.
+function goToEntryItemsPage(page) {
+  captureCurrentEntryPricesFromDom();
+  entryItemsPage = page;
+  renderEntryItemsPage();
+}
+
+function captureCurrentEntryPricesFromDom() {
+  document.querySelectorAll('[id^="bid-price-"]').forEach(input => {
+    const itemId = input.id.replace('bid-price-', '');
+    entryItemPrices[itemId] = input.value;
+  });
+}
+
+function onEntryPriceInput(itemId, el) {
+  el.value = maskCurrencyInput(el.value);
+  entryItemPrices[itemId] = el.value;
+}
+
+function renderEntryItemsPage() {
+  const { items: pageRows, page, totalPages } = paginateSlice(entryItemsCache, entryItemsPage, ENTRY_ITEMS_PAGE_SIZE);
+  entryItemsPage = page;
+
   const wrap = document.getElementById('items-list');
   wrap.innerHTML = '';
-  rows.forEach(({ item, existingBid }) => {
+  pageRows.forEach(({ item, existingBid }) => {
     const row = document.createElement('div');
     row.className = 'item-row';
-    const prefill = existingBid ? formatCurrencyFromNumber(existingBid.value) : '';
+    const typedPrice = entryItemPrices[item.id];
+    const prefill = typedPrice !== undefined ? typedPrice : (existingBid ? formatCurrencyFromNumber(existingBid.value) : '');
     row.innerHTML = `
       <div class="item-row-name">${escapeHtml(item.productName)}</div>
       <div class="item-row-meta">
@@ -1633,11 +1668,24 @@ async function loadItemsForCurrentQuotation() {
         <button class="copy-barcode-btn" type="button" title="Copiar código de barras" aria-label="Copiar código de barras" onclick="copyBarcode(this, '${item.productBarcode}')">${COPY_ICON}</button>
         <span class="item-row-qty">Qtd: ${item.quantity}</span>
         ${existingBid ? '<span class="item-row-sent">✓ Enviado</span>' : ''}
-        <input type="text" inputmode="decimal" class="item-row-price" id="bid-price-${item.id}" placeholder="0,00" value="${prefill}" oninput="this.value = maskCurrencyInput(this.value)">
+        <input type="text" inputmode="decimal" class="item-row-price" id="bid-price-${item.id}" placeholder="0,00" value="${prefill}" oninput="onEntryPriceInput('${item.id}', this)">
       </div>
     `;
     wrap.appendChild(row);
   });
+
+  const slot = document.getElementById('entry-items-pagination-slot');
+  slot.innerHTML = entryItemsCache.length > ENTRY_ITEMS_PAGE_SIZE ? paginationControlsHtml('entry-items') : '';
+  if (entryItemsCache.length > ENTRY_ITEMS_PAGE_SIZE) {
+    document.getElementById('entry-items-pagination').style.display = 'flex';
+    document.getElementById('entry-items-page-info').textContent = `Página ${page + 1} de ${totalPages}`;
+    const prevBtn = document.getElementById('entry-items-prev-btn');
+    const nextBtn = document.getElementById('entry-items-next-btn');
+    prevBtn.disabled = page === 0;
+    nextBtn.disabled = page >= totalPages - 1;
+    prevBtn.onclick = () => goToEntryItemsPage(page - 1);
+    nextBtn.onclick = () => goToEntryItemsPage(page + 1);
+  }
 }
 
 // Abre a cotação em tela cheia, pronta pra digitar — some com a tab bar (foco total
@@ -1690,12 +1738,15 @@ async function submitAllBids() {
 
   if (!supplierId) { toast('Não foi possível identificar o fornecedor deste representante.', true); return; }
 
-  const priceInputs = document.querySelectorAll('[id^="bid-price-"]');
+  // Lê do entryItemPrices (todas as páginas já digitadas), não do DOM — o DOM só tem
+  // os inputs da página que está na tela agora; o resto ficaria de fora do envio se
+  // lesse só o que está visível.
+  captureCurrentEntryPricesFromDom();
   const toSubmit = [];
-  priceInputs.forEach(input => {
-    const value = unmaskCurrencyToNumber(input.value);
+  Object.entries(entryItemPrices).forEach(([itemId, rawValue]) => {
+    const value = unmaskCurrencyToNumber(rawValue);
     if (value != null && value > 0) {
-      toSubmit.push({ itemId: input.id.replace('bid-price-', ''), value });
+      toSubmit.push({ itemId, value });
     }
   });
 

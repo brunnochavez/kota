@@ -3,7 +3,11 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>kota · Painel Administrativo</title>
+<title>Easy Kota - Gestão de cotações · Painel Administrativo</title>
+<link rel="icon" type="image/x-icon" href="/favicon.ico">
+<link rel="icon" type="image/png" sizes="32x32" href="/img/favicon-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="/img/favicon-16.png">
+<link rel="apple-touch-icon" href="/img/apple-touch-icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
@@ -17,7 +21,7 @@
     --shadow: 0 1px 2px rgba(20,30,60,0.05), 0 1px 8px rgba(20,30,60,0.04);
     --mono: 'JetBrains Mono', 'SF Mono', Consolas, monospace;
     --sans: 'Inter', -apple-system, 'Segoe UI', Roboto, sans-serif;
-    --radius: 10px;
+    --radius: 9px;
   }
   html[data-theme="dark"] {
     --bg: #0c1220; --surface: #131a2c; --surface-2: #1a2338; --surface-3: #212c46;
@@ -31,7 +35,7 @@
   * { box-sizing: border-box; }
   body {
     margin: 0; background: var(--bg); color: var(--text);
-    font-family: var(--sans); font-size: 14px; line-height: 1.5;
+    font-family: var(--sans); font-size: 13px; line-height: 1.5;
     display: flex; min-height: 100vh; transition: background 0.15s, color 0.15s;
   }
   ::-webkit-scrollbar { width: 10px; height: 10px; }
@@ -40,141 +44,156 @@
 
   /* Sidebar */
   nav.sidebar {
-    width: 262px; flex-shrink: 0; background: var(--surface);
-    border-right: 1px solid var(--border); padding: 18px 0;
+    width: 248px; flex-shrink: 0; background: var(--surface);
+    border-right: 1px solid var(--border); padding: 16px 0;
     position: sticky; top: 0; height: 100vh; overflow-y: auto;
     display: flex; flex-direction: column;
   }
-  .brand { padding: 4px 20px 18px; border-bottom: 1px solid var(--border); margin-bottom: 10px; background: var(--surface); }
+  .brand { padding: 4px 18px 16px; border-bottom: 1px solid var(--border); margin-bottom: 8px; background: var(--surface); }
   .brand-home-btn { display: flex; align-items: center; gap: 10px; background: none; border: none; padding: 0; cursor: pointer; text-align: left; font-family: var(--sans); width: 100%; min-width: 0; }
-  .brand-home-btn svg { width: 22px; height: 22px; color: var(--accent); flex-shrink: 0; }
-  #brand-logo-slot img { width: 32px; height: 32px; object-fit: contain; border-radius: 6px; flex-shrink: 0; }
+  .brand-home-btn svg { width: 20px; height: 20px; color: var(--accent); flex-shrink: 0; }
+  #brand-logo-slot img { width: 30px; height: 30px; object-fit: contain; border-radius: 6px; flex-shrink: 0; }
   .brand-text { min-width: 0; flex: 1; }
   .brand .name {
-    font-weight: 700; font-size: 14.5px; letter-spacing: -0.01em; color: var(--text);
+    font-weight: 700; font-size: 14px; letter-spacing: -0.01em; color: var(--text);
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
-  .brand .tag { color: var(--text-dim); font-size: 11.5px; margin-top: 1px; }
+  .brand .tag { color: var(--text-dim); font-size: 11px; margin-top: 1px; }
 
-  .theme-switch-floating { position: fixed; top: 18px; right: 18px; z-index: 50; }
+  .theme-switch-floating { position: fixed; top: 16px; right: 16px; z-index: 50; }
   .theme-switch {
     display: flex; align-items: center; background: var(--surface-2); border: 1px solid var(--border);
-    border-radius: 9px; padding: 2px; gap: 2px; flex-shrink: 0;
+    border-radius: 8px; padding: 2px; gap: 2px; flex-shrink: 0;
   }
   .theme-switch button {
-    width: 27px; height: 27px; border-radius: 7px; border: none; background: transparent;
+    width: 25px; height: 25px; border-radius: 6px; border: none; background: transparent;
     color: var(--text-faint); display: flex; align-items: center; justify-content: center; cursor: pointer; padding: 0;
   }
   .theme-switch button.active { background: var(--surface); color: var(--accent); box-shadow: var(--shadow); }
   .theme-switch button:hover:not(.active) { color: var(--text-dim); }
-  .theme-switch svg { width: 14px; height: 14px; }
+  .theme-switch svg { width: 13px; height: 13px; }
 
   .sidebar-account {
-    margin-top: auto; padding: 10px; border-top: 1px solid var(--border); position: relative;
+    margin-top: auto; padding: 9px; border-top: 1px solid var(--border); position: relative;
   }
   .account-trigger {
-    width: 100%; display: flex; align-items: center; gap: 10px; background: none; border: none;
-    padding: 8px 10px; border-radius: 10px; cursor: pointer; font-family: var(--sans); text-align: left;
+    width: 100%; display: flex; align-items: center; gap: 9px; background: none; border: none;
+    padding: 7px 9px; border-radius: 9px; cursor: pointer; font-family: var(--sans); text-align: left;
   }
   .account-trigger:hover { background: var(--surface-2); }
   .account-avatar {
-    width: 28px; height: 28px; border-radius: 50%; background: var(--accent); color: #fff;
-    display: flex; align-items: center; justify-content: center; font-size: 12.5px; font-weight: 700; flex-shrink: 0;
+    width: 26px; height: 26px; border-radius: 50%; background: var(--accent); color: #fff;
+    display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; flex-shrink: 0;
   }
-  .admin-identity-label { font-size: 12.5px; color: var(--text); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; }
-  .account-chevron { width: 15px; height: 15px; color: var(--text-faint); flex-shrink: 0; }
+  .admin-identity-label { font-size: 12px; color: var(--text); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; }
+  .account-chevron { width: 14px; height: 14px; color: var(--text-faint); flex-shrink: 0; }
   .account-menu {
-    position: absolute; bottom: calc(100% + 4px); left: 10px; right: 10px; background: var(--surface);
-    border: 1px solid var(--border); border-radius: 10px; box-shadow: var(--shadow); padding: 6px; z-index: 30;
+    position: absolute; bottom: calc(100% + 4px); left: 9px; right: 9px; background: var(--surface);
+    border: 1px solid var(--border); border-radius: 9px; box-shadow: var(--shadow); padding: 5px; z-index: 30;
   }
   .account-menu button {
-    width: 100%; display: flex; align-items: center; gap: 9px; background: none; border: none;
-    padding: 9px 10px; border-radius: 7px; cursor: pointer; font-family: var(--sans); font-size: 13px;
+    width: 100%; display: flex; align-items: center; gap: 8px; background: none; border: none;
+    padding: 8px 9px; border-radius: 7px; cursor: pointer; font-family: var(--sans); font-size: 12.5px;
     color: var(--text); text-align: left;
   }
   .account-menu button:hover { background: var(--surface-2); }
-  .account-menu button svg { width: 16px; height: 16px; flex-shrink: 0; color: var(--text-dim); }
-  .account-menu-divider { border: none; border-top: 1px solid var(--border); margin: 6px 2px; }
+  .account-menu button svg { width: 15px; height: 15px; flex-shrink: 0; color: var(--text-dim); }
+  .account-menu-divider { border: none; border-top: 1px solid var(--border); margin: 5px 2px; }
   .account-menu-danger { color: var(--danger); }
   .account-menu-danger svg { color: var(--danger); }
   .account-menu-danger:hover { background: var(--danger-bg); }
 
+  /* Marca do produto (kota), discreta, embaixo dos grupos de navegação — reforça "você
+     está no kota" sem competir com a marca da empresa (Multishow) lá em cima do menu.
+     flex:1 faz ela ocupar todo o vão vazio que sobra até a conta do admin (que continua
+     grudada embaixo, .sidebar-account mantém margin-top:auto) — e center/center centraliza
+     a logo dentro desse espaço inteiro, não só encostada no topo dele.
+     Fundo branco fixo no próprio selo — a logo tem texto escuro fixo (não adapta ao
+     tema), então sem isso ela some no modo escuro. */
+  .sidebar-brand-footer {
+    flex: 1; min-height: 80px; padding: 14px 24px; margin-top: 10px; border-top: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .sidebar-brand-footer img { width: 100%; max-width: 168px; height: auto; background: #fff; border-radius: 10px; padding: 10px 14px; }
+
   .nav-group-label {
-    padding: 16px 20px 6px; font-size: 10.5px; font-weight: 700; color: var(--text-faint);
+    padding: 14px 18px 5px; font-size: 10px; font-weight: 700; color: var(--text-faint);
     text-transform: uppercase; letter-spacing: 0.07em;
   }
-  .nav-group-label:first-of-type { padding-top: 6px; }
+  .nav-group-label:first-of-type { padding-top: 5px; }
 
-  .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 14px; margin-bottom: 20px; }
-  .kpi-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px 20px; box-shadow: var(--shadow); cursor: pointer; }
+  .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 16px; }
+  .kpi-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 15px 18px; box-shadow: var(--shadow); cursor: pointer; }
   .kpi-card:hover { border-color: var(--accent); }
   .kpi-card.secondary { cursor: default; }
   .kpi-card.secondary:hover { border-color: var(--border); }
-  .kpi-value { font-size: 28px; font-weight: 700; letter-spacing: -0.02em; }
-  .kpi-label { font-size: 12px; color: var(--text-dim); margin-top: 4px; }
-  .dash-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-bottom: 18px; align-items: start; }
+  .kpi-value { font-size: 25px; font-weight: 700; letter-spacing: -0.02em; }
+  .kpi-label { font-size: 11.5px; color: var(--text-dim); margin-top: 3px; }
+  .dash-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 14px; align-items: start; }
   @media (max-width: 900px) { .dash-grid { grid-template-columns: 1fr; } }
   .fill-rate-track {
-    width: 100%; height: 10px; border-radius: 999px; background: var(--surface-3); overflow: hidden;
+    width: 100%; height: 9px; border-radius: 999px; background: var(--surface-3); overflow: hidden;
   }
   .fill-rate-fill { height: 100%; border-radius: 999px; transition: width 0.3s ease; }
-  .expiring-item { display: flex; justify-content: space-between; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--surface-2); font-size: 13px; }
+  .expiring-item { display: flex; justify-content: space-between; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--surface-2); font-size: 12.5px; }
   .expiring-item:last-child { border-bottom: none; }
   .expiring-item { border-bottom: 1px solid var(--surface-2); }
   .expiring-item:last-child { border-bottom: none; }
-  .expiring-row { display: flex; justify-content: space-between; align-items: center; gap: 14px; padding: 12px 4px; cursor: pointer; }
+  .expiring-row { display: flex; justify-content: space-between; align-items: center; gap: 14px; padding: 10px 4px; cursor: pointer; }
   .expiring-row:hover { background: var(--surface-2); }
-  .expiring-row-name { font-weight: 600; font-size: 13.5px; }
-  .expiring-row-group { font-size: 12px; color: var(--text-dim); margin-top: 2px; }
+  .expiring-row-name { font-weight: 600; font-size: 13px; }
+  .expiring-row-group { font-size: 11.5px; color: var(--text-dim); margin-top: 2px; }
   .expiring-row-date { text-align: right; flex-shrink: 0; }
-  .expiring-row-countdown { display: block; font-weight: 700; font-size: 12.5px; color: var(--warning); }
-  .expiring-row-exact { display: block; font-size: 11px; color: var(--text-dim); margin-top: 2px; }
-  .search-result-item { padding: 10px 14px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px; cursor: pointer; margin-bottom: 6px; }
+  .expiring-row-countdown { display: block; font-weight: 700; font-size: 12px; color: var(--warning); }
+  .expiring-row-exact { display: block; font-size: 10.5px; color: var(--text-dim); margin-top: 2px; }
+  .search-result-item { padding: 9px 13px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px; cursor: pointer; margin-bottom: 6px; }
   .search-result-item:hover { border-color: var(--accent); }
-  .info-row { display: flex; flex-wrap: wrap; gap: 24px; margin-bottom: 4px; }
+  .info-row { display: flex; flex-wrap: wrap; gap: 22px; margin-bottom: 4px; }
   .info-row .field { min-width: 140px; }
-  .info-row .field label { display: block; font-size: 11px; color: var(--text-dim); margin-bottom: 3px; text-transform: uppercase; letter-spacing: 0.03em; }
-  .info-row .field .value { font-size: 14px; }
+  .info-row .field label { display: block; font-size: 10.5px; color: var(--text-dim); margin-bottom: 3px; text-transform: uppercase; letter-spacing: 0.03em; }
+  .info-row .field .value { font-size: 13px; }
 
   .nav-item {
-    display: flex; align-items: flex-start; gap: 11px;
-    padding: 9px 20px; color: var(--text-dim); cursor: pointer;
-    border-left: 3px solid transparent; font-size: 13.5px; font-weight: 500; user-select: none;
+    display: flex; align-items: flex-start; gap: 10px;
+    padding: 7px 18px; color: var(--text-dim); cursor: pointer;
+    border-left: 3px solid transparent; font-size: 13px; font-weight: 500; user-select: none;
+    transition: background 0.12s, color 0.12s;
   }
   .nav-item .nav-icon { margin-top: 1px; }
   .nav-item:hover { color: var(--text); background: var(--surface-2); }
   .nav-item.active { color: var(--accent); background: var(--accent-soft); border-left-color: var(--accent); }
-  .nav-item.nav-sub { padding-left: 20px; font-size: 12.5px; }
-  .nav-icon { width: 17px; height: 17px; flex-shrink: 0; opacity: 0.85; }
+  .nav-item.nav-sub { padding-left: 18px; font-size: 12px; }
+  .nav-icon { width: 16px; height: 16px; flex-shrink: 0; opacity: 0.85; }
   .nav-item.active .nav-icon { opacity: 1; }
   .nav-icon svg { width: 100%; height: 100%; }
 
   /* Main */
-  main { flex: 1; padding: 30px 40px 60px; max-width: 1200px; }
+  main { flex: 1; padding: 26px 36px 50px; max-width: 1280px; }
   .section { display: none; }
   .section.active { display: block; }
-  h1 { font-size: 21px; margin: 0 0 4px; letter-spacing: -0.02em; font-weight: 700; }
-  .subtitle { color: var(--text-dim); font-size: 13px; margin-bottom: 26px; }
+  h1 { font-size: 19px; margin: 0 0 4px; letter-spacing: -0.02em; font-weight: 700; }
+  .subtitle { color: var(--text-dim); font-size: 12.5px; margin-bottom: 20px; }
 
   /* Cards */
-  .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px 22px; margin-bottom: 18px; box-shadow: var(--shadow); }
-  .card h2 { font-size: 14.5px; margin: 0 0 16px; font-weight: 600; }
-  .card h3 { font-size: 11.5px; margin: 0 0 10px; font-weight: 600; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.05em; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px 20px; margin-bottom: 14px; box-shadow: var(--shadow); }
+  .card h2 { font-size: 14px; margin: 0 0 13px; font-weight: 600; }
+  .card h3 { font-size: 11px; margin: 0 0 9px; font-weight: 600; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.05em; }
 
   /* Forms */
-  .field-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 13px; margin-bottom: 14px; }
-  label { display: block; font-size: 12px; color: var(--text-dim); margin-bottom: 5px; font-weight: 500; }
+  .field-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 12px; }
+  label { display: block; font-size: 11.5px; color: var(--text-dim); margin-bottom: 4px; font-weight: 500; }
   input, select, textarea {
     width: 100%; background: var(--bg); border: 1px solid var(--border);
-    color: var(--text); padding: 8px 11px; border-radius: 7px; font-size: 13.5px;
-    font-family: var(--sans);
+    color: var(--text); padding: 7px 10px; border-radius: 7px; font-size: 13px;
+    font-family: var(--sans); transition: border-color 0.12s, box-shadow 0.12s;
   }
   input:focus, select:focus, textarea:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
-  textarea { resize: vertical; min-height: 50px; }
+  textarea { resize: vertical; min-height: 46px; }
 
   button {
-    background: var(--accent); color: #fff; border: none; padding: 8px 16px;
-    border-radius: 7px; font-size: 13px; font-weight: 600; cursor: pointer; font-family: var(--sans);
+    background: var(--accent); color: #fff; border: none; padding: 7px 14px;
+    border-radius: 7px; font-size: 12.5px; font-weight: 600; cursor: pointer; font-family: var(--sans);
+    transition: background 0.12s;
   }
   button:hover { background: var(--accent-hover); }
   button:disabled { opacity: 0.5; cursor: not-allowed; }
@@ -182,20 +201,20 @@
   button.secondary:hover { background: var(--surface-3); }
   button.danger { background: var(--danger-bg); color: var(--danger); border: 1px solid var(--danger-border); }
   button.success { background: var(--success-bg); color: var(--success); border: 1px solid var(--success-border); }
-  button.small { padding: 5px 11px; font-size: 12px; }
-  .btn-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 4px; }
+  button.small { padding: 4px 10px; font-size: 11.5px; }
+  .btn-row { display: flex; gap: 7px; flex-wrap: wrap; margin-top: 4px; }
 
   /* Tables */
-  table { width: 100%; border-collapse: collapse; font-size: 13px; }
-  th { text-align: left; color: var(--text-dim); font-weight: 600; font-size: 11px;
-       text-transform: uppercase; letter-spacing: 0.04em; padding: 8px 10px; border-bottom: 1px solid var(--border); }
-  td { padding: 10px 10px; border-bottom: 1px solid var(--surface-2); vertical-align: middle; }
+  table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  th { text-align: left; color: var(--text-dim); font-weight: 600; font-size: 10.5px;
+       text-transform: uppercase; letter-spacing: 0.04em; padding: 7px 10px; border-bottom: 1px solid var(--border); }
+  td { padding: 7px 10px; border-bottom: 1px solid var(--surface-2); vertical-align: middle; }
   tr:hover td { background: var(--surface-2); }
-  .mono { font-family: var(--mono); font-size: 12px; }
+  .mono { font-family: var(--mono); font-size: 11.5px; }
   .num { text-align: right; }
 
   /* Badges */
-  .badge { display: inline-flex; align-items: center; gap: 5px; padding: 3px 10px 3px 8px; border-radius: 20px; font-size: 11px; font-weight: 600; }
+  .badge { display: inline-flex; align-items: center; gap: 5px; padding: 2px 9px 2px 7px; border-radius: 20px; font-size: 10.5px; font-weight: 600; }
   .badge::before { content: ''; width: 6px; height: 6px; border-radius: 50%; }
   .badge-draft { background: var(--surface-3); color: var(--text-dim); }
   .badge-draft::before { background: var(--text-faint); }
@@ -209,55 +228,55 @@
   .badge-reviewing::before { background: var(--warning); }
 
   /* Toast */
-  #toast-wrap { position: fixed; top: 18px; right: 18px; z-index: 1200; display: flex; flex-direction: column; gap: 8px; }
-  .toast { padding: 12px 16px; border-radius: 9px; font-size: 13px; max-width: 380px; box-shadow: var(--shadow); }
+  #toast-wrap { position: fixed; top: 16px; right: 16px; z-index: 1200; display: flex; flex-direction: column; gap: 8px; }
+  .toast { padding: 11px 15px; border-radius: 9px; font-size: 12.5px; max-width: 380px; box-shadow: var(--shadow); }
   .toast.ok { background: var(--success-bg); color: var(--success); border: 1px solid var(--success-border); }
   .toast.err { background: var(--danger-bg); color: var(--danger); border: 1px solid var(--danger-border); }
 
-  .empty { color: var(--text-faint); font-size: 13px; padding: 22px 10px; text-align: center; }
-  .item-row { display: grid; grid-template-columns: 2fr 1fr auto; gap: 10px; align-items: end; margin-bottom: 8px; }
-  .divider { border: none; border-top: 1px solid var(--border); margin: 18px 0; }
+  .empty { color: var(--text-faint); font-size: 12.5px; padding: 18px 10px; text-align: center; }
+  .item-row { display: grid; grid-template-columns: 2fr 1fr auto; gap: 9px; align-items: end; margin-bottom: 7px; }
+  .divider { border: none; border-top: 1px solid var(--border); margin: 15px 0; }
 
   /* Stepper de etapas — Rascunho > Disponível > Em Revisão > Fechada */
-  .qd-stepper { margin: 4px 0 18px; }
+  .qd-stepper { margin: 3px 0 15px; }
   .qd-stepper-track { display: flex; align-items: flex-start; }
-  .qd-step { display: flex; flex-direction: column; align-items: center; gap: 6px; flex-shrink: 0; width: 84px; }
+  .qd-step { display: flex; flex-direction: column; align-items: center; gap: 5px; flex-shrink: 0; width: 76px; }
   .qd-step-dot {
-    width: 26px; height: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
-    font-size: 11.5px; font-weight: 700; border: 2px solid var(--border); color: var(--text-faint); background: var(--surface);
+    width: 23px; height: 23px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+    font-size: 10.5px; font-weight: 700; border: 2px solid var(--border); color: var(--text-faint); background: var(--surface);
     transition: all 0.15s;
   }
-  .qd-step-dot svg { width: 13px; height: 13px; }
-  .qd-step-label { font-size: 11px; color: var(--text-faint); font-weight: 600; text-align: center; }
+  .qd-step-dot svg { width: 12px; height: 12px; }
+  .qd-step-label { font-size: 10px; color: var(--text-faint); font-weight: 600; text-align: center; }
   .qd-step.done .qd-step-dot { background: var(--success); border-color: var(--success); color: #fff; }
   .qd-step.done .qd-step-label { color: var(--success); }
   .qd-step.current .qd-step-dot { background: var(--accent); border-color: var(--accent); color: #fff; box-shadow: 0 0 0 4px var(--accent-soft); }
   .qd-step.current .qd-step-label { color: var(--accent); }
   .qd-step.expired-at .qd-step-dot { background: var(--danger); border-color: var(--danger); color: #fff; }
   .qd-step.expired-at .qd-step-label { color: var(--danger); }
-  .qd-step-line { flex: 1; height: 2px; background: var(--border); margin: 12px -20px 0; }
+  .qd-step-line { flex: 1; height: 2px; background: var(--border); margin: 10px -20px 0; }
   .qd-step-line.done { background: var(--success); }
   .qd-expired-note {
-    margin-top: 10px; font-size: 12px; font-weight: 600; color: var(--danger); background: var(--danger-bg);
-    border: 1px solid var(--danger-border); border-radius: 8px; padding: 8px 12px; display: inline-block;
+    margin-top: 9px; font-size: 11.5px; font-weight: 600; color: var(--danger); background: var(--danger-bg);
+    border: 1px solid var(--danger-border); border-radius: 8px; padding: 7px 11px; display: inline-block;
   }
 
   /* Barra de estatísticas rápidas do detalhe da cotação */
-  .qd-info-bar { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 18px; }
+  .qd-info-bar { display: flex; gap: 9px; flex-wrap: wrap; margin-bottom: 15px; }
   .qd-stat {
-    background: var(--surface-2); border: 1px solid var(--border); border-radius: 10px;
-    padding: 9px 14px; min-width: 90px;
+    background: var(--surface-2); border: 1px solid var(--border); border-radius: 9px;
+    padding: 8px 13px; min-width: 82px;
   }
-  .qd-stat-value { font-size: 15px; font-weight: 700; color: var(--text); line-height: 1.2; }
-  .qd-stat-label { font-size: 10.5px; color: var(--text-dim); margin-top: 2px; text-transform: uppercase; letter-spacing: 0.03em; }
+  .qd-stat-value { font-size: 14px; font-weight: 700; color: var(--text); line-height: 1.2; }
+  .qd-stat-label { font-size: 10px; color: var(--text-dim); margin-top: 2px; text-transform: uppercase; letter-spacing: 0.03em; }
 
   .inline-form { display: flex; gap: 8px; align-items: end; flex-wrap: wrap; }
-  .tabs { display: flex; gap: 4px; margin-bottom: 18px; border-bottom: 1px solid var(--border); }
-  .tab { padding: 9px 16px; cursor: pointer; color: var(--text-dim); font-size: 13px; font-weight: 500; border-bottom: 2px solid transparent; }
+  .tabs { display: flex; gap: 4px; margin-bottom: 15px; border-bottom: 1px solid var(--border); }
+  .tab { padding: 8px 14px; cursor: pointer; color: var(--text-dim); font-size: 12.5px; font-weight: 500; border-bottom: 2px solid transparent; }
   .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
-  .pill { display: inline-flex; align-items: center; gap: 6px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 20px; padding: 4px 10px 4px 12px; font-size: 12px; }
-  .violation-box, .tie-box { background: var(--warning-bg); border: 1px solid var(--warning-border); border-radius: 9px; padding: 14px; margin-bottom: 12px; }
-  .violation-box h4, .tie-box h4 { margin: 0 0 8px; color: var(--warning); font-size: 13px; }
+  .pill { display: inline-flex; align-items: center; gap: 6px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 20px; padding: 3px 9px 3px 11px; font-size: 11.5px; }
+  .violation-box, .tie-box { background: var(--warning-bg); border: 1px solid var(--warning-border); border-radius: 9px; padding: 12px; margin-bottom: 11px; }
+  .violation-box h4, .tie-box h4 { margin: 0 0 7px; color: var(--warning); font-size: 12.5px; }
 
   .modal-overlay {
     position: fixed; inset: 0; background: rgba(10,14,24,0.55); backdrop-filter: blur(2px);
@@ -265,21 +284,39 @@
   }
   .modal-box {
     background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
-    padding: 22px 24px; width: 100%; max-width: 560px; max-height: 88vh; overflow-y: auto; box-shadow: var(--shadow);
+    padding: 20px 22px; width: 100%; max-width: 560px; max-height: 88vh; overflow-y: auto; box-shadow: var(--shadow);
     position: relative;
   }
-  .modal-box.wide { max-width: 920px; }
-  .modal-box h2 { margin: 0 0 16px; font-size: 16px; padding-right: 28px; }
+  .modal-box.wide { max-width: 1080px; height: 86vh; }
+
+  /* Detalhe da cotação — janela de tamanho FIXO (herda o height:86vh acima), com layout
+     em coluna: topo (título/form/botões) e rodapé (paginação/Fechar) ficam com altura
+     natural; quem estica pra preencher o que sobra é só a área da tabela de itens
+     (.qd-modal-items-area, flex:1). Assim o rodapé sempre gruda embaixo da janela, e
+     sobra de espaço vira espaço em branco DENTRO da tabela — nunca abaixo dela, nunca
+     rolagem, nunca janela de tamanho diferente entre cotações. */
+  .modal-box.wide #modal-box-content { height: 100%; display: flex; flex-direction: column; min-height: 0; }
+  .qd-modal-body { display: flex; flex-direction: column; height: 100%; min-height: 0; }
+  .qd-modal-top { flex-shrink: 0; }
+  .qd-modal-items-area { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+  .qd-modal-items-area .qd-items-table-wrap { flex: 1; min-height: 0; }
+  .qd-modal-footer { flex-shrink: 0; }
+
+  /* Detalhe da cotação — escopado só nesse modal (.qd-modal-body), já em cima da base
+     global (que também encolheu). O que sobra aqui é só o extra específico desse modal
+     em particular, pra caber ainda mais sem rolar. */
+  .qd-modal-body .qd-items-table td, .qd-modal-body .qd-items-table th { padding: 4px 10px; }
+  .modal-box h2 { margin: 0 0 14px; font-size: 15px; padding-right: 26px; }
   .modal-close-x {
-    position: absolute; top: 14px; right: 14px; width: 28px; height: 28px; z-index: 1;
-    border-radius: 8px; border: none; background: transparent; color: var(--text-dim);
-    font-size: 20px; line-height: 1; cursor: pointer; display: flex; align-items: center; justify-content: center;
+    position: absolute; top: 13px; right: 13px; width: 26px; height: 26px; z-index: 1;
+    border-radius: 7px; border: none; background: transparent; color: var(--text-dim);
+    font-size: 19px; line-height: 1; cursor: pointer; display: flex; align-items: center; justify-content: center;
   }
   .modal-close-x:hover { background: var(--surface-2); color: var(--text); }
-  .field-error { color: var(--danger); font-size: 12px; margin-top: 5px; }
+  .field-error { color: var(--danger); font-size: 11.5px; margin-top: 4px; }
   .input-error { border-color: var(--danger) !important; }
   .icon-btn {
-    width: 28px; height: 28px; border-radius: 7px; border: 1px solid var(--border);
+    width: 26px; height: 26px; border-radius: 7px; border: 1px solid var(--border);
     background: var(--surface-2); color: var(--text-dim); display: inline-flex;
     align-items: center; justify-content: center; cursor: pointer; padding: 0;
   }
@@ -288,22 +325,46 @@
   .icon-btn.danger:hover { background: var(--danger-border); }
   .confirm-popover {
     position: fixed; z-index: 1150; background: var(--surface); border: 1px solid var(--border);
-    border-radius: var(--radius); box-shadow: var(--shadow); padding: 12px 14px; min-width: 240px; max-width: 320px;
+    border-radius: var(--radius); box-shadow: var(--shadow); padding: 11px 13px; min-width: 240px; max-width: 320px;
   }
-  .confirm-popover-msg { font-size: 13px; line-height: 1.4; }
-  .qd-items-table-wrap { border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+  .confirm-popover-msg { font-size: 12.5px; line-height: 1.4; }
+  .qd-items-table-wrap {
+    border: 1px solid var(--border); border-radius: 9px; overflow: hidden;
+    min-height: 200px; /* header (~26px) + 6 linhas (~29px cada, QD_ITEMS_PAGE_SIZE=6),
+    já com as linhas mais compactas — trava a altura pra tabela "Itens do lote" não
+    encolher quando a busca filtra poucos resultados. */
+  }
   .qd-items-table { margin: 0; }
-  .qd-items-table td, .qd-items-table th { padding: 10px 14px; font-size: 12.5px; }
+  .qd-items-table td, .qd-items-table th { padding: 6px 12px; font-size: 12px; }
   .qd-items-table thead th { background: var(--surface-2); border-bottom: 1px solid var(--border); }
   .qd-items-table tbody tr:last-child td { border-bottom: none; }
-  .qd-items-table input[type="number"] { padding: 4px 8px; }
-  .rep-bid-group { margin-bottom: 14px; }
-  .rep-bid-group h4 { margin: 0 0 8px; font-size: 13.5px; }
+  .qd-items-table input[type="number"] { padding: 2px 7px; }
+  .rep-bid-group { margin-bottom: 12px; }
+  .rep-bid-group h4 { margin: 0 0 7px; font-size: 13px; }
   .rep-bid-fields { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
   .qd-items-table tr.rep-bid-winner-row td { background: var(--success-bg); }
   .qd-items-table tr.rep-bid-winner-row td:first-child { border-radius: 6px 0 0 6px; }
   .qd-items-table tr.rep-bid-winner-row td:last-child { border-radius: 0 6px 6px 0; }
   .row-actions { display: flex; gap: 6px; justify-content: flex-end; }
+
+  /* Listas dentro de modal que crescem com o uso (resultado de busca, membros de um
+     grupo) — altura RESERVADA (min-height), sem rolagem própria: essas listas já são
+     paginadas (6 por página), então nunca precisam de scrollbar — a altura reservada só
+     evita que a caixa encolha na última página (com menos itens que as anteriores) ou
+     enquanto a busca ainda não tem resultado nenhum. Nada de overflow/scroll aqui de
+     propósito — só paginação (Anterior/Próxima) muda o que aparece. */
+  .scroll-box { min-height: 200px; }
+
+  /* Modal "Produtos do grupo" — busca à esquerda, lista atual à direita, lado a lado
+     em vez de empilhado. Resolve largura e altura ao mesmo tempo: mais largo (usa o
+     .wide de 1080px) e mais baixo, porque as duas listas dividem a largura em vez de
+     empilhar uma embaixo da outra. */
+  .pg-modal-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+  .pg-modal-col:last-child { border-left: 1px solid var(--border); padding-left: 24px; }
+  @media (max-width: 720px) {
+    .pg-modal-grid { grid-template-columns: 1fr; }
+    .pg-modal-col:last-child { border-left: none; padding-left: 0; border-top: 1px solid var(--border); padding-top: 16px; }
+  }
 </style>
 </head>
 <body>
@@ -386,6 +447,8 @@
     <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="8" cy="9" r="3"/><circle cx="17" cy="9" r="3"/><path d="M2 20c0-3.3 2.7-6 6-6s6 2.7 6 6M12 20c0-3.3 2.7-6 6-6"/></svg></span>
     Grupos de Fornecedores
   </div>
+
+  <div class="sidebar-brand-footer"><img src="/img/kota-wordmark.png" alt="kota"></div>
 
   <div class="sidebar-account">
     <button class="account-trigger" onclick="toggleAccountMenu(event)">
@@ -689,7 +752,7 @@
         <div><label>Grupo (opcional)</label><select id="import-group"><option value="">— definir depois —</option></select></div>
         <div><label>Prazo de expiração (opcional)</label>
           <div style="display:flex; gap:6px">
-            <input type="datetime-local" id="import-expiration" style="flex:1" onchange="confirmExpirationField('import-expiration')">
+            <input type="datetime-local" id="import-expiration" step="3600" style="flex:1" onchange="confirmExpirationField('import-expiration')">
             <button type="button" class="secondary small" onclick="confirmExpirationField('import-expiration')">OK</button>
           </div>
         </div>
@@ -714,7 +777,7 @@
         <div><label>Grupo (opcional)</label><select id="mq-group"><option value="">— definir depois —</option></select></div>
         <div><label>Prazo de expiração (opcional)</label>
           <div style="display:flex; gap:6px">
-            <input type="datetime-local" id="mq-expiration" style="flex:1" onchange="confirmExpirationField('mq-expiration')">
+            <input type="datetime-local" id="mq-expiration" step="3600" style="flex:1" onchange="confirmExpirationField('mq-expiration')">
             <button type="button" class="secondary small" onclick="confirmExpirationField('mq-expiration')">OK</button>
           </div>
         </div>
@@ -759,13 +822,13 @@
 
     <div class="card">
       <h2>Filtros</h2>
-      <div class="inline-form">
-        <div><label>De</label><input type="date" id="report-from"></div>
-        <div><label>Até</label><input type="date" id="report-to"></div>
-        <div><label>Fornecedor</label><select id="report-supplier"><option value="">Todos</option></select></div>
-        <div><label>Representante</label><select id="report-representative"><option value="">Todos</option></select></div>
-        <div><label>Produto</label><input type="text" id="report-product" placeholder="Buscar por nome..."></div>
-        <div><label>Mostrar</label><select id="report-mode">
+      <div class="inline-form report-filters">
+        <div style="width:150px"><label>De</label><input type="date" id="report-from"></div>
+        <div style="width:150px"><label>Até</label><input type="date" id="report-to"></div>
+        <div style="width:180px"><label>Fornecedor</label><select id="report-supplier"><option value="">Todos</option></select></div>
+        <div style="width:180px"><label>Representante</label><select id="report-representative"><option value="">Todos</option></select></div>
+        <div style="flex:1; min-width:180px"><label>Produto</label><input type="text" id="report-product" placeholder="Buscar por nome..."></div>
+        <div style="width:190px"><label>Mostrar</label><select id="report-mode">
           <option value="winners">Só o que ganhou</option>
           <option value="all">Todos os lances enviados</option>
         </select></div>
@@ -782,7 +845,7 @@
       <div class="subtitle" id="report-summary" style="margin-bottom:12px">Configure os filtros acima e clique em "Gerar Relatório".</div>
       <table id="report-table" style="display:none"><thead><tr>
         <th>Nº da Cotação</th><th>Nome</th><th>Fechada em</th><th>Fornecedor</th><th>Representante</th>
-        <th>Total da Cotação (R$)</th><th>Resultado</th><th>Pedido</th><th></th>
+        <th>Total (R$)</th><th>Resultado</th><th>Pedido</th><th></th>
       </tr></thead>
         <tbody id="report-tbody"></tbody></table>
       <div class="btn-row" id="report-pagination" style="justify-content:space-between; margin-top:10px; display:none">
@@ -2342,40 +2405,44 @@ async function openProductGroupMembersModal(groupId) {
 
   openModal2(`
     <h2>Produtos do grupo "${escapeHtml(group.name)}"</h2>
-    <div class="subtitle" style="margin-bottom:16px">Busque por código de barras ou nome — marque um ou mais e adicione de uma vez.</div>
+    <div class="subtitle" style="margin-bottom:14px">Busque por código de barras ou nome — marque um ou mais e adicione de uma vez.</div>
 
-    <div style="position:relative; margin-bottom:12px">
-      <label>Adicionar produto</label>
-      <input type="text" id="pg-add-search" placeholder="Digite o código de barras ou o nome..." autocomplete="off"
-        oninput="searchProductForGroup()">
-    </div>
+    <div class="pg-modal-grid">
+      <div class="pg-modal-col">
+        <div style="position:relative; margin-bottom:10px">
+          <label>Adicionar produto</label>
+          <input type="text" id="pg-add-search" placeholder="Digite o código de barras ou o nome..." autocomplete="off"
+            oninput="searchProductForGroup()">
+        </div>
 
-    <label id="pg-select-all-wrap" style="display:none; align-items:center; gap:8px; margin-bottom:8px; font-size:12.5px; color:var(--text-dim); cursor:pointer">
-      <input type="checkbox" id="pg-select-all" style="width:auto" onchange="toggleSelectAllOnPage(this.checked)">
-      Marcar todos desta página
-    </label>
-    <div id="pg-add-search-results"></div>
-    <div class="btn-row" id="pg-search-pagination" style="justify-content:space-between; margin-top:8px; display:none">
-      <div style="color:var(--text-dim); font-size:12px" id="pg-search-page-info">—</div>
-      <div class="btn-row">
-        <button class="secondary small" onclick="changePgSearchPage(-1)" id="pg-search-prev-btn">← Anterior</button>
-        <button class="secondary small" onclick="changePgSearchPage(1)" id="pg-search-next-btn">Próxima →</button>
+        <label id="pg-select-all-wrap" style="display:none; align-items:center; gap:8px; margin-bottom:7px; font-size:12px; color:var(--text-dim); cursor:pointer">
+          <input type="checkbox" id="pg-select-all" style="width:auto" onchange="toggleSelectAllOnPage(this.checked)">
+          Marcar todos desta página
+        </label>
+        <div id="pg-add-search-results" class="scroll-box"></div>
+        <div class="btn-row" id="pg-search-pagination" style="justify-content:space-between; margin-top:8px; display:none">
+          <div style="color:var(--text-dim); font-size:12px" id="pg-search-page-info">—</div>
+          <div class="btn-row">
+            <button class="secondary small" onclick="changePgSearchPage(-1)" id="pg-search-prev-btn">← Anterior</button>
+            <button class="secondary small" onclick="changePgSearchPage(1)" id="pg-search-next-btn">Próxima →</button>
+          </div>
+        </div>
+        <div class="btn-row" style="margin-top:10px">
+          <button id="pg-add-selected-btn" onclick="addSelectedProductsToGroup()" style="display:none">Adicionar selecionados</button>
+        </div>
+      </div>
+
+      <div class="pg-modal-col">
+        <h3 id="product-group-members-title" style="margin-top:0">Produtos no grupo</h3>
+        <div id="product-group-members-list" class="scroll-box">Carregando...</div>
+        ${paginationControlsHtml('pg-members')}
       </div>
     </div>
-    <div class="btn-row" style="margin-top:10px; margin-bottom:20px">
-      <button id="pg-add-selected-btn" onclick="addSelectedProductsToGroup()" style="display:none">Adicionar selecionados</button>
-    </div>
-
-    <hr class="divider">
-
-    <h3 id="product-group-members-title" style="margin-top:14px">Produtos no grupo</h3>
-    <div id="product-group-members-list">Carregando...</div>
-    ${paginationControlsHtml('pg-members')}
 
     <div class="btn-row" style="margin-top:16px">
       <button class="secondary" onclick="closeModal2()">Fechar</button>
     </div>
-  `);
+  `, true);
   await refreshProductGroupMembersModal(groupId);
 }
 
@@ -2388,7 +2455,9 @@ async function refreshProductGroupMembersModal(groupId) {
   const titleEl = document.getElementById('product-group-members-title');
   if (titleEl) titleEl.textContent = `Produtos no grupo (${members.length})`;
 
-  const { items, page, totalPages } = paginateSlice(members, pgMembersPage, DEFAULT_PAGE_SIZE);
+  // Página menor (6, não o DEFAULT_PAGE_SIZE global de 10) só nesse modal — precisa
+  // caber sem rolagem dentro da janela de altura fixa, ver .pg-modal-col no CSS.
+  const { items, page, totalPages } = paginateSlice(members, pgMembersPage, 6);
   pgMembersPage = page;
 
   const listEl = document.getElementById('product-group-members-list');
@@ -2417,7 +2486,7 @@ let pgCurrentGroupId = null;
 let pgSearchMatches = [];
 let pgSearchPage = 0;
 let pgSelectedIds = new Set();
-const PG_SEARCH_PAGE_SIZE = 10;
+const PG_SEARCH_PAGE_SIZE = 6;
 
 function searchProductForGroup() {
   const term = document.getElementById('pg-add-search').value.trim().toLowerCase();
@@ -2917,6 +2986,8 @@ async function abrirDetalheCotacao(id) {
   closeState = { tieBreakWinners: {}, excludedSupplierIds: [], acceptedViolationSupplierIds: [] };
 
   openModal(`
+    <div class="qd-modal-body">
+    <div class="qd-modal-top">
     <h2 id="qd-title">Detalhe da cotação</h2>
 
     <div class="qd-info-bar" id="qd-info-bar"></div>
@@ -2925,7 +2996,7 @@ async function abrirDetalheCotacao(id) {
     <div class="inline-form">
       <div><label>Nome</label><input id="qd-name" placeholder="Ex: Cotação de Bebidas"></div>
       <div><label>Grupo</label><select id="qd-group"></select></div>
-      <div><label>Prazo de expiração</label><input type="datetime-local" id="qd-expiration"></div>
+      <div><label>Prazo de expiração</label><input type="datetime-local" id="qd-expiration" step="3600"></div>
       <div style="width:170px"><label>Projeção de venda padrão (dias)</label><input type="number" min="1" step="1" id="qd-sales-projection" placeholder="Ex: 30"></div>
       <button id="qd-save-btn" onclick="updateQuotation()">Salvar edição</button>
       <button id="qd-group-suppliers-btn" class="secondary" onclick="manageQdGroupSuppliers()">Fornecedores do Grupo</button>
@@ -2935,8 +3006,9 @@ async function abrirDetalheCotacao(id) {
       <button id="qd-publish-btn" class="success" onclick="publishQuotation()">Publicar (Rascunho → Disponível)</button>
       <button id="qd-close-btn" class="secondary" onclick="closeQuotation()">Fechar (calcular vencedores)</button>
       <button id="qd-whatsapp-btn" class="secondary" onclick="copyPublishMessage(this)" style="display:none">Copiar mensagem para WhatsApp</button>
+      <button id="qd-response-status-btn" class="secondary" onclick="openRepresentativeStatusModal()" style="display:none">Ver quem já respondeu</button>
       <button id="qd-review-bids-btn" class="secondary" onclick="openReviewBidsModal()" style="display:none">Revisar Cotações Enviadas</button>
-      <button id="qd-confirm-close-btn" class="success" onclick="confirmCloseQuotation()" style="display:none">Confirmar Fechamento (gerar PDF)</button>
+      <button id="qd-confirm-close-btn" class="success" onclick="confirmCloseQuotation(this)" style="display:none">Confirmar Fechamento (gerar PDF)</button>
       <button id="qd-pdf-link" class="secondary" style="display:none" onclick="downloadPdfWithAuth('/quotations/' + currentQuotationId + '/result-pdf', 'cotacao-' + currentQuotationId + '.pdf')">Baixar PDF do resultado</button>
       <button id="qd-duplicate-btn" class="secondary" style="display:none" onclick="duplicateQuotation()">Gerar Outra Cotação</button>
       <button id="qd-delete-btn" class="danger" style="display:none" onclick="deleteQuotationFromModal()">Excluir Cotação</button>
@@ -2961,18 +3033,23 @@ async function abrirDetalheCotacao(id) {
       <div id="qd-new-item-search-results"></div>
       <hr class="divider">
     </div>
+    </div>
 
-    <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:12px">
-      <h3 style="margin:0; font-size:14.5px; font-weight:600">Itens do lote</h3>
-      <div style="position:relative; width:220px">
-        <svg style="position:absolute; left:9px; top:50%; transform:translateY(-50%); width:14px; height:14px; opacity:0.5; pointer-events:none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
-        <input id="qd-items-filter" placeholder="Buscar nos itens..." oninput="filterQdItemsTable()" style="padding-left:30px">
+    <div class="qd-modal-items-area">
+      <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:12px">
+        <h3 style="margin:0; font-size:14.5px; font-weight:600">Itens do lote</h3>
+        <div style="position:relative; width:220px">
+          <svg style="position:absolute; left:9px; top:50%; transform:translateY(-50%); width:14px; height:14px; opacity:0.5; pointer-events:none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+          <input id="qd-items-filter" placeholder="Buscar nos itens..." oninput="filterQdItemsTable()" style="padding-left:30px">
+        </div>
+      </div>
+      <div class="qd-items-table-wrap">
+        <table class="qd-items-table"><thead><tr id="qd-items-thead"></tr></thead>
+          <tbody id="qd-items-tbody"></tbody></table>
       </div>
     </div>
-    <div class="qd-items-table-wrap">
-      <table class="qd-items-table"><thead><tr id="qd-items-thead"></tr></thead>
-        <tbody id="qd-items-tbody"></tbody></table>
-    </div>
+
+    <div class="qd-modal-footer">
     <div class="btn-row" id="qd-items-pagination" style="justify-content:space-between; margin-top:10px">
       <div style="color:var(--text-dim); font-size:12px" id="qd-items-page-info">—</div>
       <div class="btn-row">
@@ -2986,6 +3063,8 @@ async function abrirDetalheCotacao(id) {
 
     <div class="btn-row" style="justify-content:flex-start; margin-top:20px">
       <button class="secondary" onclick="closeModal()">Fechar</button>
+    </div>
+    </div>
     </div>
   `, true);
 
@@ -3105,6 +3184,7 @@ function applyQdEditLock(status) {
   document.getElementById('qd-publish-btn').disabled = !isDraft;
   document.getElementById('qd-close-btn').style.display = canClose ? 'inline-block' : 'none';
   document.getElementById('qd-whatsapp-btn').style.display = status === 'AVAILABLE' ? 'inline-block' : 'none';
+  document.getElementById('qd-response-status-btn').style.display = !isDraft ? 'inline-block' : 'none';
   document.getElementById('qd-review-bids-btn').style.display = isReviewing ? 'inline-block' : 'none';
   document.getElementById('qd-confirm-close-btn').style.display = isReviewing ? 'inline-block' : 'none';
   document.getElementById('qd-duplicate-btn').style.display = isExpired ? 'inline-block' : 'none';
@@ -3115,7 +3195,7 @@ let qdCurrentItems = [];
 let qdCurrentItemsIsDraft = false;
 let qdItemsPage = 0;
 let qdPendingQuantityEdits = {};
-const QD_ITEMS_PAGE_SIZE = 10;
+const QD_ITEMS_PAGE_SIZE = 6;
 
 async function loadQuotationItemsDetail(id, status) {
   const items = await safeCall(() => api('GET', `/quotations/${id}/items`));
@@ -3164,7 +3244,10 @@ function renderQdFulfillmentIssues(items, status) {
       <div style="font-weight:700; color:var(--warning); font-size:13px">Sem nenhum lance (${noWinnerItems.length})</div>
       <div style="font-size:12px; color:var(--text-dim); margin-bottom:6px">Nenhum representante ofertou esses produtos — a cotação fechou sem vencedor pra eles.</div>
       <ul style="margin:0 0 8px; padding-left:18px; font-size:13px">${noWinnerItems.map(itemLine).join('')}</ul>
-      <button class="secondary small" onclick="duplicateUnquotedItems()">Gerar Outra Cotação</button>
+      <div class="btn-row">
+        <button class="secondary small" onclick="duplicateUnquotedItems()">Gerar Outra Cotação</button>
+        <button class="secondary small" id="qd-add-to-existing-btn" style="display:none" onclick="openAddUnquotedToExistingModal()">Adicionar a uma cotação existente</button>
+      </div>
     </div>` : '';
 
   const cutBlock = cutItems.length ? `
@@ -3181,6 +3264,65 @@ function renderQdFulfillmentIssues(items, status) {
       ${noWinnerBlock}
       ${cutBlock}
     </div>`;
+
+  if (noWinnerItems.length) checkDraftQuotationsForAddButton();
+}
+
+// Botão "Adicionar a uma cotação existente" só aparece se houver pelo menos um
+// Rascunho pra receber os itens — busca à parte pra não travar a renderização do
+// painel de atenção esperando essa checagem.
+async function checkDraftQuotationsForAddButton() {
+  const all = await safeCall(() => api('GET', '/quotations'));
+  const hasDraft = all.some(q => q.status === 'DRAFT' && q.id !== currentQuotationId);
+  const btn = document.getElementById('qd-add-to-existing-btn');
+  if (btn) btn.style.display = hasDraft ? 'inline-block' : 'none';
+}
+
+// Modal simples: escolhe um Rascunho existente e adiciona os itens sem lance um a um
+// (não existe endpoint de lote pra isso — POST /quotations/{id}/items já é o suficiente
+// pra uma lista curta de itens "sobrando", sem precisar criar um endpoint novo só pra isso).
+async function openAddUnquotedToExistingModal() {
+  const noWinnerItems = qdCurrentItems.filter(i => !i.winningBidId);
+  const all = await safeCall(() => api('GET', '/quotations'));
+  const drafts = all.filter(q => q.status === 'DRAFT' && q.id !== currentQuotationId);
+
+  openModal2(`
+    <h2>Adicionar a uma cotação existente</h2>
+    <div class="subtitle" style="margin-bottom:14px">Os ${noWinnerItems.length} produtos sem lance dessa cotação serão adicionados ao Rascunho escolhido.</div>
+    <label>Cotação em Rascunho</label>
+    <select id="add-unquoted-target">
+      ${drafts.map(q => `<option value="${q.id}">${escapeHtml(q.name)} (Nº ${formatQuotationNumber(q.id)})</option>`).join('')}
+    </select>
+    <div class="btn-row" style="margin-top:16px; justify-content:space-between">
+      <button class="secondary" onclick="closeModal2()">Cancelar</button>
+      <button id="add-unquoted-confirm-btn" onclick="confirmAddUnquotedToExisting()">Adicionar</button>
+    </div>
+  `);
+}
+
+async function confirmAddUnquotedToExisting() {
+  const targetId = document.getElementById('add-unquoted-target').value;
+  const noWinnerItems = qdCurrentItems.filter(i => !i.winningBidId);
+  const btn = document.getElementById('add-unquoted-confirm-btn');
+  btn.disabled = true;
+
+  let added = 0;
+  let failed = 0;
+  for (const item of noWinnerItems) {
+    try {
+      await api('POST', `/quotations/${targetId}/items`, { productId: item.productId, quantity: item.quantity });
+      added++;
+    } catch (e) {
+      failed++;
+    }
+  }
+
+  if (failed) {
+    toast(`${added} adicionado${added !== 1 ? 's' : ''}, ${failed} falhou/falharam (já deve existir nesse rascunho).`, true);
+  } else {
+    toast(`${added} produto${added !== 1 ? 's' : ''} adicionado${added !== 1 ? 's' : ''} à cotação escolhida.`);
+  }
+  closeModal2();
 }
 
 // Revisão em modal separado (segunda camada), sob demanda — só busca lances quando o
@@ -3188,6 +3330,85 @@ function renderQdFulfillmentIssues(items, status) {
 // no dropdown. Com cotações grandes (centenas de itens, várias dezenas de fornecedores),
 // montar tudo de uma vez travaria a tela — assim o custo fica limitado a quem está selecionado.
 let qdReviewBidGroups = new Map();
+
+// Selo de status por representante — mesma paleta usada no resto do sistema pra cada
+// situação (verde=feito, âmbar=atenção/pendente, cinza=neutro/declinado).
+function repResponseStatusBadge(status) {
+  if (status === 'SUBMITTED') return '<span class="badge badge-available">Enviou lance</span>';
+  if (status === 'DECLINED') return '<span class="badge badge-draft">Não cotar</span>';
+  return '<span class="badge badge-reviewing">Pendente</span>';
+}
+
+async function openRepresentativeStatusModal() {
+  const rows = await safeCall(() => api('GET', `/quotations/${currentQuotationId}/representative-status`));
+
+  const rowsHtml = rows.length
+    ? rows.map(r => `
+        <tr>
+          <td>${escapeHtml(r.representativeName)}</td>
+          <td>${escapeHtml(r.supplierName)}</td>
+          <td>${repResponseStatusBadge(r.status)}</td>
+          <td>${r.status === 'SUBMITTED'
+            ? `<button class="secondary small" onclick="viewRepresentativeBids(${r.representativeId}, '${escapeHtml(r.representativeName).replace(/'/g, "\\'")}')">Ver</button>`
+            : ''}</td>
+        </tr>`).join('')
+    : '';
+
+  const pendingCount = rows.filter(r => r.status === 'PENDING').length;
+
+  openModal2(`
+    <h2>Quem já respondeu</h2>
+    <div class="subtitle" style="margin-bottom:14px">
+      ${rows.length
+        ? `${rows.length - pendingCount} de ${rows.length} representante${rows.length > 1 ? 's' : ''} do grupo já responderam${pendingCount ? ` — ${pendingCount} ainda ${pendingCount > 1 ? 'faltam' : 'falta'}` : ''}.`
+        : 'Essa cotação não tem grupo de fornecedores definido, ou nenhum fornecedor do grupo tem representante vinculado.'}
+    </div>
+    ${rows.length ? `
+      <div class="scroll-box">
+        <table><thead><tr><th>Representante</th><th>Fornecedor</th><th>Status</th><th></th></tr></thead>
+          <tbody>${rowsHtml}</tbody></table>
+      </div>` : ''}
+    <div class="btn-row" style="margin-top:16px">
+      <button class="secondary" onclick="closeModal2()">Fechar</button>
+    </div>
+  `);
+}
+
+// Reaproveita GET /bids?quotationItemId=X (já usado na Revisão de Lances) — cruza com
+// os itens da cotação e filtra só as linhas desse representante. É só leitura (sem
+// editar preço/quantidade nem marcar vencedor), diferente do modal de Revisar Lances.
+async function viewRepresentativeBids(representativeId, representativeName) {
+  const perItem = await Promise.all(qdCurrentItems.map(item =>
+    safeCall(() => api('GET', `/bids?quotationItemId=${item.id}`)).then(bids => ({ item, bids }))
+  ));
+
+  const entries = [];
+  perItem.forEach(({ item, bids }) => {
+    const bid = bids.find(b => b.submittedById === representativeId);
+    if (bid) entries.push({ item, bid });
+  });
+
+  const rowsHtml = entries.map(({ item, bid }) => `
+    <tr>
+      <td class="mono">${item.productBarcode}</td>
+      <td>${escapeHtml(item.productName)}</td>
+      <td style="text-align:center">${item.quantity}</td>
+      <td style="text-align:right">R$ ${formatCurrencyFromNumber(bid.value)}</td>
+    </tr>`).join('');
+
+  openModal2(`
+    <h2>Itens enviados por ${escapeHtml(representativeName)}</h2>
+    <div class="subtitle" style="margin-bottom:14px">${entries.length} ${entries.length === 1 ? 'item cotado' : 'itens cotados'} nessa cotação.</div>
+    <div class="scroll-box">
+      <table><thead><tr><th>Cód. de Barras</th><th>Produto</th><th style="text-align:center">Qtd.</th><th style="text-align:right">Preço (R$)</th></tr></thead>
+        <tbody>${rowsHtml || '<tr><td colspan="4" class="empty">Nenhum item encontrado.</td></tr>'}</tbody></table>
+    </div>
+    <div class="btn-row" style="margin-top:16px; justify-content:space-between">
+      <button class="secondary" onclick="openRepresentativeStatusModal()">← Voltar</button>
+      <button class="secondary" onclick="closeModal2()">Fechar</button>
+    </div>
+  `);
+}
 
 async function openReviewBidsModal() {
   openModal2(`
@@ -3903,9 +4124,12 @@ async function closeQuotation() {
   renderCloseFlow(result);
 }
 
-async function confirmCloseQuotation() {
-  if (!confirm('Confirmar o fechamento definitivo? Depois disso não dá mais pra editar os itens, e o PDF do resultado fica disponível.')) return;
-  await attemptConfirmClose();
+async function confirmCloseQuotation(anchorEl) {
+  showConfirmPopover(
+    anchorEl,
+    'Confirmar o fechamento definitivo? Depois disso não dá mais pra editar os itens, e o PDF do resultado fica disponível.',
+    attemptConfirmClose
+  );
 }
 
 async function attemptConfirmClose() {
