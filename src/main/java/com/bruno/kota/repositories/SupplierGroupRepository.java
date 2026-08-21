@@ -16,4 +16,7 @@ public interface SupplierGroupRepository extends JpaRepository<SupplierGroup, Lo
 
     @Query(value = "SELECT * FROM supplier_groups WHERE id = :id", nativeQuery = true)
     Optional<SupplierGroup> findByIdIncludingDeleted(@Param("id") Long id);
+
+    @Query(value = "SELECT * FROM supplier_groups WHERE deleted = true", nativeQuery = true)
+    java.util.List<SupplierGroup> findAllInactive();
 }

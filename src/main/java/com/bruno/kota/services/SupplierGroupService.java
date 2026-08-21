@@ -26,6 +26,13 @@ public class SupplierGroupService {
     }
 
     @Transactional(readOnly = true)
+    public List<SupplierGroupResponse> findAllInactive() {
+        return supplierGroupRepository.findAllInactive().stream()
+                .map(this::toResponse)
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
     public SupplierGroupResponse findById(Long id) {
         return toResponse(findEntityById(id));
     }

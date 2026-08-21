@@ -206,7 +206,7 @@ public class QuotationImportService {
     }
 
     private QuotationResponse toQuotationResponse(Quotation quotation) {
-        SupplierGroup group = quotation.getSupplierGroup();
+        SupplierGroup group = safeGetSupplierGroup(quotation);
         return new QuotationResponse(
                 quotation.getId(),
                 quotation.getName(),
@@ -219,5 +219,17 @@ public class QuotationImportService {
                 quotation.getUpdatedAt(),
                 quotation.getDefaultSalesProjectionDays()
         );
+    }
+
+    // O SupplierGroup tem @SQLRestriction("deleted = false"), que filtra a linha até na
+    // hora de resolver a referência preguiçosa (lazy) vinda de uma Quotation antiga. Se
+    // o grupo dessa cotação foi desativado nesse meio-tempo, trata como "sem grupo" pra
+    // exibição, em vez de derrubar a importação inteira.
+    private SupplierGroup safeGetSupplierGroup(Quotation quotation) {
+        try {
+            return quotation.getSupplierGroup();
+        } catch (jakarta.persistence.EntityNotFoundException e) {
+            return null;
+        }
     }
 }

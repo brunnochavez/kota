@@ -147,9 +147,22 @@ public class BidService {
     }
 
     private void validateGroupAccess(QuotationItem quotationItem, Supplier supplier) {
-        SupplierGroup group = quotationItem.getQuotation().getSupplierGroup();
+        SupplierGroup group = safeGetSupplierGroup(quotationItem.getQuotation());
         if (group == null || !supplier.getGroups().contains(group)) {
             throw new BusinessRuleException("Este fornecedor não pertence ao grupo autorizado a responder esta cotação.");
+        }
+    }
+
+    // O SupplierGroup tem @SQLRestriction("deleted = false"), que filtra a linha até na
+    // hora de resolver a referência preguiçosa (lazy) vinda de uma Quotation antiga. Se
+    // o grupo dessa cotação foi desativado nesse meio-tempo, trata como "sem grupo" —
+    // o resultado prático é bloquear o lance com a mensagem de negócio de cima, em vez
+    // de uma exceção não tratada.
+    private SupplierGroup safeGetSupplierGroup(Quotation quotation) {
+        try {
+            return quotation.getSupplierGroup();
+        } catch (jakarta.persistence.EntityNotFoundException e) {
+            return null;
         }
     }
 

@@ -162,7 +162,7 @@ public class QuotationService {
     private QuotationResponse duplicateInternal(Quotation original, List<QuotationItem> itemsToClone, String nameSuffix) {
         Quotation copy = Quotation.builder()
                 .name(original.getName() + nameSuffix)
-                .supplierGroup(original.getSupplierGroup())
+                .supplierGroup(safeGetSupplierGroup(original))
                 .defaultSalesProjectionDays(original.getDefaultSalesProjectionDays())
                 .build();
         copy = quotationRepository.save(copy);
@@ -226,7 +226,7 @@ public class QuotationService {
         if (quotation.getStatus() != QuotationStatus.DRAFT) {
             throw new BusinessRuleException("Só é possível publicar uma cotação que esteja em DRAFT.");
         }
-        if (quotation.getSupplierGroup() == null) {
+        if (safeGetSupplierGroup(quotation) == null) {
             throw new BusinessRuleException("Defina o grupo de fornecedores antes de publicar.");
         }
         if (quotation.getExpirationDate() == null) {
@@ -247,7 +247,7 @@ public class QuotationService {
     // getRepresentativeResponseStatus. EmailService já garante internamente que uma
     // falha de envio não propaga — a publicação em si nunca é derrubada por causa disso.
     private void notifyEligibleRepresentativesOfPublish(Quotation quotation) {
-        SupplierGroup group = quotation.getSupplierGroup();
+        SupplierGroup group = safeGetSupplierGroup(quotation);
         if (group == null) {
             return;
         }
@@ -472,7 +472,7 @@ public class QuotationService {
     // não — é o que foi combinado. "Elegível" continua sendo a mesma definição de
     // sempre: dono de um fornecedor que pertence ao grupo dessa cotação.
     private void notifyEligibleRepresentativesOfClose(Quotation quotation, List<QuotationItem> items) {
-        SupplierGroup group = quotation.getSupplierGroup();
+        SupplierGroup group = safeGetSupplierGroup(quotation);
         if (group == null) {
             return;
         }
@@ -710,7 +710,7 @@ public class QuotationService {
         List<QuotationFillRate> rates = new ArrayList<>();
 
         for (Quotation quotation : available) {
-            SupplierGroup group = quotation.getSupplierGroup();
+            SupplierGroup group = safeGetSupplierGroup(quotation);
             if (group == null) {
                 continue;
             }
@@ -760,7 +760,7 @@ public class QuotationService {
     // explícito — é isso que precisa bater, não só quem digitou.
     public List<RepresentativeResponseStatus> getRepresentativeResponseStatus(Long quotationId) {
         Quotation quotation = findEntityById(quotationId);
-        SupplierGroup group = quotation.getSupplierGroup();
+        SupplierGroup group = safeGetSupplierGroup(quotation);
         if (group == null) {
             return List.of();
         }
@@ -966,7 +966,10 @@ public class QuotationService {
         Set<Long> myGroupIds = supplier.getGroups().stream().map(SupplierGroup::getId).collect(Collectors.toSet());
         List<Quotation> published = quotationRepository.findAll().stream()
                 .filter(q -> q.getStatus() != QuotationStatus.DRAFT)
-                .filter(q -> q.getSupplierGroup() != null && myGroupIds.contains(q.getSupplierGroup().getId()))
+                .filter(q -> {
+                    SupplierGroup group = safeGetSupplierGroup(q);
+                    return group != null && myGroupIds.contains(group.getId());
+                })
                 .filter(q -> q.getPublishedAt() != null && q.getPublishedAt().isAfter(performanceCutoff))
                 .toList();
 
@@ -1263,7 +1266,7 @@ public class QuotationService {
     }
 
     private QuotationResponse toResponse(Quotation quotation) {
-        SupplierGroup group = quotation.getSupplierGroup();
+        SupplierGroup group = safeGetSupplierGroup(quotation);
         return new QuotationResponse(
                 quotation.getId(),
                 quotation.getName(),
@@ -1276,6 +1279,21 @@ public class QuotationService {
                 quotation.getUpdatedAt(),
                 quotation.getDefaultSalesProjectionDays()
         );
+    }
+
+    // O SupplierGroup tem @SQLRestriction("deleted = false"), que filtra a linha até na
+    // hora de resolver a referência preguiçosa (lazy) vinda de uma Quotation antiga —
+    // não só nas listagens normais. Isso significa que, se o grupo de uma cotação for
+    // desativado depois que ela já existia, quotation.getSupplierGroup() lança
+    // EntityNotFoundException em vez de simplesmente não achar nada. Em todo lugar
+    // abaixo que só precisa LER o grupo (exibir nome, checar elegibilidade, notificar),
+    // trata esse caso como "sem grupo" em vez de derrubar a operação inteira.
+    private SupplierGroup safeGetSupplierGroup(Quotation quotation) {
+        try {
+            return quotation.getSupplierGroup();
+        } catch (jakarta.persistence.EntityNotFoundException e) {
+            return null;
+        }
     }
 
     private QuotationItemResponse toItemResponse(QuotationItem item) {

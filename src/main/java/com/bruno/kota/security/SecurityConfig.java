@@ -49,7 +49,7 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf.disable())
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/", "/*.html", "/favicon.ico", "/img/**", "/auth/login", "/company-settings/logo").permitAll()
+                        .requestMatchers("/", "/*.html", "/favicon.ico", "/img/**", "/js/**", "/auth/login", "/company-settings/logo").permitAll()
                         .requestMatchers(org.springframework.http.HttpMethod.GET, "/company-settings").permitAll()
                         .anyRequest().authenticated()
                 )

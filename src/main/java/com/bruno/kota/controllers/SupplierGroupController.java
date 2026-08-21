@@ -33,6 +33,12 @@ public class SupplierGroupController {
         return supplierGroupService.findAll();
     }
 
+    @GetMapping("/inactive")
+    @PreAuthorize("hasRole('ADMIN')")
+    public List<SupplierGroupResponse> findAllInactive() {
+        return supplierGroupService.findAllInactive();
+    }
+
     @GetMapping("/{id}")
     public SupplierGroupResponse findById(@PathVariable Long id) {
         return supplierGroupService.findById(id);
