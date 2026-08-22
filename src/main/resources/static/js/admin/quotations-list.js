@@ -11,8 +11,16 @@ const STATUS_LABELS = { DRAFT: 'Rascunho', AVAILABLE: 'Disponível', REVIEWING: 
 const STATUS_LABELS_PLURAL = { DRAFT: 'Rascunhos', AVAILABLE: 'Disponíveis', REVIEWING: 'Em Revisão', CLOSED: 'Fechadas', EXPIRED: 'Expiradas' };
 const STATUS_CLASSES = { DRAFT: 'draft', AVAILABLE: 'available', REVIEWING: 'reviewing', CLOSED: 'closed', EXPIRED: 'expired' };
 
-function statusBadge(status) {
-  return `<span class="badge badge-${STATUS_CLASSES[status] || 'draft'}">${STATUS_LABELS[status] || status}</span>`;
+// Recebe a cotação inteira (não só o status) porque EXPIRED precisa saber se já tem
+// lance registrado — uma cotação expirada SEM ninguém ter respondido é "Expirada" de
+// verdade (vermelho, nada a fazer); uma que expirou COM lances pendentes ainda dá pra
+// fechar e calcular vencedores, então usa o mesmo tom âmbar de "Em Revisão" em vez do
+// vermelho, que sugeria erro/falha onde na verdade só falta um clique em "Fechar".
+function statusBadge(q) {
+  if (q.status === 'EXPIRED' && q.hasBids) {
+    return `<span class="badge badge-reviewing">Aguardando fechamento</span>`;
+  }
+  return `<span class="badge badge-${STATUS_CLASSES[q.status] || 'draft'}">${STATUS_LABELS[q.status] || q.status}</span>`;
 }
 
 let quotationFillRates = new Map();
@@ -60,7 +68,7 @@ function renderQuotationsList() {
     const deleteBtn = q.status === 'DRAFT'
       ? `<button class="danger small" onclick="deleteQuotationFromList(${q.id}, this)">Excluir</button>`
       : '';
-    tr.innerHTML = `<td>${q.id}</td><td>${q.name}</td><td>${statusBadge(q.status)}</td>
+    tr.innerHTML = `<td>${q.id}</td><td>${q.name}</td><td>${statusBadge(q)}</td>
       <td>${q.supplierGroupName || '—'}</td><td>${fmtDate(q.expirationDate)}</td>
       <td class="btn-row"><button class="secondary small" onclick="abrirDetalheCotacao(${q.id})">Ver Detalhe</button>${deleteBtn}</td>`;
     tbody.appendChild(tr);

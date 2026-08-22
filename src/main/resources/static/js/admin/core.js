@@ -25,7 +25,7 @@ function toast(msg, isErr) {
 }
 
 async function api(method, path, body, isFormData) {
-  const token = localStorage.getItem('kota-token');
+  const token = sessionStorage.getItem('kota-token');
   const opts = { method, headers: {} };
   if (token) opts.headers['Authorization'] = 'Bearer ' + token;
   if (body !== undefined) {
@@ -41,9 +41,9 @@ async function api(method, path, body, isFormData) {
   // Token ausente/expirado/inválido — limpa e manda de volta pro login, sem tentar
   // mostrar um erro genérico pra quem só precisa logar de novo.
   if (res.status === 401) {
-    localStorage.removeItem('kota-token');
-    localStorage.removeItem('kota-role');
-    localStorage.removeItem('kota-name');
+    sessionStorage.removeItem('kota-token');
+    sessionStorage.removeItem('kota-role');
+    sessionStorage.removeItem('kota-name');
     window.location.href = '/login.html';
     throw new Error('Sessão expirada.');
   }
@@ -71,7 +71,7 @@ async function safeCall(fn) {
 // navegador não anexa header customizado numa navegação normal. Por isso todo PDF agora
 // baixa via fetch autenticado, vira blob, e só então dispara o download.
 async function downloadPdfWithAuth(url, filename) {
-  const token = localStorage.getItem('kota-token');
+  const token = sessionStorage.getItem('kota-token');
   const res = await fetch(url, { headers: token ? { 'Authorization': 'Bearer ' + token } : {} });
   if (!res.ok) { toast('Não foi possível baixar o PDF.', true); return; }
   const blob = await res.blob();

@@ -489,7 +489,7 @@ function toast(msg, isErr) {
 }
 
 async function api(method, path, body) {
-  const token = localStorage.getItem('kota-token');
+  const token = sessionStorage.getItem('kota-token');
   const opts = { method, headers: {} };
   if (token) opts.headers['Authorization'] = 'Bearer ' + token;
   if (body !== undefined) {
@@ -499,10 +499,10 @@ async function api(method, path, body) {
   const res = await fetch(API + path, opts);
 
   if (res.status === 401) {
-    localStorage.removeItem('kota-token');
-    localStorage.removeItem('kota-role');
-    localStorage.removeItem('kota-name');
-    localStorage.removeItem('kota-representative-id');
+    sessionStorage.removeItem('kota-token');
+    sessionStorage.removeItem('kota-role');
+    sessionStorage.removeItem('kota-name');
+    sessionStorage.removeItem('kota-representative-id');
     window.location.href = '/login.html';
     throw new Error('Sessão expirada.');
   }
@@ -569,7 +569,7 @@ function buildPdfFilename(quotationName, quotationId) {
 // dos navegadores desktop não suporta, só o texto) — por isso sempre com fallback pra
 // baixar normal, nunca deixando sem nenhuma ação acontecer.
 async function sharePdfOrDownload(url, filename) {
-  const token = localStorage.getItem('kota-token');
+  const token = sessionStorage.getItem('kota-token');
   const res = await fetch(url, { headers: token ? { 'Authorization': 'Bearer ' + token } : {} });
   if (!res.ok) { toast('Não foi possível gerar o PDF.', true); return; }
   const blob = await res.blob();
@@ -696,7 +696,7 @@ let currentQuotationId = null;
 let currentTab = 'available';
 
 async function init() {
-  const token = localStorage.getItem('kota-token');
+  const token = sessionStorage.getItem('kota-token');
   if (!token) { window.location.href = '/login.html'; return; }
 
   ['quote-list', 'fulfillment-pending', 'history-list', 'won-list'].forEach(prefix => {
@@ -706,11 +706,11 @@ async function init() {
   // Essa tela é só pra representante — admin não tem fornecedor nenhum vinculado, então
   // toda a lógica de "qual empresa estou cotizando" quebra em cascata se ele cair aqui
   // (era exatamente o que causava o erro de supplierId nulo).
-  const role = localStorage.getItem('kota-role');
+  const role = sessionStorage.getItem('kota-role');
   if (role === 'ADMIN') { window.location.href = '/admin.html'; return; }
 
-  myRepresentativeId = parseInt(localStorage.getItem('kota-representative-id'));
-  myRepresentativeName = localStorage.getItem('kota-name') || '';
+  myRepresentativeId = parseInt(sessionStorage.getItem('kota-representative-id'));
+  myRepresentativeName = sessionStorage.getItem('kota-name') || '';
   document.getElementById('my-identity').textContent = myRepresentativeName;
   updateAppHeaderHeightVar();
 
@@ -725,7 +725,7 @@ async function init() {
   // vier um, ignora o que estava salvo e abre a cotação. Senão, restaura de onde a
   // página foi atualizada, em vez de sempre voltar pra Disponíveis.
   const params = new URLSearchParams(window.location.search);
-  const savedTab = localStorage.getItem('kota-rep-tab');
+  const savedTab = sessionStorage.getItem('kota-rep-tab');
   const validTabs = ['available', 'history', 'won', 'performance'];
 
   if (!params.get('cotacao') && savedTab && validTabs.includes(savedTab) && savedTab !== 'available') {
@@ -738,11 +738,11 @@ async function init() {
 }
 
 function logout() {
-  localStorage.removeItem('kota-token');
-  localStorage.removeItem('kota-role');
-  localStorage.removeItem('kota-name');
-  localStorage.removeItem('kota-representative-id');
-  localStorage.removeItem('kota-rep-tab');
+  sessionStorage.removeItem('kota-token');
+  sessionStorage.removeItem('kota-role');
+  sessionStorage.removeItem('kota-name');
+  sessionStorage.removeItem('kota-representative-id');
+  sessionStorage.removeItem('kota-rep-tab');
   window.location.href = '/login.html';
 }
 
@@ -1084,7 +1084,7 @@ function goHome() {
 
 function switchTab(tab) {
   currentTab = tab;
-  localStorage.setItem('kota-rep-tab', tab);
+  sessionStorage.setItem('kota-rep-tab', tab);
   closeItemsView(false);
   document.querySelectorAll('.tab-bar button').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));

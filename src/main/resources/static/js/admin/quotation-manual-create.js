@@ -124,10 +124,36 @@ async function addManualGroupRows() {
     : 'Todos os produtos desse grupo já estavam na lista.');
 }
 
+// Monta o fieldMap dinamicamente (diferente do fieldMap fixo que saveWithReactivation usa
+// nas outras telas) porque aqui o número de campos varia — um por item da lista. Resultado:
+// "items[0].quantity" vira uma chave, apontando pro id do input de quantidade daquela linha
+// específica. distributeFieldErrors() (o mesmo helper já usado em Produtos/Fornecedores/
+// Representantes/Grupos) faz o resto: separa a mensagem do backend por campo e mostra cada
+// uma embaixo do input certo.
+function buildMqFieldMap(rows) {
+  const fieldMap = {
+    name: 'mq-name',
+    supplierGroupId: 'mq-group',
+    expirationDate: 'mq-expiration-date',
+    defaultSalesProjectionDays: 'mq-sales-projection'
+  };
+  Array.from(rows).forEach((row, index) => {
+    const id = row.id.replace('mq-item-', '');
+    // productId não tem input visível próprio — quem o usuário vê e preenche é a busca
+    // por texto, então é nela que a mensagem deve aparecer.
+    fieldMap['items[' + index + '].productId'] = 'mq-item-search-' + id;
+    fieldMap['items[' + index + '].quantity'] = 'mq-item-qty-' + id;
+  });
+  return fieldMap;
+}
+
 async function createQuotationManually() {
-  const name = document.getElementById('mq-name').value.trim();
-  if (!name) { toast('Informe um nome para a cotação.', true); return; }
   const rows = document.querySelectorAll('#mq-items .item-row');
+  const fieldMap = buildMqFieldMap(rows);
+  Object.values(fieldMap).forEach(clearFieldError);
+
+  const name = document.getElementById('mq-name').value.trim();
+  if (!name) { showFieldError('mq-name', 'Informe um nome para a cotação.'); return; }
   if (!rows.length) { toast('Adicione pelo menos um item.', true); return; }
   const items = Array.from(rows).map(row => {
     const id = row.id.replace('mq-item-', '');
@@ -139,11 +165,19 @@ async function createQuotationManually() {
   const body = {
     name,
     supplierGroupId: document.getElementById('mq-group').value || null,
-    expirationDate: document.getElementById('mq-expiration').value || null,
+    expirationDate: getExpirationValue('mq-expiration'),
     defaultSalesProjectionDays: document.getElementById('mq-sales-projection').value || null,
     items
   };
-  const q = await safeCall(() => api('POST', '/quotations', body));
+
+  let q;
+  try {
+    q = await api('POST', '/quotations', body);
+  } catch (e) {
+    distributeFieldErrors(e.message, fieldMap);
+    return;
+  }
+
   toast('Cotação #' + q.id + ' criada em DRAFT.');
   document.getElementById('mq-name').value = '';
   document.getElementById('mq-sales-projection').value = '';

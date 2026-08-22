@@ -177,27 +177,30 @@ function toDatetimeLocal(iso) {
   return iso.substring(0, 16);
 }
 
-// O calendário nativo do navegador (datetime-local) não tem um "OK" próprio — some sozinho
-// ao clicar fora, sem confirmação visual. Esse botão só formaliza isso: fecha o campo e
-// mostra o valor escolhido, pra não ficar na dúvida se "pegou" ou não.
-// step="3600" no HTML já pede horário redondo pro navegador, mas o Chrome nem sempre
-// respeita isso na hora de exibir/deixar escolher minuto no seletor nativo — então essa
-// função garante de vez: qualquer minuto/segundo que tenha passado é zerado assim que o
-// campo muda, então mesmo que o seletor deixe escolher errado, o valor final salvo
-// sempre cai numa hora cheia.
-function roundExpirationToHour(inputEl) {
-  if (!inputEl.value) return;
-  const d = new Date(inputEl.value);
-  if (isNaN(d.getTime())) return;
-  d.setMinutes(0, 0, 0);
-  const pad = n => String(n).padStart(2, '0');
-  inputEl.value = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:00`;
+// Junta os dois inputs (data + hora) num datetime-local string ("YYYY-MM-DDTHH:mm"),
+// formato que o backend espera. Prazo é sempre opcional: sem data preenchida, retorna
+// null. Data preenchida sem hora vira 23:59 (fim do dia) — mais intuitivo que forçar
+// escolher hora, e ainda cobre o dia inteiro. Qualquer horário é aceito, sem
+// arredondamento pra hora cheia.
+function getExpirationValue(prefix) {
+  const dateVal = document.getElementById(prefix + '-date').value;
+  if (!dateVal) return null;
+  const timeVal = document.getElementById(prefix + '-time').value || '23:59';
+  return `${dateVal}T${timeVal}`;
 }
 
-function confirmExpirationField(inputId) {
-  const input = document.getElementById(inputId);
-  roundExpirationToHour(input);
-  input.blur();
-  toast(input.value ? `Prazo definido: ${fmtDate(input.value)}` : 'Prazo de expiração limpo.');
+// Preenche os dois inputs a partir de um datetime-local/ISO vindo do backend.
+function setExpirationValue(prefix, isoValue) {
+  const dateInput = document.getElementById(prefix + '-date');
+  const timeInput = document.getElementById(prefix + '-time');
+  if (!isoValue) { dateInput.value = ''; timeInput.value = ''; return; }
+  const [datePart, timePart] = toDatetimeLocal(isoValue).split('T');
+  dateInput.value = datePart;
+  timeInput.value = timePart;
+}
+
+function clearExpirationValue(prefix) {
+  document.getElementById(prefix + '-date').value = '';
+  document.getElementById(prefix + '-time').value = '';
 }
 

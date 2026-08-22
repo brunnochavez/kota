@@ -138,14 +138,23 @@ function selectQdNewItemProduct(productId) {
 }
 
 async function addQuotationItem() {
+  const fieldMap = { productId: 'qd-new-item-search', quantity: 'qd-new-item-qty' };
+  Object.values(fieldMap).forEach(clearFieldError);
+
   const productId = document.getElementById('qd-new-item-product-id').value;
   const quantity = document.getElementById('qd-new-item-qty').value;
-  if (!productId) { toast('Busque e selecione um produto na lista.', true); return; }
-  if (!quantity) { toast('Informe a quantidade.', true); return; }
-  await safeCall(() => api('POST', `/quotations/${currentQuotationId}/items`, {
-    productId: parseInt(productId),
-    quantity: parseFloat(quantity)
-  }));
+  if (!productId) { showFieldError('qd-new-item-search', 'Busque e selecione um produto na lista.'); return; }
+  if (!quantity) { showFieldError('qd-new-item-qty', 'Informe a quantidade.'); return; }
+
+  try {
+    await api('POST', `/quotations/${currentQuotationId}/items`, {
+      productId: parseInt(productId),
+      quantity: parseFloat(quantity)
+    });
+  } catch (e) {
+    distributeFieldErrors(e.message, fieldMap);
+    return;
+  }
   toast('Item adicionado.');
   document.getElementById('qd-new-item-search').value = '';
   document.getElementById('qd-new-item-product-id').value = '';

@@ -21,6 +21,13 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
     @Query("SELECT p FROM Product p WHERE :group MEMBER OF p.groups")
     List<Product> findByGroup(@Param("group") ProductGroup group);
 
+    // Usado pela listagem de Grupos de Produtos — antes, cada grupo disparava um
+    // findByGroup(group).size() próprio (busca as linhas de Product inteiras só pra
+    // contar). Agora é 1 query só, com COUNT de verdade no banco, pra todos os grupos
+    // de uma vez.
+    @Query("SELECT g.id, COUNT(p) FROM Product p JOIN p.groups g WHERE g.id IN :groupIds GROUP BY g.id")
+    List<Object[]> countByGroupIds(@Param("groupIds") List<Long> groupIds);
+
     @Query(value = "SELECT * FROM products WHERE barcode = :barcode", nativeQuery = true)
     Optional<Product> findByBarcodeIncludingDeleted(@Param("barcode") String barcode);
 

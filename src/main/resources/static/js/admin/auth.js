@@ -5,28 +5,28 @@
 // Sem token, nem adianta tentar carregar nada — manda direto pro login antes de
 // disparar qualquer chamada que ia falhar com 401 de qualquer jeito.
 (function checkAuth() {
-  const token = localStorage.getItem('kota-token');
+  const token = sessionStorage.getItem('kota-token');
   if (!token) {
     window.location.href = '/login.html';
     return;
   }
   // Espelho da mesma guarda do representante.html — representante não deve conseguir
   // acessar o painel administrativo direto pela URL.
-  if (localStorage.getItem('kota-role') !== 'ADMIN') {
+  if (sessionStorage.getItem('kota-role') !== 'ADMIN') {
     window.location.href = '/representante.html';
     return;
   }
-  const name = localStorage.getItem('kota-name') || '';
+  const name = sessionStorage.getItem('kota-name') || '';
   document.getElementById('admin-identity').textContent = name;
   document.getElementById('account-avatar').textContent = name.trim().charAt(0).toUpperCase() || 'A';
   applyCompanyBranding();
 })();
 
 function logout() {
-  localStorage.removeItem('kota-token');
-  localStorage.removeItem('kota-role');
-  localStorage.removeItem('kota-name');
-  localStorage.removeItem('kota-admin-section');
+  sessionStorage.removeItem('kota-token');
+  sessionStorage.removeItem('kota-role');
+  sessionStorage.removeItem('kota-name');
+  sessionStorage.removeItem('kota-admin-section');
   window.location.href = '/login.html';
 }
 
@@ -69,15 +69,24 @@ function openChangePasswordModal() {
 }
 
 async function submitChangePassword() {
+  const fieldMap = { currentPassword: 'cp-current', newPassword: 'cp-new' };
+  Object.values(fieldMap).forEach(clearFieldError);
+
   const currentPassword = document.getElementById('cp-current').value;
   const newPassword = document.getElementById('cp-new').value;
   const confirmPassword = document.getElementById('cp-confirm').value;
 
-  if (!currentPassword || !newPassword) { toast('Preencha todos os campos.', true); return; }
-  if (newPassword.length < 6) { toast('Nova senha deve ter pelo menos 6 caracteres.', true); return; }
-  if (newPassword !== confirmPassword) { toast('As duas senhas novas precisam ser iguais.', true); return; }
+  if (!currentPassword) { showFieldError('cp-current', 'Informe a senha atual.'); return; }
+  if (!newPassword) { showFieldError('cp-new', 'Informe a nova senha.'); return; }
+  if (newPassword.length < 6) { showFieldError('cp-new', 'Nova senha deve ter pelo menos 6 caracteres.'); return; }
+  if (newPassword !== confirmPassword) { showFieldError('cp-confirm', 'As duas senhas novas precisam ser iguais.'); return; }
 
-  await safeCall(() => api('POST', '/auth/change-password', { currentPassword, newPassword }));
+  try {
+    await api('POST', '/auth/change-password', { currentPassword, newPassword });
+  } catch (e) {
+    distributeFieldErrors(e.message, fieldMap);
+    return;
+  }
   toast('Senha trocada com sucesso.');
   closeModal();
 }

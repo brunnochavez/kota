@@ -118,13 +118,21 @@ async function confirmRemoveQuotationItem(itemId) {
 }
 
 async function updateQuotation() {
+  const fieldMap = { name: 'qd-name' };
+  Object.values(fieldMap).forEach(clearFieldError);
+
   const body = {
     name: document.getElementById('qd-name').value.trim(),
     supplierGroupId: document.getElementById('qd-group').value || null,
-    expirationDate: document.getElementById('qd-expiration').value || null,
+    expirationDate: getExpirationValue('qd-expiration'),
     defaultSalesProjectionDays: document.getElementById('qd-sales-projection').value || null
   };
-  await safeCall(() => api('PUT', `/quotations/${currentQuotationId}`, body));
+  try {
+    await api('PUT', `/quotations/${currentQuotationId}`, body);
+  } catch (e) {
+    distributeFieldErrors(e.message, fieldMap);
+    return;
+  }
   toast('Cotação atualizada.');
   loadQuotations();
   abrirDetalheCotacao(currentQuotationId);
@@ -180,7 +188,30 @@ async function duplicateUnquotedItems() {
   abrirDetalheCotacao(q.id);
 }
 
-async function closeQuotation() {
+// Passa por confirmação extra SÓ quando é o clique original no botão "Fechar" (buttonEl
+// vem preenchido, veio do onclick="closeQuotation(this)" no HTML) E a cotação ainda está
+// dentro do prazo — fechar antes da hora corta fornecedores que ainda não responderam,
+// então vale um "tem certeza?" antes de seguir. As reexecuções internas do próprio fluxo
+// de fechamento (reenviar com desempate, excluir fornecedor, aceitar violação) chamam
+// closeQuotation() sem argumento nenhum — aí cai direto, sem popover de novo, porque o
+// admin já confirmou a intenção de fechar na primeira vez.
+function closeQuotation(buttonEl) {
+  const expirationRaw = getExpirationValue('qd-expiration');
+  const stillWithinDeadline = expirationRaw && new Date(expirationRaw) > new Date();
+
+  if (buttonEl && stillWithinDeadline) {
+    showConfirmPopover(
+      buttonEl,
+      'Essa cotação ainda está dentro do prazo — fornecedores podem ainda não ter enviado seus preços. Fechar mesmo assim?',
+      doCloseQuotation
+    );
+    return;
+  }
+
+  doCloseQuotation();
+}
+
+async function doCloseQuotation() {
   const result = await safeCall(() => api('POST', `/quotations/${currentQuotationId}/close`, closeState));
   renderCloseFlow(result);
 }

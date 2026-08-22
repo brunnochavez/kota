@@ -15,7 +15,7 @@ function switchToSection(section) {
   document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
   document.getElementById('section-' + section).classList.add('active');
   loadSectionData(section);
-  localStorage.setItem('kota-admin-section', section);
+  sessionStorage.setItem('kota-admin-section', section);
 }
 
 function goToSection(section) {

@@ -8,7 +8,7 @@ async function importFile(withMapping) {
   const name = document.getElementById('import-name').value.trim();
   if (!name) { toast('Informe um nome para a cotação.', true); return; }
   const groupId = document.getElementById('import-group').value;
-  const expiration = document.getElementById('import-expiration').value;
+  const expiration = getExpirationValue('import-expiration');
   const salesProjection = document.getElementById('import-sales-projection').value;
 
   const formData = new FormData();
@@ -40,7 +40,7 @@ async function importFile(withMapping) {
     document.getElementById('import-mapping').style.display = 'none';
     document.getElementById('import-name').value = '';
     document.getElementById('import-group').value = '';
-    document.getElementById('import-expiration').value = '';
+    clearExpirationValue('import-expiration');
     document.getElementById('import-sales-projection').value = '';
     fileInput.value = '';
     goToSection('quotation-reports');

@@ -232,7 +232,6 @@
   .badge-expired::before { background: var(--danger); }
   .badge-reviewing { background: var(--warning-bg); color: var(--warning); }
   .badge-reviewing::before { background: var(--warning); }
-
   /* Toast */
   #toast-wrap { position: fixed; top: 16px; right: 16px; z-index: 1200; display: flex; flex-direction: column; gap: 8px; }
   .toast { padding: 11px 15px; border-radius: 9px; font-size: 12.5px; max-width: 380px; box-shadow: var(--shadow); }
@@ -260,11 +259,16 @@
   .qd-step.current .qd-step-label { color: var(--accent); }
   .qd-step.expired-at .qd-step-dot { background: var(--danger); border-color: var(--danger); color: #fff; }
   .qd-step.expired-at .qd-step-label { color: var(--danger); }
+  .qd-step.expired-at.has-bids .qd-step-dot { background: var(--warning); border-color: var(--warning); }
+  .qd-step.expired-at.has-bids .qd-step-label { color: var(--warning); }
   .qd-step-line { flex: 1; height: 2px; background: var(--border); margin: 10px -20px 0; }
   .qd-step-line.done { background: var(--success); }
   .qd-expired-note {
     margin-top: 9px; font-size: 11.5px; font-weight: 600; color: var(--danger); background: var(--danger-bg);
     border: 1px solid var(--danger-border); border-radius: 8px; padding: 7px 11px; display: inline-block;
+  }
+  .qd-expired-note.has-bids {
+    color: var(--warning); background: var(--warning-bg); border-color: var(--warning-border);
   }
 
   /* Barra de estatísticas rápidas do detalhe da cotação */
@@ -771,8 +775,8 @@
         <div><label>Grupo (opcional)</label><select id="import-group"><option value="">— definir depois —</option></select></div>
         <div><label>Prazo de expiração (opcional)</label>
           <div style="display:flex; gap:6px">
-            <input type="datetime-local" id="import-expiration" step="3600" style="flex:1" onchange="confirmExpirationField('import-expiration')">
-            <button type="button" class="secondary small" onclick="confirmExpirationField('import-expiration')">OK</button>
+            <input type="date" id="import-expiration-date" style="flex:1.3">
+            <input type="time" id="import-expiration-time" style="flex:1">
           </div>
         </div>
         <div style="width:170px"><label>Projeção de venda padrão (dias)</label><input type="number" min="1" step="1" id="import-sales-projection" placeholder="Ex: 30"></div>
@@ -796,8 +800,8 @@
         <div><label>Grupo (opcional)</label><select id="mq-group"><option value="">— definir depois —</option></select></div>
         <div><label>Prazo de expiração (opcional)</label>
           <div style="display:flex; gap:6px">
-            <input type="datetime-local" id="mq-expiration" step="3600" style="flex:1" onchange="confirmExpirationField('mq-expiration')">
-            <button type="button" class="secondary small" onclick="confirmExpirationField('mq-expiration')">OK</button>
+            <input type="date" id="mq-expiration-date" style="flex:1.3">
+            <input type="time" id="mq-expiration-time" style="flex:1">
           </div>
         </div>
         <div style="width:170px"><label>Projeção de venda padrão (dias)</label><input type="number" min="1" step="1" id="mq-sales-projection" placeholder="Ex: 30"></div>

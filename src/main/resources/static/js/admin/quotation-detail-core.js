@@ -19,7 +19,12 @@ async function abrirDetalheCotacao(id) {
     <div class="inline-form">
       <div><label>Nome</label><input id="qd-name" placeholder="Ex: Cotação de Bebidas"></div>
       <div><label>Grupo</label><select id="qd-group"></select></div>
-      <div><label>Prazo de expiração</label><input type="datetime-local" id="qd-expiration" step="3600" onchange="roundExpirationToHour(this)"></div>
+      <div><label>Prazo de expiração</label>
+        <div style="display:flex; gap:6px">
+          <input type="date" id="qd-expiration-date" style="flex:1.3">
+          <input type="time" id="qd-expiration-time" style="flex:1">
+        </div>
+      </div>
       <div style="width:170px"><label>Projeção de venda padrão (dias)</label><input type="number" min="1" step="1" id="qd-sales-projection" placeholder="Ex: 30"></div>
       <button id="qd-save-btn" onclick="updateQuotation()">Salvar edição</button>
       <button id="qd-group-suppliers-btn" class="secondary" onclick="manageQdGroupSuppliers()">Fornecedores do Grupo</button>
@@ -27,7 +32,7 @@ async function abrirDetalheCotacao(id) {
 
     <div class="btn-row" style="margin-top:16px">
       <button id="qd-publish-btn" class="success" onclick="publishQuotation()">Publicar (Rascunho → Disponível)</button>
-      <button id="qd-close-btn" class="secondary" onclick="closeQuotation()">Fechar (calcular vencedores)</button>
+      <button id="qd-close-btn" class="secondary" onclick="closeQuotation(this)">Fechar (calcular vencedores)</button>
       <button id="qd-whatsapp-btn" class="secondary" onclick="copyPublishMessage(this)" style="display:none">Copiar mensagem para WhatsApp</button>
       <button id="qd-response-status-btn" class="secondary" onclick="openRepresentativeStatusModal()" style="display:none">Ver quem já respondeu</button>
       <button id="qd-review-bids-btn" class="secondary" onclick="openReviewBidsModal()" style="display:none">Revisar Cotações Enviadas</button>
@@ -96,16 +101,16 @@ async function abrirDetalheCotacao(id) {
     groups.map(g => `<option value="${g.id}">${g.name}</option>`).join('');
 
   const q = await safeCall(() => api('GET', `/quotations/${id}`));
-  document.getElementById('qd-title').innerHTML = `Cotação Nº ${formatQuotationNumber(q.id)} - ${escapeHtml(q.name)} ${statusBadge(q.status)}`;
+  document.getElementById('qd-title').innerHTML = `Cotação Nº ${formatQuotationNumber(q.id)} - ${escapeHtml(q.name)} ${statusBadge(q)}`;
   document.getElementById('qd-name').value = q.name;
   document.getElementById('qd-group').value = q.supplierGroupId || '';
-  document.getElementById('qd-expiration').value = toDatetimeLocal(q.expirationDate);
+  setExpirationValue('qd-expiration', q.expirationDate);
   document.getElementById('qd-sales-projection').value = q.defaultSalesProjectionDays ?? '';
 
   const pdfLink = document.getElementById('qd-pdf-link');
   pdfLink.style.display = q.status === 'CLOSED' ? 'inline-block' : 'none';
 
-  renderQdStepper(q.status);
+  renderQdStepper(q.status, q.hasBids);
   applyQdEditLock(q.status);
   await loadQuotationItemsDetail(id, q.status);
   renderQdInfoBar(q);
@@ -115,9 +120,12 @@ async function abrirDetalheCotacao(id) {
 // exatamente em que ponto do ciclo aquela cotação está e o que falta pra chegar no fim,
 // sem precisar decorar o que cada status "quer dizer". Expirada é tratada à parte: não é
 // uma etapa normal do caminho, é o que acontece quando ninguém fecha a tempo — trava
-// visualmente logo depois de "Disponível" (foi até ali que ela chegou de verdade) com um
-// aviso vermelho, em vez de inventar uma 5ª bolinha só pra ela.
-function renderQdStepper(status) {
+// visualmente logo depois de "Disponível" (foi até ali que ela chegou de verdade). Com
+// hasBids=false (ninguém respondeu) o aviso é vermelho, de verdade sem solução. Com
+// hasBids=true (tem lance pendente, só falta clicar em Fechar) usa o tom âmbar de "Em
+// Revisão" — vermelho ali passaria a ideia de erro/falha quando na real é só uma etapa
+// que ficou pra trás.
+function renderQdStepper(status, hasBids) {
   const steps = [
     { key: 'DRAFT', label: 'Rascunho' },
     { key: 'AVAILABLE', label: 'Disponível' },
@@ -126,6 +134,7 @@ function renderQdStepper(status) {
   ];
   const order = ['DRAFT', 'AVAILABLE', 'REVIEWING', 'CLOSED'];
   const isExpired = status === 'EXPIRED';
+  const expiredWithBids = isExpired && hasBids;
   const effectiveIndex = isExpired ? 1 : order.indexOf(status);
 
   const CHECK_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 12l4 4L19 7"/></svg>';
@@ -134,6 +143,7 @@ function renderQdStepper(status) {
     let stateClass = 'upcoming';
     if (idx < effectiveIndex) stateClass = 'done';
     else if (idx === effectiveIndex) stateClass = isExpired ? 'expired-at' : 'current';
+    if (stateClass === 'expired-at' && expiredWithBids) stateClass += ' has-bids';
 
     const dotContent = stateClass === 'done' ? CHECK_SVG : (idx + 1);
     const lineClass = idx < effectiveIndex ? 'done' : '';
@@ -145,9 +155,12 @@ function renderQdStepper(status) {
     </div>${line}`;
   }).join('');
 
-  const expiredNote = isExpired
-    ? '<div class="qd-expired-note">⚠ Expirou antes de ser fechada — o prazo passou sem ninguém confirmar o resultado.</div>'
-    : '';
+  let expiredNote = '';
+  if (expiredWithBids) {
+    expiredNote = '<div class="qd-expired-note has-bids">⏳ O prazo passou, mas há lances registrados — clique em "Fechar" pra calcular os vencedores.</div>';
+  } else if (isExpired) {
+    expiredNote = '<div class="qd-expired-note">⚠ Expirou antes de ser fechada — o prazo passou sem ninguém responder.</div>';
+  }
 
   document.getElementById('qd-stepper').innerHTML = `<div class="qd-stepper-track">${stepsHtml}</div>${expiredNote}`;
 }
@@ -199,7 +212,7 @@ function applyQdEditLock(status) {
   const isExpired = status === 'EXPIRED';
   const canClose = status === 'AVAILABLE' || isExpired;
 
-  ['qd-name', 'qd-group', 'qd-expiration', 'qd-sales-projection'].forEach(id => {
+  ['qd-name', 'qd-group', 'qd-expiration-date', 'qd-expiration-time', 'qd-sales-projection'].forEach(id => {
     document.getElementById(id).disabled = !isDraft;
   });
   document.getElementById('qd-save-btn').disabled = !isDraft;

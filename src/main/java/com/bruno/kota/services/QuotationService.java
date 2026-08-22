@@ -60,8 +60,23 @@ public class QuotationService {
 
     @Transactional(readOnly = true)
     public List<QuotationResponse> findAll() {
-        return quotationRepository.findAll().stream()
-                .map(this::toResponse)
+        // findAllWithGroup traz o grupo de fornecedores já junto (JOIN FETCH) — evita 1
+        // query lazy por cotação em toResponse() só pra ler o nome do grupo. Essa é a
+        // listagem usada em GET /quotations, a primeira chamada que o dashboard dispara.
+        List<Quotation> quotations = quotationRepository.findAllWithGroup();
+        if (quotations.isEmpty()) {
+            return List.of();
+        }
+
+        // hasBids em lote — 1 query pra descobrir quais dessas cotações têm pelo menos um
+        // lance, em vez de 1 existsByQuotationItem_QuotationId() por cotação (o overload
+        // de toResponse SEM esse parâmetro faz isso, mas dentro de um .map() sobre a lista
+        // inteira isso vira N+1 de novo).
+        List<Long> ids = quotations.stream().map(Quotation::getId).toList();
+        Set<Long> idsWithBids = new HashSet<>(bidRepository.findDistinctQuotationIdsWithBids(ids));
+
+        return quotations.stream()
+                .map(q -> toResponse(q, idsWithBids.contains(q.getId())))
                 .toList();
     }
 
@@ -706,7 +721,38 @@ public class QuotationService {
     // ficam fora da lista — não tem barra pra mostrar.
     @Transactional(readOnly = true)
     public List<QuotationFillRate> getRepresentativeFillRate() {
-        List<Quotation> available = quotationRepository.findByStatus(QuotationStatus.AVAILABLE);
+        // Traz o grupo de fornecedores já junto (JOIN FETCH), então quotation.getSupplierGroup()
+        // logo abaixo não dispara mais uma query por cotação.
+        List<Quotation> available = quotationRepository.findByStatusWithGroup(QuotationStatus.AVAILABLE);
+        if (available.isEmpty()) {
+            return List.of();
+        }
+
+        List<Long> quotationIds = available.stream().map(Quotation::getId).toList();
+
+        // Antes: 1 query de lances + 1 query de "Não Cotar" POR cotação disponível, e
+        // cada bid.getSubmittedBy() dentro do loop disparava mais uma query (N+1 dentro
+        // do N+1). Agora: 1 query de cada, pra TODAS as cotações disponíveis de uma vez,
+        // já agrupada por cotação em memória.
+        Map<Long, Set<Long>> submittedRepIdsByQuotation = bidRepository
+                .findByQuotationItem_QuotationIdInWithSubmitter(quotationIds).stream()
+                .collect(Collectors.groupingBy(
+                        b -> b.getQuotationItem().getQuotation().getId(),
+                        Collectors.mapping(b -> b.getSubmittedBy().getId(), Collectors.toSet())));
+
+        // "Não Cotar" conta como resposta pra taxa de participação — o representante
+        // olhou a cotação e declarou explicitamente que não tem nada a oferecer, o que é
+        // bem diferente de simplesmente nunca ter aberto a cotação.
+        Map<Long, Set<Long>> declinedRepIdsByQuotation = quotationDeclineRepository
+                .findByQuotationIdInWithDetails(quotationIds).stream()
+                .collect(Collectors.groupingBy(
+                        d -> d.getQuotation().getId(),
+                        Collectors.mapping(d -> d.getDeclinedBy().getId(), Collectors.toSet())));
+
+        // Cache de grupo → representantes elegíveis dentro dessa geração de relatório só,
+        // pra não repetir a mesma consulta quando várias cotações disponíveis compartilham
+        // o mesmo grupo de fornecedores.
+        Map<Long, Set<Long>> eligibleByGroup = new HashMap<>();
         List<QuotationFillRate> rates = new ArrayList<>();
 
         for (Quotation quotation : available) {
@@ -715,29 +761,20 @@ public class QuotationService {
                 continue;
             }
 
-            Set<Long> eligibleRepIds = supplierRepository.findByGroup(group).stream()
-                    .map(Supplier::getRepresentative)
-                    .filter(Objects::nonNull)
-                    .map(Representative::getId)
-                    .collect(Collectors.toSet());
+            Set<Long> eligibleRepIds = eligibleByGroup.computeIfAbsent(group.getId(), gid ->
+                    supplierRepository.findByGroup(group).stream()
+                            .map(Supplier::getRepresentative)
+                            .filter(Objects::nonNull)
+                            .map(Representative::getId)
+                            .collect(Collectors.toSet()));
 
             if (eligibleRepIds.isEmpty()) {
                 continue;
             }
 
-            Set<Long> submittedRepIds = bidRepository.findByQuotationItem_QuotationId(quotation.getId()).stream()
-                    .map(bid -> bid.getSubmittedBy().getId())
-                    .collect(Collectors.toSet());
-
-            // "Não Cotar" conta como resposta pra taxa de participação — o representante
-            // olhou a cotação e declarou explicitamente que não tem nada a oferecer, o
-            // que é bem diferente de simplesmente nunca ter aberto a cotação.
-            Set<Long> declinedRepIds = quotationDeclineRepository.findByQuotationId(quotation.getId()).stream()
-                    .map(d -> d.getDeclinedBy().getId())
-                    .collect(Collectors.toSet());
-
-            Set<Long> respondedRepIds = new HashSet<>(submittedRepIds);
-            respondedRepIds.addAll(declinedRepIds);
+            Set<Long> respondedRepIds = new HashSet<>(
+                    submittedRepIdsByQuotation.getOrDefault(quotation.getId(), Set.of()));
+            respondedRepIds.addAll(declinedRepIdsByQuotation.getOrDefault(quotation.getId(), Set.of()));
 
             int filled = (int) eligibleRepIds.stream().filter(respondedRepIds::contains).count();
             rates.add(new QuotationFillRate(quotation.getId(), eligibleRepIds.size(), filled));
@@ -836,14 +873,35 @@ public class QuotationService {
         List<Quotation> closedQuotations = quotationRepository.findByStatus(QuotationStatus.CLOSED);
         List<WonQuotationSummary> result = new ArrayList<>();
 
-        for (Quotation quotation : closedQuotations) {
-            boolean isFinalized = orderFulfillmentConfirmationRepository
-                    .existsByQuotationIdAndSupplierId(quotation.getId(), supplierId);
-            if (isFinalized != finalized) {
-                continue;
-            }
+        if (closedQuotations.isEmpty()) {
+            return result;
+        }
 
-            List<QuotationItem> items = quotationItemRepository.findByQuotationId(quotation.getId());
+        List<Long> closedIds = closedQuotations.stream().map(Quotation::getId).toList();
+
+        // Antes: 1 exists() + 1 query de itens POR cotação fechada dentro do loop, e
+        // dentro do item, winner.getSupplier() e item.getProduct() lazy disparavam mais
+        // uma query cada (N+1 dentro do N+1) — exatamente o mesmo padrão do relatório de
+        // Ponto de Compra. Agora: 1 query pra saber quais cotações já foram finalizadas
+        // por esse fornecedor, e 1 query pra todos os itens já com tudo pré-carregado.
+        Set<Long> finalizedQuotationIds = new HashSet<>(orderFulfillmentConfirmationRepository
+                .findQuotationIdsBySupplierIdAndQuotationIdIn(supplierId, closedIds));
+
+        List<Quotation> relevantQuotations = closedQuotations.stream()
+                .filter(q -> finalizedQuotationIds.contains(q.getId()) == finalized)
+                .toList();
+
+        if (relevantQuotations.isEmpty()) {
+            return result;
+        }
+
+        List<Long> relevantIds = relevantQuotations.stream().map(Quotation::getId).toList();
+        Map<Long, List<QuotationItem>> itemsByQuotation = quotationItemRepository
+                .findByQuotationIdInWithReorderDetails(relevantIds).stream()
+                .collect(Collectors.groupingBy(qi -> qi.getQuotation().getId()));
+
+        for (Quotation quotation : relevantQuotations) {
+            List<QuotationItem> items = itemsByQuotation.getOrDefault(quotation.getId(), List.of());
             List<WonQuotationItem> wonItems = new ArrayList<>();
             BigDecimal total = BigDecimal.ZERO;
 
@@ -898,7 +956,10 @@ public class QuotationService {
         // de meses atrás. Um único corte na origem (aqui) já reflete em tudo que vem
         // depois: taxa de vitória, produtos, perdas, valor ganho.
         LocalDateTime performanceCutoff = LocalDateTime.now().minusDays(30);
-        List<Bid> myBids = bidRepository.findBySupplierId(supplierId).stream()
+        // findBySupplierIdWithDetails traz item/produto/cotação/grupo/vencedor já
+        // pré-carregados — antes, cada acesso a bid.getQuotationItem().getProduct() etc.
+        // dentro do loop abaixo disparava uma query lazy por lance do fornecedor.
+        List<Bid> myBids = bidRepository.findBySupplierIdWithDetails(supplierId).stream()
                 .filter(b -> b.getSubmittedAt() != null && b.getSubmittedAt().isAfter(performanceCutoff))
                 .toList();
 
@@ -964,13 +1025,15 @@ public class QuotationService {
                 .toList();
 
         Set<Long> myGroupIds = supplier.getGroups().stream().map(SupplierGroup::getId).collect(Collectors.toSet());
-        List<Quotation> published = quotationRepository.findAll().stream()
-                .filter(q -> q.getStatus() != QuotationStatus.DRAFT)
+        // findPublishedSince já filtra status <> DRAFT e publishedAt > cutoff DIRETO no
+        // banco (antes era quotationRepository.findAll() — a TABELA INTEIRA de cotações,
+        // sem filtro nenhum, filtrada em memória depois) e já traz o grupo junto, então
+        // safeGetSupplierGroup() abaixo não dispara mais uma query lazy por cotação.
+        List<Quotation> published = quotationRepository.findPublishedSince(performanceCutoff).stream()
                 .filter(q -> {
                     SupplierGroup group = safeGetSupplierGroup(q);
                     return group != null && myGroupIds.contains(group.getId());
                 })
-                .filter(q -> q.getPublishedAt() != null && q.getPublishedAt().isAfter(performanceCutoff))
                 .toList();
 
         Set<Long> respondedQuotationIds = myBids.stream()
@@ -1009,45 +1072,63 @@ public class QuotationService {
         // então cacheia por combinação dentro dessa geração de relatório só.
         Map<String, Boolean> orderConfirmedCache = new HashMap<>();
 
-        for (Quotation quotation : closedQuotations) {
+        // Filtra por período ANTES de buscar os lances — reduz o lote que vai pra query
+        // única abaixo, em vez de buscar tudo e descartar depois.
+        List<Quotation> quotationsInRange = closedQuotations.stream()
+                .filter(q -> {
+                    LocalDateTime closedAt = q.getUpdatedAt();
+                    if (from != null && (closedAt == null || closedAt.isBefore(from))) return false;
+                    if (to != null && (closedAt == null || closedAt.isAfter(to))) return false;
+                    return true;
+                })
+                .toList();
+
+        if (quotationsInRange.isEmpty()) {
+            return rows;
+        }
+
+        List<Long> quotationIds = quotationsInRange.stream().map(Quotation::getId).toList();
+
+        // Antes: 1 query de lances POR cotação (N+1), e dentro do loop, bid.getSupplier(),
+        // bid.getSubmittedBy() e item.getProduct() eram lazy e cada acesso disparava mais
+        // uma query por lance (N+1 dentro do N+1). Agora: 1 query só, já com tudo pré-carregado.
+        List<Bid> bids = bidRepository.findByQuotationItem_QuotationIdInWithReportDetails(quotationIds);
+
+        for (Bid bid : bids) {
+            QuotationItem item = bid.getQuotationItem();
+            Quotation quotation = item.getQuotation();
             LocalDateTime closedAt = quotation.getUpdatedAt();
-            if (from != null && (closedAt == null || closedAt.isBefore(from))) continue;
-            if (to != null && (closedAt == null || closedAt.isAfter(to))) continue;
 
-            List<Bid> bids = bidRepository.findByQuotationItem_QuotationId(quotation.getId());
-            for (Bid bid : bids) {
-                QuotationItem item = bid.getQuotationItem();
-                boolean won = item.getWinningBid() != null && item.getWinningBid().getId().equals(bid.getId());
-                if (onlyWinners && !won) continue;
+            boolean won = item.getWinningBid() != null && item.getWinningBid().getId().equals(bid.getId());
+            if (onlyWinners && !won) continue;
 
-                Supplier supplier = bid.getSupplier();
-                if (supplierId != null && !supplier.getId().equals(supplierId)) continue;
+            Supplier supplier = bid.getSupplier();
+            if (supplierId != null && !supplier.getId().equals(supplierId)) continue;
 
-                Representative rep = bid.getSubmittedBy();
-                if (representativeId != null && (rep == null || !rep.getId().equals(representativeId))) continue;
+            Representative rep = bid.getSubmittedBy();
+            if (representativeId != null && (rep == null || !rep.getId().equals(representativeId))) continue;
 
-                String productName = item.getProduct().getName();
-                if (normalizedProductQuery != null && !normalizedProductQuery.isEmpty()
-                        && !productName.toLowerCase().contains(normalizedProductQuery)) continue;
+            String productName = item.getProduct().getName();
+            if (normalizedProductQuery != null && !normalizedProductQuery.isEmpty()
+                    && !productName.toLowerCase().contains(normalizedProductQuery)) continue;
 
-                String cacheKey = quotation.getId() + ":" + supplier.getId();
-                boolean orderConfirmed = orderConfirmedCache.computeIfAbsent(cacheKey,
-                        k -> orderFulfillmentConfirmationRepository.existsByQuotationIdAndSupplierId(quotation.getId(), supplier.getId()));
+            String cacheKey = quotation.getId() + ":" + supplier.getId();
+            boolean orderConfirmed = orderConfirmedCache.computeIfAbsent(cacheKey,
+                    k -> orderFulfillmentConfirmationRepository.existsByQuotationIdAndSupplierId(quotation.getId(), supplier.getId()));
 
-                rows.add(new QuotationReportRow(
-                        quotation.getId(),
-                        quotation.getName(),
-                        closedAt,
-                        supplier.getName(),
-                        rep != null ? rep.getName() : "—",
-                        productName,
-                        item.getQuantity(),
-                        bid.getValue(),
-                        bid.getValue().multiply(item.getQuantity()),
-                        won,
-                        orderConfirmed
-                ));
-            }
+            rows.add(new QuotationReportRow(
+                    quotation.getId(),
+                    quotation.getName(),
+                    closedAt,
+                    supplier.getName(),
+                    rep != null ? rep.getName() : "—",
+                    productName,
+                    item.getQuantity(),
+                    bid.getValue(),
+                    bid.getValue().multiply(item.getQuantity()),
+                    won,
+                    orderConfirmed
+            ));
         }
 
         rows.sort((a, b) -> {
@@ -1077,49 +1158,63 @@ public class QuotationService {
         List<Quotation> closedQuotations = quotationRepository.findByStatus(QuotationStatus.CLOSED);
         List<ReorderPointRow> rows = new ArrayList<>();
 
-        for (Quotation quotation : closedQuotations) {
+        List<Long> quotationIds = closedQuotations.stream()
+                .filter(q -> q.getUpdatedAt() != null)
+                .map(Quotation::getId)
+                .toList();
+
+        if (quotationIds.isEmpty()) {
+            return rows;
+        }
+
+        // Antes: 1 query de itens POR cotação fechada (N+1), e dentro do loop,
+        // item.getProduct(), item.getWinningBid(), winningBid.getSupplier() e
+        // winningBid.getSubmittedBy() eram lazy — cada acesso disparava mais uma query
+        // por item (N+1 dentro do N+1). Numa base com histórico de cotações, isso vira
+        // centenas de queries só pra montar esse relatório. Agora: 1 query só, com tudo
+        // pré-carregado via JOIN FETCH.
+        List<QuotationItem> items = quotationItemRepository.findByQuotationIdInWithReorderDetails(quotationIds);
+
+        for (QuotationItem item : items) {
+            if (item.isFulfillmentCut()) continue;
+
+            Bid winningBid = item.getWinningBid();
+            if (winningBid == null) continue;
+
+            Quotation quotation = item.getQuotation();
             LocalDateTime closedAt = quotation.getUpdatedAt();
-            if (closedAt == null) continue;
 
-            List<QuotationItem> items = quotationItemRepository.findByQuotationId(quotation.getId());
-            for (QuotationItem item : items) {
-                if (item.isFulfillmentCut()) continue;
+            Integer deliveryDeadlineDays = winningBid.getDeliveryDeadlineDays() != null
+                    ? winningBid.getDeliveryDeadlineDays()
+                    : winningBid.getSupplier().getDefaultDeliveryDeadlineDays();
+            Integer projectionDays = item.getSalesProjectionDaysOverride() != null
+                    ? item.getSalesProjectionDaysOverride()
+                    : quotation.getDefaultSalesProjectionDays();
+            if (deliveryDeadlineDays == null || projectionDays == null) continue;
 
-                Bid winningBid = item.getWinningBid();
-                if (winningBid == null) continue;
+            LocalDateTime estimatedArrivalDate = closedAt.plusDays(deliveryDeadlineDays);
+            LocalDateTime estimatedDepletionDate = estimatedArrivalDate.plusDays(projectionDays);
+            LocalDateTime reorderDate = estimatedDepletionDate.minusDays(deliveryDeadlineDays);
+            long daysUntilReorder = java.time.temporal.ChronoUnit.DAYS.between(LocalDateTime.now(), reorderDate);
 
-                Integer deliveryDeadlineDays = winningBid.getDeliveryDeadlineDays() != null
-                        ? winningBid.getDeliveryDeadlineDays()
-                        : winningBid.getSupplier().getDefaultDeliveryDeadlineDays();
-                Integer projectionDays = item.getSalesProjectionDaysOverride() != null
-                        ? item.getSalesProjectionDaysOverride()
-                        : quotation.getDefaultSalesProjectionDays();
-                if (deliveryDeadlineDays == null || projectionDays == null) continue;
-
-                LocalDateTime estimatedArrivalDate = closedAt.plusDays(deliveryDeadlineDays);
-                LocalDateTime estimatedDepletionDate = estimatedArrivalDate.plusDays(projectionDays);
-                LocalDateTime reorderDate = estimatedDepletionDate.minusDays(deliveryDeadlineDays);
-                long daysUntilReorder = java.time.temporal.ChronoUnit.DAYS.between(LocalDateTime.now(), reorderDate);
-
-                rows.add(new ReorderPointRow(
-                        quotation.getId(),
-                        quotation.getName(),
-                        closedAt,
-                        item.getId(),
-                        item.getProduct().getId(),
-                        item.getProduct().getName(),
-                        item.getProduct().getBarcode(),
-                        winningBid.getSupplier().getName(),
-                        winningBid.getSubmittedBy() != null ? winningBid.getSubmittedBy().getName() : "—",
-                        item.getQuantity(),
-                        deliveryDeadlineDays,
-                        projectionDays,
-                        estimatedArrivalDate,
-                        estimatedDepletionDate,
-                        reorderDate,
-                        daysUntilReorder
-                ));
-            }
+            rows.add(new ReorderPointRow(
+                    quotation.getId(),
+                    quotation.getName(),
+                    closedAt,
+                    item.getId(),
+                    item.getProduct().getId(),
+                    item.getProduct().getName(),
+                    item.getProduct().getBarcode(),
+                    winningBid.getSupplier().getName(),
+                    winningBid.getSubmittedBy() != null ? winningBid.getSubmittedBy().getName() : "—",
+                    item.getQuantity(),
+                    deliveryDeadlineDays,
+                    projectionDays,
+                    estimatedArrivalDate,
+                    estimatedDepletionDate,
+                    reorderDate,
+                    daysUntilReorder
+            ));
         }
 
         rows.sort(Comparator.comparing(ReorderPointRow::reorderDate));
@@ -1266,6 +1361,13 @@ public class QuotationService {
     }
 
     private QuotationResponse toResponse(Quotation quotation) {
+        // 1 EXISTS aceitável aqui — esse overload só é usado nos pontos que tratam UMA
+        // cotação por vez (create, update, publish, close...), nunca dentro de um loop.
+        // findAll() usa o outro overload abaixo, com o hasBids já calculado em lote.
+        return toResponse(quotation, bidRepository.existsByQuotationItem_QuotationId(quotation.getId()));
+    }
+
+    private QuotationResponse toResponse(Quotation quotation, boolean hasBids) {
         SupplierGroup group = safeGetSupplierGroup(quotation);
         return new QuotationResponse(
                 quotation.getId(),
@@ -1277,7 +1379,8 @@ public class QuotationService {
                 quotation.getPublishedAt(),
                 quotation.getExpirationDate(),
                 quotation.getUpdatedAt(),
-                quotation.getDefaultSalesProjectionDays()
+                quotation.getDefaultSalesProjectionDays(),
+                hasBids
         );
     }
 

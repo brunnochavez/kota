@@ -39,6 +39,9 @@ function renderCompanyLogoPreview(logoUrl) {
 }
 
 async function saveCompanySettings() {
+  const fieldMap = { name: 'company-name' };
+  Object.values(fieldMap).forEach(clearFieldError);
+
   const body = {
     name: document.getElementById('company-name').value.trim(),
     cnpj: unmaskDigits(document.getElementById('company-cnpj').value),
@@ -51,9 +54,14 @@ async function saveCompanySettings() {
     state: document.getElementById('company-state').value,
     zipCode: unmaskDigits(document.getElementById('company-zip').value)
   };
-  if (!body.name) { toast('Nome é obrigatório.', true); return; }
+  if (!body.name) { showFieldError('company-name', 'Nome é obrigatório.'); return; }
 
-  await safeCall(() => api('PUT', '/company-settings', body));
+  try {
+    await api('PUT', '/company-settings', body);
+  } catch (e) {
+    distributeFieldErrors(e.message, fieldMap);
+    return;
+  }
   toast('Dados da empresa salvos.');
   applyCompanyBranding();
 }
@@ -68,7 +76,7 @@ async function uploadCompanyLogo() {
   const formData = new FormData();
   formData.append('file', file);
 
-  const token = localStorage.getItem('kota-token');
+  const token = sessionStorage.getItem('kota-token');
   const res = await fetch(API + '/company-settings/logo', {
     method: 'POST',
     headers: token ? { 'Authorization': 'Bearer ' + token } : {},

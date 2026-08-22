@@ -141,12 +141,17 @@
 applyTheme(window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
 function applyTheme(theme) { document.documentElement.setAttribute('data-theme', theme); }
 
-// Se já tem token guardado, não faz sentido mostrar login de novo — manda direto pro
-// app certo. Não valida o token aqui (isso é trabalho do backend na primeira chamada);
-// se estiver expirado, o próprio app vai jogar de volta pro login sozinho.
+// Se já tem token guardado NESSA MESMA ABA/SESSÃO (ex: usuário deu F5 na tela de login
+// por engano, ou voltou pelo botão "voltar" do navegador), não faz sentido mostrar login
+// de novo — manda direto pro app certo. Como o token agora vive em sessionStorage (não
+// mais localStorage), isso só acontece dentro da mesma sessão de navegador — fechar a
+// aba/janela já limpa tudo, então da próxima vez cai no formulário de login de verdade,
+// mesmo que o JWT em si ainda não tivesse expirado. Não valida o token aqui (isso é
+// trabalho do backend na primeira chamada); se estiver expirado, o próprio app vai
+// jogar de volta pro login sozinho.
 (function redirectIfLoggedIn() {
-  const token = localStorage.getItem('kota-token');
-  const role = localStorage.getItem('kota-role');
+  const token = sessionStorage.getItem('kota-token');
+  const role = sessionStorage.getItem('kota-role');
   if (token && role) {
     window.location.href = role === 'ADMIN' ? '/admin.html' : '/representante.html';
   }
@@ -175,10 +180,10 @@ function applyTheme(theme) { document.documentElement.setAttribute('data-theme',
   }
 })();
 
-// Dados da troca de senha obrigatória ficam só em memória (nunca em localStorage)
-// enquanto pendente — se a pessoa atualizar a página nesse meio-tempo, ela cai de volta
-// no login puro, sem token nenhum guardado. É proposital: assim não existe brecha de
-// pular a troca de senha com um F5 na hora certa.
+// Dados da troca de senha obrigatória ficam só em memória (nunca em storage nenhum —
+// nem localStorage, nem sessionStorage) enquanto pendente — se a pessoa atualizar a
+// página nesse meio-tempo, ela cai de volta no login puro, sem token nenhum guardado.
+// É proposital: assim não existe brecha de pular a troca de senha com um F5 na hora certa.
 let pendingLogin = null;
 
 // Reaproveitado nos três campos de senha da página (login, nova senha, confirmar) — só
@@ -194,11 +199,13 @@ function togglePasswordVisibility(inputId, buttonEl) {
 }
 
 function goToApp(role) {
-  // Limpa a aba lembrada do representante — login sempre deve cair na página inicial
-  // (Disponíveis), mesmo que ele tenha saído numa aba diferente da última vez.
-  // Atualizações de página (F5) durante a mesma sessão continuam restaurando a aba
-  // normalmente, já que essa limpeza só roda aqui, no momento do login.
-  localStorage.removeItem('kota-rep-tab');
+  // Limpa a aba/seção lembrada de quem logou — login sempre deve cair na página inicial
+  // (Disponíveis pro representante, Dashboard pro admin), mesmo que a pessoa tenha saído
+  // numa aba/seção diferente da última vez. Atualizações de página (F5) durante a mesma
+  // sessão continuam restaurando a aba/seção normalmente, já que essa limpeza só roda
+  // aqui, no momento do login — não a cada carregamento.
+  sessionStorage.removeItem('kota-rep-tab');
+  sessionStorage.removeItem('kota-admin-section');
   window.location.href = role === 'ADMIN' ? '/admin.html' : '/representante.html';
 }
 
@@ -231,13 +238,13 @@ document.getElementById('login-form').addEventListener('submit', async (e) => {
       return;
     }
 
-    localStorage.setItem('kota-token', data.token);
-    localStorage.setItem('kota-role', data.role);
-    localStorage.setItem('kota-name', data.name);
+    sessionStorage.setItem('kota-token', data.token);
+    sessionStorage.setItem('kota-role', data.role);
+    sessionStorage.setItem('kota-name', data.name);
     if (data.representativeId) {
-      localStorage.setItem('kota-representative-id', data.representativeId);
+      sessionStorage.setItem('kota-representative-id', data.representativeId);
     } else {
-      localStorage.removeItem('kota-representative-id');
+      sessionStorage.removeItem('kota-representative-id');
     }
 
     goToApp(data.role);
@@ -283,13 +290,13 @@ document.getElementById('change-password-form').addEventListener('submit', async
     }
 
     // Só agora, com a senha já trocada de verdade, o token vira sessão persistida.
-    localStorage.setItem('kota-token', pendingLogin.token);
-    localStorage.setItem('kota-role', pendingLogin.role);
-    localStorage.setItem('kota-name', pendingLogin.name);
+    sessionStorage.setItem('kota-token', pendingLogin.token);
+    sessionStorage.setItem('kota-role', pendingLogin.role);
+    sessionStorage.setItem('kota-name', pendingLogin.name);
     if (pendingLogin.representativeId) {
-      localStorage.setItem('kota-representative-id', pendingLogin.representativeId);
+      sessionStorage.setItem('kota-representative-id', pendingLogin.representativeId);
     } else {
-      localStorage.removeItem('kota-representative-id');
+      sessionStorage.removeItem('kota-representative-id');
     }
 
     goToApp(pendingLogin.role);

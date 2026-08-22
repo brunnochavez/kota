@@ -38,7 +38,10 @@ public class BidService {
 
     @Transactional(readOnly = true)
     public List<BidResponse> findByQuotationItem(Long quotationItemId) {
-        return bidRepository.findByQuotationItemId(quotationItemId).stream()
+        // findByQuotationItemIdWithDetails traz fornecedor e representante já
+        // pré-carregados — antes, toResponse() acessava bid.getSupplier().getName() e
+        // bid.getSubmittedBy().getName() lazy, 1 query extra de cada por lance.
+        return bidRepository.findByQuotationItemIdWithDetails(quotationItemId).stream()
                 .map(this::toResponse)
                 .toList();
     }

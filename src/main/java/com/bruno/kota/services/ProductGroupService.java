@@ -1,5 +1,7 @@
 package com.bruno.kota.services;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import com.bruno.kota.dtos.ProductGroupRequest;
@@ -22,8 +24,10 @@ public class ProductGroupService {
 
     @Transactional(readOnly = true)
     public List<ProductGroupResponse> findAll() {
-        return productGroupRepository.findAll().stream()
-                .map(this::toResponse)
+        List<ProductGroup> groups = productGroupRepository.findAll();
+        Map<Long, Integer> countByGroupId = loadProductCounts(groups);
+        return groups.stream()
+                .map(g -> new ProductGroupResponse(g.getId(), g.getName(), countByGroupId.getOrDefault(g.getId(), 0)))
                 .toList();
     }
 
@@ -78,6 +82,23 @@ public class ProductGroupService {
                 .orElseThrow(() -> new ResourceNotFoundException("Grupo não encontrado: id " + id));
     }
 
+    // Usada por findAll() (lista completa) — 1 query de COUNT só, pra todos os grupos de
+    // uma vez, em vez de 1 findByGroup(group).size() por grupo (que ainda por cima trazia
+    // as linhas de Product inteiras só pra contar).
+    private Map<Long, Integer> loadProductCounts(List<ProductGroup> groups) {
+        if (groups.isEmpty()) {
+            return Map.of();
+        }
+        List<Long> groupIds = groups.stream().map(ProductGroup::getId).toList();
+        Map<Long, Integer> countByGroupId = new HashMap<>();
+        for (Object[] row : productRepository.countByGroupIds(groupIds)) {
+            countByGroupId.put((Long) row[0], ((Long) row[1]).intValue());
+        }
+        return countByGroupId;
+    }
+
+    // Usado nos pontos que lidam com UM grupo só (findById, create, update, reactivate) —
+    // aqui 1 query extra é aceitável, não é uma listagem em loop.
     private ProductGroupResponse toResponse(ProductGroup group) {
         int productCount = productRepository.findByGroup(group).size();
         return new ProductGroupResponse(group.getId(), group.getName(), productCount);

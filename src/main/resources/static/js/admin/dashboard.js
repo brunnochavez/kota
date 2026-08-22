@@ -112,7 +112,7 @@ function renderRecentQuotations(quotations) {
   const tbody = document.getElementById('dash-recent-tbody');
   tbody.innerHTML = recent.length
     ? recent.map(q => `<tr style="cursor:pointer" onclick="abrirDetalheCotacao(${q.id})">
-        <td>${q.id}</td><td>${escapeHtml(q.name)}</td><td>${statusBadge(q.status)}</td></tr>`).join('')
+        <td>${q.id}</td><td>${escapeHtml(q.name)}</td><td>${statusBadge(q)}</td></tr>`).join('')
     : '<tr><td colspan="3" class="empty">Nenhuma cotação criada ainda.</td></tr>';
 }
 

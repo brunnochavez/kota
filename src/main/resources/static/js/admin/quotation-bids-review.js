@@ -384,12 +384,19 @@ function selectReviewAddProduct(productId) {
 // checagem — evita adicionar um produto que virou item da cotação depois da busca
 // (outra aba, outro admin mexendo ao mesmo tempo).
 async function addProductToRep(repId) {
+  const fieldMap = {
+    productId: 'review-add-product-search',
+    quantity: 'review-add-product-qty',
+    value: 'review-add-product-price'
+  };
+  Object.values(fieldMap).forEach(clearFieldError);
+
   const productId = document.getElementById('review-add-product-id').value;
   const qty = document.getElementById('review-add-product-qty').value;
   const price = unmaskCurrencyToNumber(document.getElementById('review-add-product-price').value);
-  if (!productId) { toast('Busque e selecione um produto.', true); return; }
-  if (!qty) { toast('Informe a quantidade.', true); return; }
-  if (!price) { toast('Informe o preço.', true); return; }
+  if (!productId) { showFieldError('review-add-product-search', 'Busque e selecione um produto.'); return; }
+  if (!qty) { showFieldError('review-add-product-qty', 'Informe a quantidade.'); return; }
+  if (!price) { showFieldError('review-add-product-price', 'Informe o preço.'); return; }
 
   const suppliers = await safeCall(() => api('GET', '/suppliers'));
   const supplier = suppliers.find(s => s.representativeId === repId);
@@ -401,13 +408,18 @@ async function addProductToRep(repId) {
     return;
   }
 
-  await safeCall(() => api('POST', `/quotations/${currentQuotationId}/items/add-with-winner`, {
-    productId: parseInt(productId),
-    quantity: parseFloat(qty),
-    supplierId: supplier.id,
-    representativeId: repId,
-    value: price
-  }));
+  try {
+    await api('POST', `/quotations/${currentQuotationId}/items/add-with-winner`, {
+      productId: parseInt(productId),
+      quantity: parseFloat(qty),
+      supplierId: supplier.id,
+      representativeId: repId,
+      value: price
+    });
+  } catch (e) {
+    distributeFieldErrors(e.message, fieldMap);
+    return;
+  }
 
   toast('Produto adicionado ao pedido desse representante.');
   qdCurrentItems = await safeCall(() => api('GET', `/quotations/${currentQuotationId}/items`));

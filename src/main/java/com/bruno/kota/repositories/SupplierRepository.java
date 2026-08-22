@@ -15,7 +15,12 @@ public interface SupplierRepository extends JpaRepository<Supplier, Long> {
 
     boolean existsByRepresentativeId(Long representativeId);
 
-    @Query("SELECT s FROM Supplier s WHERE :group MEMBER OF s.groups")
+    // LEFT JOIN FETCH no representante: Representative já tem @BatchSize(25) a nível de
+    // entidade (então mesmo sem isso o Hibernate já agrupava os proxies em lotes em vez
+    // de 1 por fornecedor), mas trazer junto aqui elimina de vez até essa query em lote —
+    // usado por getRepresentativeResponseStatus (nome do representante por fornecedor do
+    // grupo) e pela tela "Fornecedores por Grupo".
+    @Query("SELECT s FROM Supplier s LEFT JOIN FETCH s.representative WHERE :group MEMBER OF s.groups")
     List<Supplier> findByGroup(@Param("group") SupplierGroup group);
 
     @Query(value = "SELECT * FROM suppliers WHERE cnpj = :cnpj", nativeQuery = true)

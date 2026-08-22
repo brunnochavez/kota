@@ -6,7 +6,7 @@
 // qualquer tela sempre jogava de volta pro Dashboard, perdendo o contexto de onde
 // o admin estava trabalhando.
 (function initSection() {
-  const savedSection = localStorage.getItem('kota-admin-section');
+  const savedSection = sessionStorage.getItem('kota-admin-section');
   const validSections = Array.from(document.querySelectorAll('.nav-item')).map(el => el.dataset.section);
   if (savedSection && validSections.includes(savedSection)) {
     goToSection(savedSection);
