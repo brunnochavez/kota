@@ -172,7 +172,33 @@ function changeVrbPage(delta) {
   renderVrbPage();
 }
 
+// Busca os lances de todos os itens ANTES de montar o modal — antes, o formulário
+// inteiro aparecia vazio (select com "Carregando...", tabela em branco) e só se
+// preenchia depois que loadReviewBidsData() terminava. As outras 3 chamadas de
+// loadReviewBidsData() no arquivo (excludeSupplier, acceptViolation, addProductToRep)
+// continuam usando a função original — ali o modal já está aberto e cheio de conteúdo
+// de verdade, é só uma atualização depois de uma ação, não a abertura inicial.
 async function openReviewBidsModal() {
+  openModal2('<div style="padding:60px 20px; text-align:center; color:var(--text-dim)">Carregando lances enviados…</div>', true);
+  reviewBidsPage = 0;
+
+  const perItem = await Promise.all(qdCurrentItems.map(item =>
+    safeCall(() => api('GET', `/bids?quotationItemId=${item.id}`)).then(bids => ({ item, bids }))
+  ));
+
+  qdReviewBidGroups = new Map();
+  perItem.forEach(({ item, bids }) => {
+    bids.forEach(bid => {
+      if (!qdReviewBidGroups.has(bid.submittedById)) {
+        qdReviewBidGroups.set(bid.submittedById, { name: bid.submittedByName, entries: [] });
+      }
+      qdReviewBidGroups.get(bid.submittedById).entries.push({ item, bid });
+    });
+  });
+
+  const winningReps = Array.from(qdReviewBidGroups.entries())
+    .filter(([, group]) => group.entries.some(({ item, bid }) => item.winningBidId === bid.id));
+
   openModal2(`
     <h2 style="margin-bottom:4px">Revisar Lances Enviados</h2>
     <div class="subtitle" style="margin-bottom:10px">Escolha um representante vencedor pra ver os produtos que ele ganhou.</div>
@@ -180,7 +206,9 @@ async function openReviewBidsModal() {
     <div style="display:flex; justify-content:space-between; align-items:end; flex-wrap:wrap; gap:16px; margin-bottom:10px">
       <div style="max-width:320px; flex:1; min-width:200px">
         <label style="margin-bottom:3px">Representante</label>
-        <select id="review-bids-rep-select" onchange="onReviewRepChange()"><option value="">Carregando...</option></select>
+        <select id="review-bids-rep-select" onchange="onReviewRepChange()">${winningReps.length
+          ? winningReps.map(([repId, group]) => `<option value="${repId}">${escapeHtml(group.name)}</option>`).join('')
+          : '<option value="">Nenhum representante venceu itens</option>'}</select>
       </div>
       <div style="display:flex; gap:18px; text-align:right">
         <div><div style="font-size:10.5px; color:var(--text-dim); text-transform:uppercase; letter-spacing:0.03em">Qtd. de itens</div><div id="review-rep-count" style="font-weight:700; font-size:14px">—</div></div>
@@ -209,8 +237,11 @@ async function openReviewBidsModal() {
     </div>
   `, true);
 
-  reviewBidsPage = 0;
-  await loadReviewBidsData();
+  if (!winningReps.length) {
+    document.getElementById('review-bids-list').innerHTML = '<tr><td colspan="5" class="empty">Sem vencedores calculados no momento.</td></tr>';
+    return;
+  }
+  renderSelectedRepBids();
 }
 
 async function loadReviewBidsData() {

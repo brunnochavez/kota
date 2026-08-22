@@ -4,28 +4,56 @@
 let currentQuotationId = null;
 let closeState = { tieBreakWinners: {}, excludedSupplierIds: [], acceptedViolationSupplierIds: [] };
 
+// Busca TUDO que a tela precisa antes de montar o conteúdo final — nada de abrir o modal
+// já com os campos vazios e ir preenchendo conforme cada chamada de API responde (o efeito
+// de "montando na hora" que dava a impressão de página quebrada). Mostra um carregando
+// simples primeiro, busca os dados em paralelo (Promise.all — mais rápido que em série,
+// já que uma chamada não depende da outra), e só troca pro conteúdo de verdade quando
+// tudo já está pronto pra preencher de uma vez, sem nenhum "await" no meio da montagem.
 async function abrirDetalheCotacao(id) {
   currentQuotationId = id;
   closeState = { tieBreakWinners: {}, excludedSupplierIds: [], acceptedViolationSupplierIds: [] };
 
+  openModal('<div style="padding:60px 20px; text-align:center; color:var(--text-dim)">Carregando cotação…</div>', true);
+
+  const [groups, q] = await Promise.all([
+    safeCall(() => api('GET', '/supplier-groups')),
+    safeCall(() => api('GET', `/quotations/${id}`))
+  ]);
+
+  // Itens depende de já saber o status (pra decidir cabeçalho/edição da tabela), mas o
+  // cache de produtos (só usado se for Rascunho) não depende de nada — roda junto.
+  const [items] = await Promise.all([
+    safeCall(() => api('GET', `/quotations/${id}/items`)),
+    q.status === 'DRAFT' ? loadQdProductsCache() : Promise.resolve()
+  ]);
+
+  qdCurrentItems = items;
+  qdCurrentItemsIsDraft = q.status === 'DRAFT';
+  qdItemsPage = 0;
+  qdPendingQuantityEdits = {};
+
   openModal(`
     <div class="qd-modal-body">
     <div class="qd-modal-top">
-    <h2 id="qd-title">Detalhe da cotação</h2>
+    <h2 id="qd-title">Cotação Nº ${formatQuotationNumber(q.id)} - ${escapeHtml(q.name)} ${statusBadge(q)}</h2>
 
     <div class="qd-info-bar" id="qd-info-bar"></div>
     <div class="qd-stepper" id="qd-stepper"></div>
 
     <div class="inline-form">
-      <div><label>Nome</label><input id="qd-name" placeholder="Ex: Cotação de Bebidas"></div>
-      <div><label>Grupo</label><select id="qd-group"></select></div>
+      <div><label>Nome</label><input id="qd-name" placeholder="Ex: Cotação de Bebidas" value="${escapeHtml(q.name)}"></div>
+      <div><label>Grupo</label><select id="qd-group">
+        <option value="">— nenhum —</option>
+        ${groups.map(g => `<option value="${g.id}" ${g.id === q.supplierGroupId ? 'selected' : ''}>${escapeHtml(g.name)}</option>`).join('')}
+      </select></div>
       <div><label>Prazo de expiração</label>
         <div style="display:flex; gap:6px">
           <input type="date" id="qd-expiration-date" style="flex:1.3">
           <input type="time" id="qd-expiration-time" style="flex:1">
         </div>
       </div>
-      <div style="width:170px"><label>Projeção de venda padrão (dias)</label><input type="number" min="1" step="1" id="qd-sales-projection" placeholder="Ex: 30"></div>
+      <div style="width:170px"><label>Projeção de venda padrão (dias)</label><input type="number" min="1" step="1" id="qd-sales-projection" placeholder="Ex: 30" value="${q.defaultSalesProjectionDays ?? ''}"></div>
       <button id="qd-save-btn" onclick="updateQuotation()">Salvar edição</button>
       <button id="qd-group-suppliers-btn" class="secondary" onclick="manageQdGroupSuppliers()">Fornecedores do Grupo</button>
     </div>
@@ -37,7 +65,7 @@ async function abrirDetalheCotacao(id) {
       <button id="qd-response-status-btn" class="secondary" onclick="openRepresentativeStatusModal()" style="display:none">Ver quem já respondeu</button>
       <button id="qd-review-bids-btn" class="secondary" onclick="openReviewBidsModal()" style="display:none">Revisar Cotações Enviadas</button>
       <button id="qd-confirm-close-btn" class="success" onclick="confirmCloseQuotation(this)" style="display:none">Confirmar Fechamento (gerar PDF)</button>
-      <button id="qd-pdf-link" class="secondary" style="display:none" onclick="downloadPdfWithAuth('/quotations/' + currentQuotationId + '/result-pdf', 'cotacao-' + currentQuotationId + '.pdf')">Baixar PDF do resultado</button>
+      <button id="qd-pdf-link" class="secondary" style="display:${q.status === 'CLOSED' ? 'inline-block' : 'none'}" onclick="downloadPdfWithAuth('/quotations/' + currentQuotationId + '/result-pdf', 'cotacao-' + currentQuotationId + '.pdf')">Baixar PDF do resultado</button>
       <button id="qd-duplicate-btn" class="secondary" style="display:none" onclick="duplicateQuotation()">Gerar Outra Cotação</button>
       <button id="qd-delete-btn" class="danger" style="display:none" onclick="deleteQuotationFromModal(this)">Excluir Cotação</button>
     </div>
@@ -47,7 +75,7 @@ async function abrirDetalheCotacao(id) {
     <div id="qd-fulfillment-issues" style="display:none"></div>
 
     <hr class="divider">
-    <div id="qd-add-item-panel" style="display:none">
+    <div id="qd-add-item-panel" style="display:${qdCurrentItemsIsDraft ? 'block' : 'none'}">
       <h3>Adicionar item</h3>
       <div class="inline-form">
         <div style="flex:1">
@@ -72,7 +100,9 @@ async function abrirDetalheCotacao(id) {
         </div>
       </div>
       <div class="qd-items-table-wrap">
-        <table class="qd-items-table"><thead><tr id="qd-items-thead"></tr></thead>
+        <table class="qd-items-table"><thead><tr id="qd-items-thead">${qdCurrentItemsIsDraft
+          ? '<th>Cód. de Barras</th><th>Produto</th><th style="text-align:center">Quantidade</th><th style="text-align:center">Projeção de venda (dias)</th><th></th>'
+          : '<th>Cód. de Barras</th><th>Produto</th><th style="text-align:center">Quantidade</th><th style="text-align:center">Projeção de venda (dias)</th>'}</tr></thead>
           <tbody id="qd-items-tbody"></tbody></table>
       </div>
     </div>
@@ -85,7 +115,7 @@ async function abrirDetalheCotacao(id) {
         <button class="secondary small" onclick="changeQdItemsPage(1)" id="qd-items-next-btn">Próxima →</button>
       </div>
     </div>
-    <div class="btn-row" id="qd-save-quantities-row" style="display:none; justify-content:flex-end; margin-top:12px">
+    <div class="btn-row" id="qd-save-quantities-row" style="display:${qdCurrentItemsIsDraft ? 'flex' : 'none'}; justify-content:flex-end; margin-top:12px">
       <button onclick="saveAllQuotationItemQuantities()">Salvar quantidades</button>
     </div>
 
@@ -96,23 +126,12 @@ async function abrirDetalheCotacao(id) {
     </div>
   `, true);
 
-  const groups = await safeCall(() => api('GET', '/supplier-groups'));
-  document.getElementById('qd-group').innerHTML = '<option value="">— nenhum —</option>' +
-    groups.map(g => `<option value="${g.id}">${g.name}</option>`).join('');
-
-  const q = await safeCall(() => api('GET', `/quotations/${id}`));
-  document.getElementById('qd-title').innerHTML = `Cotação Nº ${formatQuotationNumber(q.id)} - ${escapeHtml(q.name)} ${statusBadge(q)}`;
-  document.getElementById('qd-name').value = q.name;
-  document.getElementById('qd-group').value = q.supplierGroupId || '';
   setExpirationValue('qd-expiration', q.expirationDate);
-  document.getElementById('qd-sales-projection').value = q.defaultSalesProjectionDays ?? '';
-
-  const pdfLink = document.getElementById('qd-pdf-link');
-  pdfLink.style.display = q.status === 'CLOSED' ? 'inline-block' : 'none';
-
   renderQdStepper(q.status, q.hasBids);
   applyQdEditLock(q.status);
-  await loadQuotationItemsDetail(id, q.status);
+  document.getElementById('qd-items-filter').value = '';
+  renderQdItemsRows(items);
+  renderQdFulfillmentIssues(items, q.status);
   renderQdInfoBar(q);
 }
 
