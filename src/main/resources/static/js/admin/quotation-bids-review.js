@@ -11,39 +11,84 @@ function repResponseStatusBadge(status) {
   return '<span class="badge badge-reviewing">Pendente</span>';
 }
 
+// Estado da busca/paginação do modal — vive fora da função porque cada digitação e cada
+// clique de página chamam loadRepStatusPage() de novo, sem reabrir o modal inteiro.
+let repStatusSearch = '';
+let repStatusPage = 0;
+const REP_STATUS_PAGE_SIZE = 10;
+let repStatusSearchTimer = null;
+
 async function openRepresentativeStatusModal() {
-  const rows = await safeCall(() => api('GET', `/quotations/${currentQuotationId}/representative-status`));
-
-  const rowsHtml = rows.length
-    ? rows.map(r => `
-        <tr>
-          <td>${escapeHtml(r.representativeName)}</td>
-          <td>${escapeHtml(r.supplierName)}</td>
-          <td>${repResponseStatusBadge(r.status)}</td>
-          <td>${r.status === 'SUBMITTED'
-            ? `<button class="secondary small" onclick="viewRepresentativeBids(${r.representativeId}, ${r.supplierId}, '${escapeHtml(r.representativeName).replace(/'/g, "\\'")}', '${escapeHtml(r.supplierName).replace(/'/g, "\\'")}')">Ver</button>`
-            : ''}</td>
-        </tr>`).join('')
-    : '';
-
-  const pendingCount = rows.filter(r => r.status === 'PENDING').length;
-
+  repStatusSearch = '';
+  repStatusPage = 0;
   openModal2(`
     <h2>Quem já respondeu</h2>
-    <div class="subtitle" style="margin-bottom:14px">
-      ${rows.length
-        ? `${rows.length - pendingCount} de ${rows.length} representante${rows.length > 1 ? 's' : ''} do grupo já responderam${pendingCount ? ` — ${pendingCount} ainda ${pendingCount > 1 ? 'faltam' : 'falta'}` : ''}.`
-        : 'Essa cotação não tem grupo de fornecedores definido, ou nenhum fornecedor do grupo tem representante vinculado.'}
-    </div>
-    ${rows.length ? `
-      <div class="scroll-box">
-        <table><thead><tr><th>Representante</th><th>Fornecedor</th><th>Status</th><th></th></tr></thead>
-          <tbody>${rowsHtml}</tbody></table>
-      </div>` : ''}
+    <div class="subtitle" id="rep-status-summary" style="margin-bottom:14px">Carregando…</div>
+    <input type="text" id="rep-status-search" placeholder="Buscar por representante ou fornecedor..."
+      oninput="onRepStatusSearchInput()" style="margin-bottom:12px">
+    <div id="rep-status-body">Carregando…</div>
+    ${paginationControlsHtml('rep-status')}
     <div class="btn-row" style="margin-top:16px">
       <button class="secondary" onclick="closeModal2()">Fechar</button>
     </div>
   `);
+  await loadRepStatusPage();
+}
+
+// Debounce de 350ms — busca já dispara requisição pro backend a cada letra digitada
+// (é ele quem filtra agora, não o front), então esperar a pessoa parar de digitar evita
+// uma chamada de API por tecla.
+function onRepStatusSearchInput() {
+  repStatusSearch = document.getElementById('rep-status-search').value;
+  repStatusPage = 0;
+  clearTimeout(repStatusSearchTimer);
+  repStatusSearchTimer = setTimeout(loadRepStatusPage, 350);
+}
+
+function goToRepStatusPage(page) {
+  repStatusPage = page;
+  loadRepStatusPage();
+}
+
+async function loadRepStatusPage() {
+  const query = `?search=${encodeURIComponent(repStatusSearch)}&page=${repStatusPage}&size=${REP_STATUS_PAGE_SIZE}`;
+  const result = await safeCall(() => api('GET', `/quotations/${currentQuotationId}/representative-status${query}`));
+
+  const summaryEl = document.getElementById('rep-status-summary');
+  const pendingCount = result.totalGroupSize - result.respondedCount;
+  summaryEl.textContent = result.totalGroupSize
+    ? `${result.respondedCount} de ${result.totalGroupSize} representante${result.totalGroupSize > 1 ? 's' : ''} do grupo já responderam${pendingCount ? ` — ${pendingCount} ainda ${pendingCount > 1 ? 'faltam' : 'falta'}` : ''}.`
+    : 'Essa cotação não tem grupo de fornecedores definido, ou nenhum fornecedor do grupo tem representante vinculado.';
+
+  const bodyEl = document.getElementById('rep-status-body');
+  if (!result.totalGroupSize) {
+    bodyEl.innerHTML = '';
+    return;
+  }
+  if (!result.content.length) {
+    bodyEl.innerHTML = '<div class="subtitle" style="padding:18px 0">Nenhum representante ou fornecedor encontrado com esse termo.</div>';
+    updatePaginationControls('rep-status', 0, 1, 0, goToRepStatusPage);
+    return;
+  }
+
+  const rowsHtml = result.content.map(r => `
+    <tr>
+      <td class="truncate-cell" title="${escapeHtml(r.representativeName)}">${escapeHtml(r.representativeName)}</td>
+      <td class="truncate-cell" title="${escapeHtml(r.supplierName)}">${escapeHtml(r.supplierName)}</td>
+      <td>${repResponseStatusBadge(r.status)}</td>
+      <td>${r.status === 'SUBMITTED'
+        ? `<button class="secondary small" onclick="viewRepresentativeBids(${r.representativeId}, ${r.supplierId}, '${escapeHtml(r.representativeName).replace(/'/g, "\\'")}', '${escapeHtml(r.supplierName).replace(/'/g, "\\'")}')">Ver</button>`
+        : ''}</td>
+    </tr>`).join('');
+
+  bodyEl.innerHTML = `
+    <div class="scroll-box">
+      <table>
+        <thead><tr><th>Representante</th><th>Fornecedor</th><th>Status</th><th></th></tr></thead>
+        <tbody>${rowsHtml}</tbody>
+      </table>
+    </div>`;
+  updatePaginationControls('rep-status', result.page, result.totalPages, result.totalElements, goToRepStatusPage);
 }
 
 // Reaproveita GET /bids?quotationItemId=X (já usado na Revisão de Lances) — cruza com

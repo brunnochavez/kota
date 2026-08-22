@@ -212,6 +212,12 @@
 
   /* Tables */
   table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+
+  /* Impede que nome de fornecedor/produto longo quebre em várias linhas dentro da
+     célula (deixava a tabela toda desalinhada e feia) — corta com reticências e mostra
+     o texto completo ao passar o mouse (via atributo title no elemento). Funciona em
+     qualquer tabela, não precisa de table-layout:fixed nem de larguras definidas. */
+  .truncate-cell { max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   th { text-align: left; color: var(--text-dim); font-weight: 600; font-size: 10.5px;
        text-transform: uppercase; letter-spacing: 0.04em; padding: 7px 10px; border-bottom: 1px solid var(--border); }
   td { padding: 7px 10px; border-bottom: 1px solid var(--surface-2); vertical-align: middle; }
@@ -828,6 +834,7 @@
       <div class="tab" data-status="AVAILABLE">Disponíveis</div>
       <div class="tab" data-status="REVIEWING">Em Revisão</div>
       <div class="tab" data-status="CLOSED">Fechadas</div>
+      <div class="tab" data-status="AWAITING_CLOSE">Aguardando Fechamento</div>
       <div class="tab" data-status="EXPIRED">Expiradas</div>
     </div>
 

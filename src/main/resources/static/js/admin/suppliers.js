@@ -60,10 +60,10 @@ function renderSuppliersList() {
          <button class="danger small" onclick="hardDeleteSupplier(${s.id}, this)">Excluir</button>`
       : `<button class="success small" onclick="reactivateSupplierModal(${s.id})">Reativar</button>
          <button class="danger small" onclick="hardDeleteSupplier(${s.id}, this)">Excluir</button>`;
-    tr.innerHTML = `<td>${s.id}</td><td>${s.name}</td><td class="mono">${s.cnpj}</td>
+    tr.innerHTML = `<td>${s.id}</td><td class="truncate-cell" title="${escapeHtml(s.name)}">${s.name}</td><td class="mono">${s.cnpj}</td>
       <td class="num">${s.minimumOrderValue != null ? 'R$ ' + s.minimumOrderValue : '—'}</td>
       <td>${s.defaultDeliveryDeadlineDays != null ? s.defaultDeliveryDeadlineDays + ' dias' : '—'}</td>
-      <td>${s.representativeName || '—'}</td>
+      <td class="truncate-cell" title="${escapeHtml(s.representativeName || '')}">${s.representativeName || '—'}</td>
       <td><div class="row-actions">${actions}</div></td>`;
     tbody.appendChild(tr);
   });

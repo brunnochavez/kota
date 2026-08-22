@@ -261,6 +261,43 @@ async function loadQuotationItemsDetail(id, status) {
 
 const QD_TRASH_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" width="15" height="15"><path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m3 0l-1 14a2 2 0 01-2 2H7a2 2 0 01-2-2L4 6h16z"/></svg>';
 
+// Lista completa de cada bloco (Sem lance / Cortados) — guardada à parte pra alimentar o
+// modal "Ver mais" sem precisar embutir o array inteiro no onclick (JSON escapado em
+// atributo HTML é frágil e ilegível). Só o bloco visível na tela usa QD_ITEM_LIST_LIMIT;
+// o "Ver mais" mostra a lista inteira.
+const QD_ITEM_LIST_LIMIT = 6;
+let qdNoWinnerItemsFull = [];
+let qdCutItemsFull = [];
+
+const qdItemLine = i => `<li><strong>${escapeHtml(i.productName)}</strong> <span class="mono" style="color:var(--text-dim); font-size:12px">(${escapeHtml(i.productBarcode)})</span> — ${i.quantity} un.</li>`;
+
+// Corta a lista em QD_ITEM_LIST_LIMIT itens e, se sobrar mais, acrescenta um botão "Ver
+// mais" que abre a lista inteira num modal à parte — sem isso, o painel de atenção podia
+// crescer indefinidamente na tela (uma cotação com dezenas de produtos sem atendimento
+// empurrava todo o resto do modal pra baixo, ficando difícil até de rolar até o fim).
+function qdRenderItemListWithMore(items, which) {
+  const visible = items.slice(0, QD_ITEM_LIST_LIMIT);
+  const listHtml = `<ul style="margin:0 0 8px; padding-left:18px; font-size:13px">${visible.map(qdItemLine).join('')}</ul>`;
+  if (items.length <= QD_ITEM_LIST_LIMIT) return listHtml;
+  const remaining = items.length - QD_ITEM_LIST_LIMIT;
+  return `${listHtml}<button class="secondary small" onclick="qdOpenFullItemListModal('${which}')">Ver mais (${remaining})</button>`;
+}
+
+function qdOpenFullItemListModal(which) {
+  const isCut = which === 'cut';
+  const items = isCut ? qdCutItemsFull : qdNoWinnerItemsFull;
+  const title = isCut ? 'Cortados por falta de estoque' : 'Produtos sem nenhum lance';
+  openModal2(`
+    <h2>${title} (${items.length})</h2>
+    <div class="scroll-box" style="max-height:60vh">
+      <ul style="margin:0; padding-left:18px; font-size:13px">${items.map(qdItemLine).join('')}</ul>
+    </div>
+    <div class="btn-row" style="margin-top:16px">
+      <button class="secondary" onclick="closeModal2()">Fechar</button>
+    </div>
+  `);
+}
+
 // Painel de atenção, só pra cotação FECHADA — só nessa fase "sem vencedor" e "cortado"
 // têm sentido (antes disso winningBidId é sempre nulo pra todo mundo, é só o processo
 // normal de ainda não ter fechado). Some sozinho quando não há nenhum caso, pra não virar
@@ -273,14 +310,15 @@ function renderQdFulfillmentIssues(items, status) {
   const cutItems = items.filter(i => i.fulfillmentCut);
   if (!noWinnerItems.length && !cutItems.length) { wrap.style.display = 'none'; wrap.innerHTML = ''; return; }
 
-  const itemLine = i => `<li><strong>${escapeHtml(i.productName)}</strong> <span class="mono" style="color:var(--text-dim); font-size:12px">(${escapeHtml(i.productBarcode)})</span> — ${i.quantity} un.</li>`;
+  qdNoWinnerItemsFull = noWinnerItems;
+  qdCutItemsFull = cutItems;
 
   const noWinnerBlock = noWinnerItems.length ? `
     <div style="margin-bottom:${cutItems.length ? '14px' : '0'}">
       <div style="font-weight:700; color:var(--warning); font-size:13px">Sem nenhum lance (${noWinnerItems.length})</div>
       <div style="font-size:12px; color:var(--text-dim); margin-bottom:6px">Nenhum representante ofertou esses produtos — a cotação fechou sem vencedor pra eles.</div>
-      <ul style="margin:0 0 8px; padding-left:18px; font-size:13px">${noWinnerItems.map(itemLine).join('')}</ul>
-      <div class="btn-row">
+      ${qdRenderItemListWithMore(noWinnerItems, 'noWinner')}
+      <div class="btn-row" style="margin-top:6px">
         <button class="secondary small" onclick="duplicateUnquotedItems()">Gerar Outra Cotação</button>
         <button class="secondary small" id="qd-add-to-existing-btn" style="display:none" onclick="openAddUnquotedToExistingModal()">Adicionar a uma cotação existente</button>
       </div>
@@ -290,7 +328,7 @@ function renderQdFulfillmentIssues(items, status) {
     <div>
       <div style="font-weight:700; color:var(--danger); font-size:13px">Cortados por falta de estoque (${cutItems.length})</div>
       <div style="font-size:12px; color:var(--text-dim); margin-bottom:6px">O representante venceu, mas depois confirmou que não tem esse item em estoque.</div>
-      <ul style="margin:0; padding-left:18px; font-size:13px">${cutItems.map(itemLine).join('')}</ul>
+      ${qdRenderItemListWithMore(cutItems, 'cut')}
     </div>` : '';
 
   wrap.style.display = 'block';

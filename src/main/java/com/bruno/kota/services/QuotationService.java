@@ -795,7 +795,13 @@ public class QuotationService {
     // olhava o ID do representante, ignorando qual fornecedor ele estava representando
     // naquele lance específico. Bid e QuotationDecline sempre têm o fornecedor
     // explícito — é isso que precisa bater, não só quem digitou.
-    public List<RepresentativeResponseStatus> getRepresentativeResponseStatus(Long quotationId) {
+    // Separado da versão paginada abaixo porque o cálculo (cruzar fornecedores do grupo
+    // com quem já deu lance/recusou) é sempre feito por inteiro — não dá pra "paginar a
+    // consulta" de verdade, já que o status de cada fornecedor não é uma coluna pronta no
+    // banco. Compensa: normalmente é um grupo só (dezenas a poucas centenas de
+    // fornecedores), então computar tudo em memória é rápido; a paginação/busca abaixo
+    // serve pra não mandar a lista inteira pro navegador de uma vez só.
+    private List<RepresentativeResponseStatus> computeRepresentativeResponseStatus(Long quotationId) {
         Quotation quotation = findEntityById(quotationId);
         SupplierGroup group = safeGetSupplierGroup(quotation);
         if (group == null) {
@@ -825,6 +831,35 @@ public class QuotationService {
         result.sort(Comparator.<RepresentativeResponseStatus>comparingInt(r -> statusOrder.get(r.status()))
                 .thenComparing(RepresentativeResponseStatus::representativeName));
         return result;
+    }
+
+    // search filtra por nome do representante OU do fornecedor (o admin pode lembrar de
+    // qualquer um dos dois na hora de procurar). page/size cortam a lista já filtrada —
+    // o front só recebe a fatia que vai mostrar, não a lista inteira do grupo.
+    // totalGroupSize/respondedCount vêm do grupo INTEIRO, sem o filtro de busca aplicado —
+    // são pro resumo fixo do topo do modal, que não deve mudar conforme o admin digita.
+    @Transactional(readOnly = true)
+    public RepresentativeStatusPageResponse getRepresentativeResponseStatus(
+            Long quotationId, String search, int page, int size) {
+        List<RepresentativeResponseStatus> all = computeRepresentativeResponseStatus(quotationId);
+        int respondedCount = (int) all.stream().filter(r -> !"PENDING".equals(r.status())).count();
+
+        String normalizedSearch = search != null ? search.trim().toLowerCase() : "";
+        List<RepresentativeResponseStatus> filtered = normalizedSearch.isEmpty()
+                ? all
+                : all.stream()
+                    .filter(r -> r.representativeName().toLowerCase().contains(normalizedSearch)
+                            || r.supplierName().toLowerCase().contains(normalizedSearch))
+                    .toList();
+
+        int totalElements = filtered.size();
+        int totalPages = size > 0 ? (int) Math.ceil((double) totalElements / size) : 1;
+        int fromIndex = Math.min(page * size, totalElements);
+        int toIndex = Math.min(fromIndex + size, totalElements);
+        List<RepresentativeResponseStatus> content = filtered.subList(fromIndex, toIndex);
+
+        return new RepresentativeStatusPageResponse(
+                content, page, size, totalElements, totalPages, all.size(), respondedCount);
     }
 
     // Mesmo princípio do BidService.submit(): authenticatedRepresentativeId vem do token,

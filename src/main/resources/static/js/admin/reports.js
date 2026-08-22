@@ -161,10 +161,10 @@ function renderReportTable() {
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td><a href="#" onclick="abrirDetalheCotacao(${g.quotationId}); return false;">${formatQuotationNumber(g.quotationId)}</a></td>
-      <td><a href="#" onclick="abrirDetalheCotacao(${g.quotationId}); return false;">${escapeHtml(g.quotationName)}</a></td>
+      <td class="truncate-cell" title="${escapeHtml(g.quotationName)}"><a href="#" onclick="abrirDetalheCotacao(${g.quotationId}); return false;">${escapeHtml(g.quotationName)}</a></td>
       <td>${fmtDate(g.closedAt)}</td>
-      <td>${escapeHtml(g.supplierName)}</td>
-      <td>${escapeHtml(g.representativeName)}</td>
+      <td class="truncate-cell" title="${escapeHtml(g.supplierName)}">${escapeHtml(g.supplierName)}</td>
+      <td class="truncate-cell" title="${escapeHtml(g.representativeName)}">${escapeHtml(g.representativeName)}</td>
       <td style="text-align:right">${formatCurrencyFromNumber(g.total)}</td>
       <td>${reportResultBadge(g)}</td>
       <td>${reportOrderBadge(g)}</td>

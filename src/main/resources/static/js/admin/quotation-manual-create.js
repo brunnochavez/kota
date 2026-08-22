@@ -178,7 +178,7 @@ async function createQuotationManually() {
     return;
   }
 
-  toast('Cotação #' + q.id + ' criada em DRAFT.');
+  toast('Cotação #' + q.id + ' criada como Rascunho. Você pode publicá-la a qualquer momento na aba Rascunhos.');
   document.getElementById('mq-name').value = '';
   document.getElementById('mq-sales-projection').value = '';
   document.getElementById('mq-items').innerHTML = '';

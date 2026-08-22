@@ -8,7 +8,7 @@ let quotationsCache = [];
 let currentStatusFilter = 'DRAFT';
 
 const STATUS_LABELS = { DRAFT: 'Rascunho', AVAILABLE: 'Disponível', REVIEWING: 'Em Revisão', CLOSED: 'Fechada', EXPIRED: 'Expirada' };
-const STATUS_LABELS_PLURAL = { DRAFT: 'Rascunhos', AVAILABLE: 'Disponíveis', REVIEWING: 'Em Revisão', CLOSED: 'Fechadas', EXPIRED: 'Expiradas' };
+const STATUS_LABELS_PLURAL = { DRAFT: 'Rascunhos', AVAILABLE: 'Disponíveis', REVIEWING: 'Em Revisão', CLOSED: 'Fechadas', EXPIRED: 'Expiradas', AWAITING_CLOSE: 'Aguardando Fechamento' };
 const STATUS_CLASSES = { DRAFT: 'draft', AVAILABLE: 'available', REVIEWING: 'reviewing', CLOSED: 'closed', EXPIRED: 'expired' };
 
 // Recebe a cotação inteira (não só o status) porque EXPIRED precisa saber se já tem
@@ -58,8 +58,17 @@ function fillRateBarHtml(quotationId) {
   </div>`;
 }
 
+// "Aguardando Fechamento" não é um status de verdade no banco — é sempre EXPIRED com
+// hasBids=true por baixo. Ganhou aba própria (em vez de ficar misturado com as
+// "Expiradas" de verdade) porque as duas situações pedem ações completamente
+// diferentes: uma cotação aqui ainda dá pra fechar e calcular vencedores; uma Expirada
+// de verdade (sem nenhum lance) não tem mais o que fazer, só arquivar mentalmente.
 function renderQuotationsList() {
-  const filtered = quotationsCache.filter(q => q.status === currentStatusFilter);
+  const filtered = quotationsCache.filter(q => {
+    if (currentStatusFilter === 'AWAITING_CLOSE') return q.status === 'EXPIRED' && q.hasBids;
+    if (currentStatusFilter === 'EXPIRED') return q.status === 'EXPIRED' && !q.hasBids;
+    return q.status === currentStatusFilter;
+  });
   const tbody = document.getElementById('quotations-tbody');
   tbody.innerHTML = '';
   document.getElementById('quotations-empty').style.display = filtered.length ? 'none' : 'block';

@@ -24,6 +24,7 @@ import org.springframework.web.multipart.MultipartFile;
 import com.bruno.kota.dtos.AddItemWithWinnerRequest;
 import com.bruno.kota.dtos.ConfirmCloseRequest;
 import com.bruno.kota.dtos.ManualWinnerAssignRequest;
+import com.bruno.kota.dtos.RepresentativeStatusPageResponse;
 import com.bruno.kota.dtos.QuotationCloseRequest;
 import com.bruno.kota.dtos.QuotationCloseResult;
 import com.bruno.kota.dtos.QuotationCreateRequest;
@@ -73,8 +74,12 @@ public class QuotationController {
 
     @GetMapping("/{id}/representative-status")
     @PreAuthorize("hasRole('ADMIN')")
-    public List<RepresentativeResponseStatus> getRepresentativeResponseStatus(@PathVariable Long id) {
-        return quotationService.getRepresentativeResponseStatus(id);
+    public RepresentativeStatusPageResponse getRepresentativeResponseStatus(
+            @PathVariable Long id,
+            @RequestParam(required = false) String search,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+        return quotationService.getRepresentativeResponseStatus(id, search, page, size);
     }
 
     @GetMapping("/won")

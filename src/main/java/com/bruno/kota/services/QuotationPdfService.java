@@ -2,6 +2,8 @@ package com.bruno.kota.services;
 
 import java.awt.Color;
 import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
 import java.math.BigDecimal;
 import java.text.DecimalFormat;
 import java.text.DecimalFormatSymbols;
@@ -20,9 +22,14 @@ import org.openpdf.text.Font;
 import org.openpdf.text.Image;
 import org.openpdf.text.Paragraph;
 import org.openpdf.text.Phrase;
+import org.openpdf.text.Rectangle;
+import org.openpdf.text.pdf.ColumnText;
+import org.openpdf.text.pdf.PdfContentByte;
 import org.openpdf.text.pdf.PdfPCell;
 import org.openpdf.text.pdf.PdfPTable;
+import org.openpdf.text.pdf.PdfPageEventHelper;
 import org.openpdf.text.pdf.PdfWriter;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -55,8 +62,72 @@ public class QuotationPdfService {
     // e não como campo estático aqui.
     private static final Locale PT_BR = new Locale("pt", "BR");
     private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
-    private static final Color HEADER_BG = new Color(230, 236, 245);
-    private static final Color STRIPE_BG = new Color(246, 248, 251);
+
+    // Paleta alinhada com a cor de destaque usada no próprio site (--accent: #2f6fed),
+    // pra o PDF parecer parte do mesmo produto, não um relatório genérico de planilha.
+    private static final Color ACCENT = new Color(47, 111, 237);
+    private static final Color ACCENT_DARK = new Color(30, 58, 138);
+    private static final Color ACCENT_SOFT = new Color(232, 240, 254);
+    private static final Color TEXT_DIM = new Color(107, 114, 128);
+    private static final Color BORDER_LIGHT = new Color(228, 231, 236);
+    private static final Color STRIPE_BG = new Color(248, 249, 251);
+
+    // A logo do Kota (marca do software) é um arquivo estático do próprio projeto —
+    // igual pra todo mundo, diferente da logo da empresa-cliente (essa sim varia por
+    // tenant, vem de CompanySettings). Por ser sempre a mesma, carrega uma vez só e
+    // reaproveita — não faz sentido reler o arquivo do disco a cada PDF gerado.
+    private static volatile byte[] kotaWordmarkBytes;
+
+    private static byte[] loadKotaWordmark() {
+        if (kotaWordmarkBytes == null) {
+            synchronized (QuotationPdfService.class) {
+                if (kotaWordmarkBytes == null) {
+                    try (InputStream in = new ClassPathResource("static/img/kota-wordmark.png").getInputStream()) {
+                        kotaWordmarkBytes = in.readAllBytes();
+                    } catch (IOException e) {
+                        kotaWordmarkBytes = new byte[0];
+                    }
+                }
+            }
+        }
+        return kotaWordmarkBytes;
+    }
+
+    // Rodapé de marca — "Gerado com Kota" + número da página, em toda página do
+    // documento (não só na última). O PdfPageEventHelper é o jeito certo de fazer isso
+    // no OpenPDF: desenha direto no content stream de cada página conforme ela é
+    // fechada, então funciona igual não importa quantas páginas o PDF tiver.
+    private static class KotaFooterEvent extends PdfPageEventHelper {
+        @Override
+        public void onEndPage(PdfWriter writer, Document document) {
+            PdfContentByte cb = writer.getDirectContent();
+            float pageWidth = document.getPageSize().getWidth();
+            float bottom = document.bottom() - 24;
+
+            cb.setColorStroke(BORDER_LIGHT);
+            cb.setLineWidth(0.75f);
+            cb.moveTo(document.leftMargin(), bottom + 14);
+            cb.lineTo(pageWidth - document.rightMargin(), bottom + 14);
+            cb.stroke();
+
+            byte[] logoBytes = loadKotaWordmark();
+            if (logoBytes.length > 0) {
+                try {
+                    Image logo = Image.getInstance(logoBytes);
+                    logo.scaleToFit(52, 15);
+                    logo.setAbsolutePosition(document.leftMargin(), bottom - 2);
+                    cb.addImage(logo);
+                } catch (Exception e) {
+                    // Sem logo, sem drama — o rodapé segue sem ela.
+                }
+            }
+
+            Font pageNumFont = new Font(Font.HELVETICA, 8, Font.NORMAL, TEXT_DIM);
+            ColumnText.showTextAligned(cb, Element.ALIGN_RIGHT,
+                    new Phrase("Página " + writer.getPageNumber(), pageNumFont),
+                    pageWidth - document.rightMargin(), bottom, 0);
+        }
+    }
 
     // Reaproveitado pelos dois PDFs — logo (se tiver sido cadastrada) mais nome/CNPJ/
     // endereço/telefone da empresa, sempre no topo do documento. Se não tiver nada
@@ -79,7 +150,7 @@ public class QuotationPdfService {
         }
 
         Font companyNameFont = new Font(Font.HELVETICA, 12, Font.BOLD);
-        Font companyDetailFont = new Font(Font.HELVETICA, 8.5f, Font.NORMAL, Color.GRAY);
+        Font companyDetailFont = new Font(Font.HELVETICA, 8.5f, Font.NORMAL, TEXT_DIM);
 
         if (company.name() != null && !company.name().isBlank()) {
             document.add(new Paragraph(company.name(), companyNameFont));
@@ -107,8 +178,104 @@ public class QuotationPdfService {
             }
         }
         Paragraph spacer = new Paragraph(" ", companyDetailFont);
-        spacer.setSpacingAfter(6);
+        spacer.setSpacingAfter(4);
         document.add(spacer);
+    }
+
+    // Faixa colorida com o título — em vez de um Paragraph preto solto no topo, como
+    // documento de Word/Excel padrão. Uma tabela de 1 célula só é o jeito mais simples
+    // e confiável de conseguir um fundo colorido atrás de texto no OpenPDF.
+    private void addTitleBand(Document document, String title, String subtitle) throws DocumentException {
+        PdfPTable band = new PdfPTable(1);
+        band.setWidthPercentage(100);
+        PdfPCell cell = new PdfPCell();
+        cell.setBackgroundColor(ACCENT_DARK);
+        cell.setBorder(Rectangle.NO_BORDER);
+        cell.setPadding(14);
+
+        Font titleFont = new Font(Font.HELVETICA, 16, Font.BOLD, Color.WHITE);
+        Font subtitleFont = new Font(Font.HELVETICA, 9, Font.NORMAL, new Color(203, 213, 225));
+
+        Paragraph titleP = new Paragraph(title, titleFont);
+        Paragraph subtitleP = new Paragraph(subtitle, subtitleFont);
+        subtitleP.setSpacingBefore(3);
+        cell.addElement(titleP);
+        cell.addElement(subtitleP);
+
+        band.addCell(cell);
+        band.setSpacingAfter(16);
+        document.add(band);
+    }
+
+    // Título do bloco de cada fornecedor — uma faixa clara com barra de destaque à
+    // esquerda, em vez de só um texto em negrito. Ajuda a separar visualmente um
+    // fornecedor do outro quando o PDF tem vários (rola bastante quando um pedido é
+    // dividido entre fornecedores diferentes).
+    private void addSupplierHeading(Document document, String supplierName) throws DocumentException {
+        PdfPTable heading = new PdfPTable(1);
+        heading.setWidthPercentage(100);
+        PdfPCell cell = new PdfPCell(new Phrase(supplierName, new Font(Font.HELVETICA, 12.5f, Font.BOLD, ACCENT_DARK)));
+        cell.setBackgroundColor(ACCENT_SOFT);
+        cell.setBorder(Rectangle.LEFT);
+        cell.setBorderColor(ACCENT);
+        cell.setBorderWidthLeft(3.5f);
+        cell.setPadding(9);
+        heading.addCell(cell);
+        heading.setSpacingBefore(6);
+        heading.setSpacingAfter(8);
+        document.add(heading);
+    }
+
+    private PdfPTable buildItemsTable(List<QuotationItem> items, DecimalFormat moneyFormat, DecimalFormat qtyFormat) {
+        Font headerFont = new Font(Font.HELVETICA, 8.5f, Font.BOLD, Color.WHITE);
+        Font cellFont = new Font(Font.HELVETICA, 9.5f, Font.NORMAL, new Color(31, 41, 55));
+
+        PdfPTable table = new PdfPTable(5);
+        table.setWidthPercentage(100);
+        try {
+            table.setWidths(new float[]{2.3f, 4f, 1.3f, 1.9f, 1.9f});
+        } catch (DocumentException e) {
+            // Não acontece de verdade (array já tem o mesmo tamanho de colunas), mas o
+            // método declara a exceção — sem isso o compilador reclama.
+        }
+
+        addHeaderCell(table, "Código de Barras", headerFont, Element.ALIGN_LEFT);
+        addHeaderCell(table, "Descrição", headerFont, Element.ALIGN_LEFT);
+        addHeaderCell(table, "Qtd.", headerFont, Element.ALIGN_RIGHT);
+        addHeaderCell(table, "Preço Unit. (R$)", headerFont, Element.ALIGN_RIGHT);
+        addHeaderCell(table, "Subtotal (R$)", headerFont, Element.ALIGN_RIGHT);
+
+        boolean stripe = false;
+        for (QuotationItem item : items) {
+            Bid winner = item.getWinningBid();
+            BigDecimal subtotal = winner.getValue().multiply(item.getQuantity());
+            Color rowColor = stripe ? STRIPE_BG : Color.WHITE;
+            addCell(table, item.getProduct().getBarcode(), cellFont, Element.ALIGN_LEFT, rowColor);
+            addCell(table, item.getProduct().getName(), cellFont, Element.ALIGN_LEFT, rowColor);
+            addCell(table, qtyFormat.format(item.getQuantity()), cellFont, Element.ALIGN_RIGHT, rowColor);
+            addCell(table, moneyFormat.format(winner.getValue()), cellFont, Element.ALIGN_RIGHT, rowColor);
+            addCell(table, moneyFormat.format(subtotal), cellFont, Element.ALIGN_RIGHT, rowColor);
+            stripe = !stripe;
+        }
+        return table;
+    }
+
+    // Total como um cartão destacado (fundo suave + borda), não só um texto alinhado à
+    // direita perdido no meio da página — é o número mais importante do documento,
+    // merece se destacar visualmente do resto.
+    private void addTotalCallout(Document document, String label, BigDecimal value, DecimalFormat moneyFormat, boolean emphasized) throws DocumentException {
+        PdfPTable wrap = new PdfPTable(1);
+        wrap.setWidthPercentage(46);
+        wrap.setHorizontalAlignment(Element.ALIGN_RIGHT);
+        PdfPCell cell = new PdfPCell(new Phrase(label + "  R$ " + moneyFormat.format(value),
+                new Font(Font.HELVETICA, emphasized ? 12.5f : 11f, Font.BOLD, emphasized ? Color.WHITE : ACCENT_DARK)));
+        cell.setBackgroundColor(emphasized ? ACCENT : ACCENT_SOFT);
+        cell.setBorder(Rectangle.NO_BORDER);
+        cell.setPadding(10);
+        cell.setHorizontalAlignment(Element.ALIGN_RIGHT);
+        wrap.addCell(cell);
+        wrap.setSpacingBefore(emphasized ? 14 : 6);
+        document.add(wrap);
     }
 
     private String labelOrNull(String label, String value) {
@@ -155,23 +322,13 @@ public class QuotationPdfService {
 
         try {
             ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
-            Document document = new Document();
-            PdfWriter.getInstance(document, outputStream);
+            Document document = new Document(org.openpdf.text.PageSize.A4, 36, 36, 36, 54);
+            PdfWriter writer = PdfWriter.getInstance(document, outputStream);
+            writer.setPageEvent(new KotaFooterEvent());
             document.open();
             addCompanyHeader(document);
-
-            Font titleFont = new Font(Font.HELVETICA, 17, Font.BOLD);
-            Font subtitleFont = new Font(Font.HELVETICA, 9.5f, Font.NORMAL, Color.GRAY);
-            Font supplierFont = new Font(Font.HELVETICA, 13, Font.BOLD);
-            Font headerFont = new Font(Font.HELVETICA, 9, Font.BOLD);
-            Font cellFont = new Font(Font.HELVETICA, 10, Font.NORMAL);
-            Font totalFont = new Font(Font.HELVETICA, 11, Font.BOLD);
-            Font grandTotalFont = new Font(Font.HELVETICA, 13, Font.BOLD);
-
-            document.add(new Paragraph("Resultado da Cotação #" + quotation.getId() + " — " + quotation.getName(), titleFont));
-            Paragraph subtitle = new Paragraph("Gerado em " + LocalDateTime.now().format(DATE_FORMAT), subtitleFont);
-            subtitle.setSpacingAfter(14);
-            document.add(subtitle);
+            addTitleBand(document, "Cotação #" + quotation.getId() + " — " + quotation.getName(),
+                    "Resultado gerado em " + LocalDateTime.now().format(DATE_FORMAT));
 
             BigDecimal grandTotal = BigDecimal.ZERO;
 
@@ -179,55 +336,20 @@ public class QuotationPdfService {
                 Supplier supplier = suppliersById.get(entry.getKey());
                 List<QuotationItem> supplierItems = entry.getValue();
 
-                Paragraph supplierHeading = new Paragraph("Fornecedor: " + supplier.getName(), supplierFont);
-                supplierHeading.setSpacingBefore(14);
-                supplierHeading.setSpacingAfter(6);
-                document.add(supplierHeading);
+                addSupplierHeading(document, supplier.getName());
+                document.add(buildItemsTable(supplierItems, moneyFormat, qtyFormat));
 
-                PdfPTable table = new PdfPTable(5);
-                table.setWidthPercentage(100);
-                table.setWidths(new float[]{2.3f, 4f, 1.3f, 1.9f, 1.9f});
-
-                addHeaderCell(table, "Código de Barras", headerFont, Element.ALIGN_LEFT);
-                addHeaderCell(table, "Descrição", headerFont, Element.ALIGN_LEFT);
-                addHeaderCell(table, "Qtd.", headerFont, Element.ALIGN_RIGHT);
-                addHeaderCell(table, "Preço Unit. (R$)", headerFont, Element.ALIGN_RIGHT);
-                addHeaderCell(table, "Subtotal (R$)", headerFont, Element.ALIGN_RIGHT);
-
-                BigDecimal supplierTotal = BigDecimal.ZERO;
-                boolean stripe = false;
-
-                for (QuotationItem item : supplierItems) {
-                    Bid winner = item.getWinningBid();
-                    BigDecimal subtotal = winner.getValue().multiply(item.getQuantity());
-                    supplierTotal = supplierTotal.add(subtotal);
-
-                    Color rowColor = stripe ? STRIPE_BG : Color.WHITE;
-                    addCell(table, item.getProduct().getBarcode(), cellFont, Element.ALIGN_LEFT, rowColor);
-                    addCell(table, item.getProduct().getName(), cellFont, Element.ALIGN_LEFT, rowColor);
-                    addCell(table, qtyFormat.format(item.getQuantity()), cellFont, Element.ALIGN_RIGHT, rowColor);
-                    addCell(table, moneyFormat.format(winner.getValue()), cellFont, Element.ALIGN_RIGHT, rowColor);
-                    addCell(table, moneyFormat.format(subtotal), cellFont, Element.ALIGN_RIGHT, rowColor);
-                    stripe = !stripe;
-                }
-
-                document.add(table);
-
-                Paragraph totalParagraph = new Paragraph("Total do pedido: R$ " + moneyFormat.format(supplierTotal), totalFont);
-                totalParagraph.setAlignment(Element.ALIGN_RIGHT);
-                totalParagraph.setSpacingBefore(4);
-                document.add(totalParagraph);
-
+                BigDecimal supplierTotal = supplierItems.stream()
+                        .map(item -> item.getWinningBid().getValue().multiply(item.getQuantity()))
+                        .reduce(BigDecimal.ZERO, BigDecimal::add);
+                addTotalCallout(document, "Total do pedido:", supplierTotal, moneyFormat, false);
                 grandTotal = grandTotal.add(supplierTotal);
             }
 
             // Só faz sentido mostrar um total geral separado quando tem mais de um
             // fornecedor — com um só, seria repetir o mesmo número duas vezes.
             if (itemsBySupplier.size() > 1) {
-                Paragraph grandTotalParagraph = new Paragraph("Total geral da cotação: R$ " + moneyFormat.format(grandTotal), grandTotalFont);
-                grandTotalParagraph.setAlignment(Element.ALIGN_RIGHT);
-                grandTotalParagraph.setSpacingBefore(16);
-                document.add(grandTotalParagraph);
+                addTotalCallout(document, "Total geral da cotação:", grandTotal, moneyFormat, true);
             }
 
             document.close();
@@ -271,60 +393,21 @@ public class QuotationPdfService {
 
         try {
             ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
-            Document document = new Document();
-            PdfWriter.getInstance(document, outputStream);
+            Document document = new Document(org.openpdf.text.PageSize.A4, 36, 36, 36, 54);
+            PdfWriter writer = PdfWriter.getInstance(document, outputStream);
+            writer.setPageEvent(new KotaFooterEvent());
             document.open();
             addCompanyHeader(document);
+            addTitleBand(document, "Pedido — Cotação #" + quotation.getId() + " — " + quotation.getName(),
+                    "Gerado em " + LocalDateTime.now().format(DATE_FORMAT));
 
-            Font titleFont = new Font(Font.HELVETICA, 17, Font.BOLD);
-            Font subtitleFont = new Font(Font.HELVETICA, 9.5f, Font.NORMAL, Color.GRAY);
-            Font supplierFont = new Font(Font.HELVETICA, 13, Font.BOLD);
-            Font headerFont = new Font(Font.HELVETICA, 9, Font.BOLD);
-            Font cellFont = new Font(Font.HELVETICA, 10, Font.NORMAL);
-            Font totalFont = new Font(Font.HELVETICA, 11, Font.BOLD);
+            addSupplierHeading(document, "Fornecedor: " + supplier.getName());
+            document.add(buildItemsTable(supplierItems, moneyFormat, qtyFormat));
 
-            document.add(new Paragraph("Pedido — Cotação #" + quotation.getId() + " — " + quotation.getName(), titleFont));
-            Paragraph subtitle = new Paragraph("Gerado em " + LocalDateTime.now().format(DATE_FORMAT), subtitleFont);
-            subtitle.setSpacingAfter(14);
-            document.add(subtitle);
-
-            Paragraph supplierHeading = new Paragraph("Fornecedor: " + supplier.getName(), supplierFont);
-            supplierHeading.setSpacingAfter(6);
-            document.add(supplierHeading);
-
-            PdfPTable table = new PdfPTable(5);
-            table.setWidthPercentage(100);
-            table.setWidths(new float[]{2.3f, 4f, 1.3f, 1.9f, 1.9f});
-
-            addHeaderCell(table, "Código de Barras", headerFont, Element.ALIGN_LEFT);
-            addHeaderCell(table, "Descrição", headerFont, Element.ALIGN_LEFT);
-            addHeaderCell(table, "Qtd.", headerFont, Element.ALIGN_RIGHT);
-            addHeaderCell(table, "Preço Unit. (R$)", headerFont, Element.ALIGN_RIGHT);
-            addHeaderCell(table, "Subtotal (R$)", headerFont, Element.ALIGN_RIGHT);
-
-            BigDecimal supplierTotal = BigDecimal.ZERO;
-            boolean stripe = false;
-
-            for (QuotationItem item : supplierItems) {
-                Bid winner = item.getWinningBid();
-                BigDecimal subtotal = winner.getValue().multiply(item.getQuantity());
-                supplierTotal = supplierTotal.add(subtotal);
-
-                Color rowColor = stripe ? STRIPE_BG : Color.WHITE;
-                addCell(table, item.getProduct().getBarcode(), cellFont, Element.ALIGN_LEFT, rowColor);
-                addCell(table, item.getProduct().getName(), cellFont, Element.ALIGN_LEFT, rowColor);
-                addCell(table, qtyFormat.format(item.getQuantity()), cellFont, Element.ALIGN_RIGHT, rowColor);
-                addCell(table, moneyFormat.format(winner.getValue()), cellFont, Element.ALIGN_RIGHT, rowColor);
-                addCell(table, moneyFormat.format(subtotal), cellFont, Element.ALIGN_RIGHT, rowColor);
-                stripe = !stripe;
-            }
-
-            document.add(table);
-
-            Paragraph totalParagraph = new Paragraph("Total do pedido: R$ " + moneyFormat.format(supplierTotal), totalFont);
-            totalParagraph.setAlignment(Element.ALIGN_RIGHT);
-            totalParagraph.setSpacingBefore(4);
-            document.add(totalParagraph);
+            BigDecimal supplierTotal = supplierItems.stream()
+                    .map(item -> item.getWinningBid().getValue().multiply(item.getQuantity()))
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            addTotalCallout(document, "Total do pedido:", supplierTotal, moneyFormat, true);
 
             document.close();
             return outputStream.toByteArray();
@@ -335,17 +418,21 @@ public class QuotationPdfService {
 
     private void addHeaderCell(PdfPTable table, String text, Font font, int align) {
         PdfPCell cell = new PdfPCell(new Phrase(text, font));
-        cell.setPadding(6);
+        cell.setPadding(7);
         cell.setHorizontalAlignment(align);
-        cell.setBackgroundColor(HEADER_BG);
+        cell.setBackgroundColor(ACCENT);
+        cell.setBorder(Rectangle.NO_BORDER);
         table.addCell(cell);
     }
 
     private void addCell(PdfPTable table, String text, Font font, int align, Color background) {
         PdfPCell cell = new PdfPCell(new Phrase(text, font));
-        cell.setPadding(5);
+        cell.setPadding(6);
         cell.setHorizontalAlignment(align);
         cell.setBackgroundColor(background);
+        cell.setBorder(Rectangle.BOTTOM);
+        cell.setBorderColor(BORDER_LIGHT);
+        cell.setBorderWidthBottom(0.75f);
         table.addCell(cell);
     }
 }
