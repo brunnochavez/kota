@@ -15,11 +15,15 @@ function setTheme(theme) { applyTheme(theme); }
 applyTheme(window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
 
 // ---------- helpers ----------
+const TOAST_OK_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="9"/><path d="M8 12.5l2.5 2.5L16 9.5"/></svg>';
+const TOAST_ERR_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.2v.1"/></svg>';
+
 function toast(msg, isErr) {
   const wrap = document.getElementById('toast-wrap');
   const t = document.createElement('div');
   t.className = 'toast ' + (isErr ? 'err' : 'ok');
-  t.textContent = msg;
+  t.innerHTML = `<span class="toast-icon">${isErr ? TOAST_ERR_ICON : TOAST_OK_ICON}</span><span class="toast-text"></span>`;
+  t.querySelector('.toast-text').textContent = msg;
   wrap.appendChild(t);
   setTimeout(() => t.remove(), 5000);
 }

@@ -10,12 +10,65 @@ document.querySelectorAll('.nav-item').forEach(item => {
 // menu E por goToSection(), que agora também precisa funcionar pra seções sem item
 // correspondente na nav principal (ex: "Dados da Empresa", que só é acessível pelo
 // menu de conta).
+//
+// Trocar de seção só esconde a div antiga (display:none) e mostra a nova — nunca destrói
+// e reconstrói nada. Sem isso, texto digitado num campo de busca ou num formulário ficava
+// exatamente do jeito que a pessoa deixou, mesmo depois de navegar pra outro lugar e
+// voltar horas depois. Por isso, antes de trocar, zera os campos "voláteis" da seção que
+// está sendo deixada — buscas viram texto vazio de novo, e o formulário de "Iniciar uma
+// Cotação" (o mais expressivo — nome, itens, tudo) volta pro estado em branco.
 function switchToSection(section) {
+  const previousSection = document.querySelector('.section.active');
+  const previousId = previousSection ? previousSection.id.replace('section-', '') : null;
+  if (previousId && previousId !== section) {
+    resetSectionVolatileInputs(previousId);
+  }
+
   document.querySelectorAll('.nav-item').forEach(i => i.classList.toggle('active', i.dataset.section === section));
   document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
   document.getElementById('section-' + section).classList.add('active');
   loadSectionData(section);
   sessionStorage.setItem('kota-admin-section', section);
+}
+
+// Campo de busca de cada listagem — cada um só filtra a própria tela, não faz sentido
+// nenhum reaparecer preenchido numa visita futura.
+const SECTION_SEARCH_INPUT_IDS = {
+  products: 'product-search',
+  representatives: 'rep-search',
+  suppliers: 'supplier-search'
+};
+
+function resetSectionVolatileInputs(section) {
+  const searchId = SECTION_SEARCH_INPUT_IDS[section];
+  if (searchId) {
+    const el = document.getElementById(searchId);
+    if (el) el.value = '';
+  }
+  if (section === 'quotation-start') resetQuotationStartForm();
+}
+
+// Limpa os dois formulários de "Iniciar uma Cotação" (Importar CSV e Criar Manualmente)
+// por completo — incluindo as linhas de item já adicionadas, que não são um <input>
+// simples de resetar, são elementos criados na hora. Também volta pro método padrão
+// (Importar), pra sempre abrir do mesmo jeito da primeira vez.
+function resetQuotationStartForm() {
+  document.getElementById('import-name').value = '';
+  document.getElementById('import-group').value = '';
+  clearExpirationValue('import-expiration');
+  document.getElementById('import-sales-projection').value = '';
+  document.getElementById('import-file').value = '';
+  document.getElementById('import-mapping').style.display = 'none';
+  document.getElementById('import-headers-list').innerHTML = '';
+
+  document.getElementById('mq-name').value = '';
+  document.getElementById('mq-group').value = '';
+  clearExpirationValue('mq-expiration');
+  document.getElementById('mq-sales-projection').value = '';
+  document.getElementById('mq-items').innerHTML = '';
+  manualItemCount = 0;
+
+  showStartMethod('import');
 }
 
 function goToSection(section) {

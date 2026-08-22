@@ -239,10 +239,20 @@
   .badge-reviewing { background: var(--warning-bg); color: var(--warning); }
   .badge-reviewing::before { background: var(--warning); }
   /* Toast */
-  #toast-wrap { position: fixed; top: 16px; right: 16px; z-index: 1200; display: flex; flex-direction: column; gap: 8px; }
-  .toast { padding: 11px 15px; border-radius: 9px; font-size: 12.5px; max-width: 380px; box-shadow: var(--shadow); }
-  .toast.ok { background: var(--success-bg); color: var(--success); border: 1px solid var(--success-border); }
-  .toast.err { background: var(--danger-bg); color: var(--danger); border: 1px solid var(--danger-border); }
+  #toast-wrap { position: fixed; top: 16px; right: 16px; z-index: 1200; display: flex; flex-direction: column; gap: 8px; align-items: flex-end; }
+  .toast {
+    display: flex; align-items: flex-start; gap: 9px; padding: 11px 14px 11px 12px;
+    border-radius: 7px; font-size: 12.5px; max-width: 380px; box-shadow: var(--shadow);
+    background: var(--surface); border: 1px solid var(--border); border-left: 3px solid var(--success);
+    color: var(--text); animation: toast-in 0.18s ease-out;
+  }
+  .toast.err { border-left-color: var(--danger); }
+  .toast-icon { flex-shrink: 0; width: 16px; height: 16px; margin-top: 1px; }
+  .toast-icon svg { width: 100%; height: 100%; display: block; }
+  .toast.ok .toast-icon { color: var(--success); }
+  .toast.err .toast-icon { color: var(--danger); }
+  .toast-text { flex: 1; line-height: 1.45; }
+  @keyframes toast-in { from { opacity: 0; transform: translateX(14px); } to { opacity: 1; transform: translateX(0); } }
 
   .empty { color: var(--text-faint); font-size: 12.5px; padding: 18px 10px; text-align: center; }
   .item-row { display: grid; grid-template-columns: 2fr 1fr auto; gap: 9px; align-items: end; margin-bottom: 7px; }
@@ -321,6 +331,28 @@
      global (que também encolheu). O que sobra aqui é só o extra específico desse modal
      em particular, pra caber ainda mais sem rolar. */
   .qd-modal-body .qd-items-table td, .qd-modal-body .qd-items-table th { padding: 4px 10px; }
+
+  /* Modal mais denso: fonte um pouco menor e menos respiro entre os blocos (info,
+     stepper, formulário, botões, painel de atenção) — é o mesmo conteúdo de sempre, só
+     mais compacto, pra caber nos 88vh sem precisar rolar nem esconder nada atrás de aba. */
+  .qd-modal-body { font-size: 12px; }
+  .qd-modal-body label { font-size: 10.5px; margin-bottom: 3px; }
+  .qd-modal-body input, .qd-modal-body select { padding: 5px 8px; font-size: 12px; }
+  .qd-modal-body button { padding: 5px 11px; font-size: 11.5px; }
+  .qd-modal-body button.small { padding: 3px 8px; font-size: 10.5px; }
+  .qd-modal-body .qd-info-bar { margin-bottom: 10px; gap: 7px; }
+  .qd-modal-body .qd-stat { padding: 6px 10px; min-width: 68px; }
+  .qd-modal-body .qd-stat-value { font-size: 12.5px; }
+  .qd-modal-body .qd-stepper { margin: 2px 0 10px; }
+  .qd-modal-body .qd-step { width: 64px; gap: 3px; }
+  .qd-modal-body .qd-step-dot { width: 19px; height: 19px; font-size: 9.5px; }
+  .qd-modal-body .qd-step-dot svg { width: 10px; height: 10px; }
+  .qd-modal-body .qd-step-label { font-size: 9px; }
+  .qd-modal-body .qd-expired-note { margin-top: 6px; padding: 5px 9px; font-size: 10.5px; }
+  .qd-modal-body .inline-form { gap: 6px; }
+  .qd-modal-body .btn-row { margin-top: 3px; gap: 6px; }
+  .qd-modal-body .divider { margin: 10px 0; }
+  .qd-modal-body h3 { font-size: 12px; margin: 0 0 6px; }
   .modal-box h2 { margin: 0 0 14px; font-size: 15px; padding-right: 26px; }
   .modal-close-x {
     position: absolute; top: 13px; right: 13px; width: 26px; height: 26px; z-index: 1;

@@ -85,6 +85,38 @@ async function copyPublishMessage(buttonEl) {
   }
 }
 
+// Mesma ideia de copyPublishMessage, mas pra quando a cotação já fechou — avisa o
+// representante que o resultado saiu, sem repetir prazo/grupo (não fazem mais sentido
+// pra uma cotação fechada). Manda pra "Disponíveis" porque é a página inicial do
+// representante — é lá que "Resultados de Cotações" mostra os itens que ele ganhou,
+// pendentes de confirmação, então não precisa de link com parâmetro nenhum.
+async function copyResultMessage(buttonEl) {
+  const [q, company] = await Promise.all([
+    safeCall(() => api('GET', `/quotations/${currentQuotationId}`)),
+    safeCall(() => api('GET', '/company-settings'))
+  ]);
+  const link = `https://easykota.com.br/representante.html`;
+  const message = `📋 *Resultado da cotação — ${company.name || 'Empresa'}*\n\n`
+      + `Cotação: *${q.name}* (Nº ${formatQuotationNumber(q.id)})\n\n`
+      + `Acesse o link abaixo, faça login, vá na aba "Disponíveis" para conferir se você venceu algum item e ver os detalhes.\n\n`
+      + `🔗 ${link}\n\n`
+      + `Qualquer dúvida, é só chamar!`;
+
+  const onSuccess = () => {
+    const original = buttonEl.textContent;
+    buttonEl.textContent = 'Copiado!';
+    toast('Mensagem copiada — já pode colar no WhatsApp.');
+    setTimeout(() => { buttonEl.textContent = original; }, 1800);
+  };
+  const onFailure = () => toast('Não foi possível copiar a mensagem.', true);
+
+  if (window.isSecureContext && navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(message).then(onSuccess).catch(() => copyTextFallback(message, onSuccess, onFailure));
+  } else {
+    copyTextFallback(message, onSuccess, onFailure);
+  }
+}
+
 function copyTextFallback(text, onSuccess, onFailure) {
   const el = document.createElement('textarea');
   el.value = text;

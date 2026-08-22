@@ -62,6 +62,7 @@ async function abrirDetalheCotacao(id) {
       <button id="qd-publish-btn" class="success" onclick="publishQuotation()">Publicar (Rascunho → Disponível)</button>
       <button id="qd-close-btn" class="secondary" onclick="closeQuotation(this)">Fechar (calcular vencedores)</button>
       <button id="qd-whatsapp-btn" class="secondary" onclick="copyPublishMessage(this)" style="display:none">Copiar mensagem para WhatsApp</button>
+      <button id="qd-whatsapp-result-btn" class="secondary" onclick="copyResultMessage(this)" style="display:none">Copiar mensagem para WhatsApp</button>
       <button id="qd-response-status-btn" class="secondary" onclick="openRepresentativeStatusModal()" style="display:none">Ver quem já respondeu</button>
       <button id="qd-review-bids-btn" class="secondary" onclick="openReviewBidsModal()" style="display:none">Revisar Cotações Enviadas</button>
       <button id="qd-confirm-close-btn" class="success" onclick="confirmCloseQuotation(this)" style="display:none">Confirmar Fechamento (gerar PDF)</button>
@@ -239,6 +240,7 @@ function applyQdEditLock(status) {
   document.getElementById('qd-publish-btn').disabled = !isDraft;
   document.getElementById('qd-close-btn').style.display = canClose ? 'inline-block' : 'none';
   document.getElementById('qd-whatsapp-btn').style.display = status === 'AVAILABLE' ? 'inline-block' : 'none';
+  document.getElementById('qd-whatsapp-result-btn').style.display = status === 'CLOSED' ? 'inline-block' : 'none';
   document.getElementById('qd-response-status-btn').style.display = !isDraft ? 'inline-block' : 'none';
   document.getElementById('qd-review-bids-btn').style.display = isReviewing ? 'inline-block' : 'none';
   document.getElementById('qd-confirm-close-btn').style.display = isReviewing ? 'inline-block' : 'none';
@@ -284,11 +286,11 @@ const QD_TRASH_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor
 // modal "Ver mais" sem precisar embutir o array inteiro no onclick (JSON escapado em
 // atributo HTML é frágil e ilegível). Só o bloco visível na tela usa QD_ITEM_LIST_LIMIT;
 // o "Ver mais" mostra a lista inteira.
-const QD_ITEM_LIST_LIMIT = 6;
+const QD_ITEM_LIST_LIMIT = 4;
 let qdNoWinnerItemsFull = [];
 let qdCutItemsFull = [];
 
-const qdItemLine = i => `<li><strong>${escapeHtml(i.productName)}</strong> <span class="mono" style="color:var(--text-dim); font-size:12px">(${escapeHtml(i.productBarcode)})</span> — ${i.quantity} un.</li>`;
+const qdItemLine = i => `<li style="margin-bottom:2px"><strong style="font-size:11.5px">${escapeHtml(i.productName)}</strong> <span class="mono" style="color:var(--text-dim); font-size:10.5px">(${escapeHtml(i.productBarcode)})</span> — ${i.quantity} un.</li>`;
 
 // Corta a lista em QD_ITEM_LIST_LIMIT itens e, se sobrar mais, acrescenta um botão "Ver
 // mais" que abre a lista inteira num modal à parte — sem isso, o painel de atenção podia
@@ -296,7 +298,7 @@ const qdItemLine = i => `<li><strong>${escapeHtml(i.productName)}</strong> <span
 // empurrava todo o resto do modal pra baixo, ficando difícil até de rolar até o fim).
 function qdRenderItemListWithMore(items, which) {
   const visible = items.slice(0, QD_ITEM_LIST_LIMIT);
-  const listHtml = `<ul style="margin:0 0 8px; padding-left:18px; font-size:13px">${visible.map(qdItemLine).join('')}</ul>`;
+  const listHtml = `<ul style="margin:0 0 5px; padding-left:16px; font-size:11.5px">${visible.map(qdItemLine).join('')}</ul>`;
   if (items.length <= QD_ITEM_LIST_LIMIT) return listHtml;
   const remaining = items.length - QD_ITEM_LIST_LIMIT;
   return `${listHtml}<button class="secondary small" onclick="qdOpenFullItemListModal('${which}')">Ver mais (${remaining})</button>`;
@@ -333,11 +335,11 @@ function renderQdFulfillmentIssues(items, status) {
   qdCutItemsFull = cutItems;
 
   const noWinnerBlock = noWinnerItems.length ? `
-    <div style="margin-bottom:${cutItems.length ? '14px' : '0'}">
-      <div style="font-weight:700; color:var(--warning); font-size:13px">Sem nenhum lance (${noWinnerItems.length})</div>
-      <div style="font-size:12px; color:var(--text-dim); margin-bottom:6px">Nenhum representante ofertou esses produtos — a cotação fechou sem vencedor pra eles.</div>
+    <div style="margin-bottom:${cutItems.length ? '10px' : '0'}">
+      <div style="font-weight:700; color:var(--warning); font-size:11.5px">Sem nenhum lance (${noWinnerItems.length})</div>
+      <div style="font-size:10.5px; color:var(--text-dim); margin-bottom:4px">Nenhum representante ofertou esses produtos — a cotação fechou sem vencedor pra eles.</div>
       ${qdRenderItemListWithMore(noWinnerItems, 'noWinner')}
-      <div class="btn-row" style="margin-top:6px">
+      <div class="btn-row" style="margin-top:4px">
         <button class="secondary small" onclick="duplicateUnquotedItems()">Gerar Outra Cotação</button>
         <button class="secondary small" id="qd-add-to-existing-btn" style="display:none" onclick="openAddUnquotedToExistingModal()">Adicionar a uma cotação existente</button>
       </div>
@@ -345,15 +347,15 @@ function renderQdFulfillmentIssues(items, status) {
 
   const cutBlock = cutItems.length ? `
     <div>
-      <div style="font-weight:700; color:var(--danger); font-size:13px">Cortados por falta de estoque (${cutItems.length})</div>
-      <div style="font-size:12px; color:var(--text-dim); margin-bottom:6px">O representante venceu, mas depois confirmou que não tem esse item em estoque.</div>
+      <div style="font-weight:700; color:var(--danger); font-size:11.5px">Cortados por falta de estoque (${cutItems.length})</div>
+      <div style="font-size:10.5px; color:var(--text-dim); margin-bottom:4px">O representante venceu, mas depois confirmou que não tem esse item em estoque.</div>
       ${qdRenderItemListWithMore(cutItems, 'cut')}
     </div>` : '';
 
   wrap.style.display = 'block';
   wrap.innerHTML = `
-    <div style="background:var(--warning-bg); border:1px solid var(--warning-border); border-radius:10px; padding:14px 16px; margin-top:14px">
-      <div style="font-weight:700; font-size:14px; margin-bottom:8px">⚠ Produtos sem atendimento</div>
+    <div style="background:var(--warning-bg); border:1px solid var(--warning-border); border-radius:9px; padding:10px 13px; margin-top:10px">
+      <div style="font-weight:700; font-size:12px; margin-bottom:5px">⚠ Produtos sem atendimento</div>
       ${noWinnerBlock}
       ${cutBlock}
     </div>`;
