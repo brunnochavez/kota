@@ -257,6 +257,9 @@ public class QuotationService {
         if (quotation.getExpirationDate() == null) {
             throw new BusinessRuleException("Defina o prazo de expiração antes de publicar.");
         }
+        if (quotation.getExpirationDate().isBefore(LocalDateTime.now())) {
+            throw new BusinessRuleException("O prazo de expiração já passou — ajuste a data antes de publicar.");
+        }
 
         quotation.setStatus(QuotationStatus.AVAILABLE);
         quotation.setPublishedAt(LocalDateTime.now());
@@ -280,10 +283,11 @@ public class QuotationService {
         // esses campos das entidades. O envio em si roda em outra thread (@Async), sem
         // acesso à sessão do Hibernate; passar as entidades direto pra lá arriscaria
         // LazyInitializationException na hora de ler representative.getName().
-        List<EmailService.RepContact> eligibleReps = supplierRepository.findByGroup(group).stream()
+        List<Representative> reps = distinctById(supplierRepository.findByGroup(group).stream()
                 .map(Supplier::getRepresentative)
                 .filter(Objects::nonNull)
-                .distinct()
+                .toList());
+        List<EmailService.RepContact> eligibleReps = reps.stream()
                 .map(r -> new EmailService.RepContact(r.getName(), r.getEmail()))
                 .toList();
         emailService.notifyQuotationPublished(quotation.getId(), quotation.getName(), quotation.getExpirationDate(), eligibleReps);
@@ -309,12 +313,11 @@ public class QuotationService {
                 .map(d -> d.getSupplier().getId())
                 .collect(Collectors.toSet());
 
-        List<Representative> pendingReps = supplierRepository.findByGroup(group).stream()
+        List<Representative> pendingReps = distinctById(supplierRepository.findByGroup(group).stream()
                 .filter(s -> !submittedSupplierIds.contains(s.getId()) && !declinedSupplierIds.contains(s.getId()))
                 .map(Supplier::getRepresentative)
                 .filter(Objects::nonNull)
-                .distinct()
-                .toList();
+                .toList());
 
         if (!pendingReps.isEmpty()) {
             // Mesma lógica de notifyEligibleRepresentativesOfPublish: extrai nome/e-mail
@@ -543,11 +546,10 @@ public class QuotationService {
         if (group == null) {
             return;
         }
-        List<Representative> eligibleReps = supplierRepository.findByGroup(group).stream()
+        List<Representative> eligibleReps = distinctById(supplierRepository.findByGroup(group).stream()
                 .map(Supplier::getRepresentative)
                 .filter(Objects::nonNull)
-                .distinct()
-                .toList();
+                .toList());
 
         for (Representative rep : eligibleReps) {
             List<QuotationItem> wonItems = items.stream()
@@ -1477,6 +1479,20 @@ public class QuotationService {
                 quotation.getDefaultSalesProjectionDays(),
                 hasBids
         );
+    }
+
+    // Um representante pode ser dono de mais de um fornecedor do mesmo grupo — sem essa
+    // deduplicação explícita por ID, ele receberia um e-mail POR fornecedor que
+    // representa, em vez de um só. .distinct() puro (igualdade de referência de objeto)
+    // até funcionaria na prática aqui dentro da mesma transação, mas depende de um
+    // detalhe interno do Hibernate (cache de 1º nível) — deduplicar pelo ID é
+    // inequívoco e não depende de como a entidade foi carregada.
+    private List<Representative> distinctById(List<Representative> reps) {
+        Map<Long, Representative> byId = new LinkedHashMap<>();
+        for (Representative rep : reps) {
+            byId.putIfAbsent(rep.getId(), rep);
+        }
+        return new ArrayList<>(byId.values());
     }
 
     // O SupplierGroup tem @SQLRestriction("deleted = false"), que filtra a linha até na
