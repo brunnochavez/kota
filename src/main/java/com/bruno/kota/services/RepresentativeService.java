@@ -45,20 +45,19 @@ public class RepresentativeService {
 
     @Transactional
     public RepresentativeResponse create(RepresentativeRequest request) {
-        Representative existing = representativeRepository.findByCpfIncludingDeleted(request.cpf()).orElse(null);
+        Representative existing = representativeRepository.findByEmailIncludingDeleted(request.email()).orElse(null);
 
         if (existing != null) {
             if (Boolean.TRUE.equals(existing.getDeleted())) {
                 throw new InactiveResourceException(
-                        "Já existe um representante inativo com este CPF (id " + existing.getId() + "). Reative-o em vez de criar um novo.",
+                        "Já existe um representante inativo com este e-mail (id " + existing.getId() + "). Reative-o em vez de criar um novo.",
                         existing.getId()
                 );
             }
-            throw new DuplicateResourceException("Já existe um representante com o CPF " + request.cpf());
+            throw new DuplicateResourceException("Já existe um representante com o e-mail " + request.email());
         }
 
         Representative representative = Representative.builder()
-                .cpf(request.cpf())
                 .name(request.name())
                 .phone(request.phone())
                 .email(request.email())
@@ -70,7 +69,6 @@ public class RepresentativeService {
     @Transactional
     public RepresentativeResponse update(Long id, RepresentativeRequest request) {
         Representative representative = findEntityById(id);
-        representative.setCpf(request.cpf());
         representative.setName(request.name());
         representative.setPhone(request.phone());
         representative.setEmail(request.email());
@@ -135,7 +133,6 @@ public class RepresentativeService {
     private RepresentativeResponse toResponse(Representative representative) {
         return new RepresentativeResponse(
                 representative.getId(),
-                representative.getCpf(),
                 representative.getName(),
                 representative.getPhone(),
                 representative.getEmail()

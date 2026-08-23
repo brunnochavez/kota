@@ -461,7 +461,7 @@ async function openQuotationHistoryModal() {
           <div style="flex:1; min-width:0">
             <div style="font-size:11px; font-weight:700; color:var(--text-dim); text-transform:uppercase; letter-spacing:0.03em">${QD_EVENT_LABELS[e.type] || e.type}</div>
             <div style="font-size:13px; margin-top:2px">${escapeHtml(e.description)}</div>
-            <div style="font-size:11px; color:var(--text-dim); margin-top:2px">${fmtDate(e.occurredAt)}</div>
+            <div style="font-size:11px; color:var(--text-dim); margin-top:2px">${fmtDate(e.occurredAt)}${e.performedBy ? ' — por ' + escapeHtml(e.performedBy) : ''}</div>
           </div>
         </div>`).join('')
     : '<div class="empty">Nenhum evento registrado ainda.</div>';

@@ -12,12 +12,12 @@ import com.bruno.kota.entities.Representative;
 
 public interface RepresentativeRepository extends JpaRepository<Representative, Long> {
 
-    Optional<Representative> findByCpf(String cpf);
-
     Optional<Representative> findByUserId(Long userId);
 
-    @Query(value = "SELECT * FROM representatives WHERE cpf = :cpf", nativeQuery = true)
-    Optional<Representative> findByCpfIncludingDeleted(@Param("cpf") String cpf);
+    // Chave de deduplicação/reativação no cadastro — antes era CPF, agora é e-mail (ver
+    // Representative.java: CPF foi retirado da coleta de dados).
+    @Query(value = "SELECT * FROM representatives WHERE email = :email", nativeQuery = true)
+    Optional<Representative> findByEmailIncludingDeleted(@Param("email") String email);
 
     @Query(value = "SELECT * FROM representatives WHERE id = :id", nativeQuery = true)
     Optional<Representative> findByIdIncludingDeleted(@Param("id") Long id);

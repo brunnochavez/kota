@@ -60,7 +60,7 @@ function renderRepsList() {
          <button class="danger small" onclick="hardDeleteRep(${r.id}, this)">Excluir</button>`
       : `<button class="success small" onclick="reactivateRepModal(${r.id})">Reativar</button>
          <button class="danger small" onclick="hardDeleteRep(${r.id}, this)">Excluir</button>`;
-    tr.innerHTML = `<td>${r.id}</td><td class="mono">${r.cpf}</td><td>${r.name}</td><td>${r.phone}</td><td>${r.email}</td>
+    tr.innerHTML = `<td>${r.id}</td><td>${r.name}</td><td>${r.phone}</td><td>${r.email}</td>
       <td><div class="row-actions">${actions}</div></td>`;
     tbody.appendChild(tr);
   });
@@ -72,7 +72,7 @@ function findRepById(id) {
   return repsCache.find(r => r.id === id) || repsInactiveCache.find(r => r.id === id);
 }
 
-// Cadastro do representante (nome, CPF, telefone) e o login dele (email/senha) são coisas
+// Cadastro do representante (nome, telefone, e-mail) e o login dele (email/senha) são coisas
 // separadas de propósito — nem todo representante precisa logar direto no sistema. Esse
 // modal só cuida do login: criar do zero, resetar senha, ou ativar/desativar o acesso.
 async function openRepAccessModal(id) {
@@ -155,7 +155,6 @@ function openRepModal(id) {
     <h2>${r ? 'Editar representante #' + r.id : 'Novo representante'}</h2>
     <input type="hidden" id="modal-rep-id" value="${r ? r.id : ''}">
     <div class="field-grid">
-      <div><label>CPF</label><input id="modal-rep-cpf" value="${r ? maskCpf(r.cpf) : ''}" placeholder="123.456.789-00" oninput="this.value = maskCpf(this.value)"></div>
       <div><label>Nome</label><input id="modal-rep-name" value="${r ? escapeHtml(r.name) : ''}" placeholder="Nome completo"></div>
       <div><label>Telefone</label><input id="modal-rep-phone" value="${r ? maskPhone(r.phone) : ''}" placeholder="(27) 99999-9999" oninput="this.value = maskPhone(this.value)"></div>
       <div><label>E-mail</label><input id="modal-rep-email" type="email" value="${r ? escapeHtml(r.email) : ''}" placeholder="nome@empresa.com"></div>
@@ -170,7 +169,6 @@ function openRepModal(id) {
 function submitRepModal(buttonEl) {
   const id = document.getElementById('modal-rep-id').value;
   const body = {
-    cpf: unmaskDigits(document.getElementById('modal-rep-cpf').value),
     name: document.getElementById('modal-rep-name').value.trim(),
     phone: unmaskDigits(document.getElementById('modal-rep-phone').value),
     email: document.getElementById('modal-rep-email').value.trim()
@@ -178,7 +176,7 @@ function submitRepModal(buttonEl) {
   saveWithReactivation(
     () => api(id ? 'PUT' : 'POST', id ? `/representatives/${id}` : '/representatives', body),
     (existingId) => api('POST', `/representatives/${existingId}/reactivate`, body),
-    { cpf: 'modal-rep-cpf', name: 'modal-rep-name', phone: 'modal-rep-phone', email: 'modal-rep-email' },
+    { name: 'modal-rep-name', phone: 'modal-rep-phone', email: 'modal-rep-email' },
     buttonEl,
     () => {
       toast(id ? 'Representante atualizado.' : 'Representante salvo.');
@@ -196,7 +194,6 @@ function reactivateRepModal(id) {
     <div class="subtitle">Confira os dados antes de reativar — eles são atualizados junto.</div>
     <input type="hidden" id="modal-rep-id" value="${r.id}">
     <div class="field-grid">
-      <div><label>CPF</label><input id="modal-rep-cpf" value="${maskCpf(r.cpf)}" oninput="this.value = maskCpf(this.value)"></div>
       <div><label>Nome</label><input id="modal-rep-name" value="${escapeHtml(r.name)}"></div>
       <div><label>Telefone</label><input id="modal-rep-phone" value="${maskPhone(r.phone)}" oninput="this.value = maskPhone(this.value)"></div>
       <div><label>E-mail</label><input id="modal-rep-email" type="email" value="${escapeHtml(r.email)}"></div>
@@ -211,7 +208,6 @@ function reactivateRepModal(id) {
 async function submitReactivateRep() {
   const id = document.getElementById('modal-rep-id').value;
   const body = {
-    cpf: unmaskDigits(document.getElementById('modal-rep-cpf').value),
     name: document.getElementById('modal-rep-name').value.trim(),
     phone: unmaskDigits(document.getElementById('modal-rep-phone').value),
     email: document.getElementById('modal-rep-email').value.trim()

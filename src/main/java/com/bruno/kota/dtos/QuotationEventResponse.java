@@ -8,5 +8,6 @@ public record QuotationEventResponse(
         Long id,
         QuotationEventType type,
         String description,
-        LocalDateTime occurredAt
+        LocalDateTime occurredAt,
+        String performedBy
 ) {}

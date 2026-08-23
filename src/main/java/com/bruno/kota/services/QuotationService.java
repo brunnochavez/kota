@@ -244,7 +244,7 @@ public class QuotationService {
     }
 
     @Transactional
-    public QuotationResponse createManually(QuotationCreateRequest request) {
+    public QuotationResponse createManually(QuotationCreateRequest request, String performedBy) {
         if (request.items() == null || request.items().isEmpty()) {
             throw new BusinessRuleException("Uma cotação precisa de pelo menos um item.");
         }
@@ -266,7 +266,7 @@ public class QuotationService {
                 .defaultSalesProjectionDays(request.defaultSalesProjectionDays())
                 .build();
         quotation = quotationRepository.save(quotation);
-        logEvent(quotation, QuotationEventType.CREATED, "Cotação criada manualmente.");
+        logEvent(quotation, QuotationEventType.CREATED, "Cotação criada manualmente.", performedBy);
 
         for (QuotationItemCreateRequest itemRequest : request.items()) {
             Product product = productRepository.findById(itemRequest.productId())
@@ -383,7 +383,7 @@ public class QuotationService {
     }
 
     @Transactional
-    public QuotationResponse publish(Long id) {
+    public QuotationResponse publish(Long id, String performedBy) {
         Quotation quotation = findEntityById(id);
 
         if (quotation.getStatus() != QuotationStatus.DRAFT) {
@@ -403,7 +403,7 @@ public class QuotationService {
         quotation.setPublishedAt(LocalDateTime.now());
         Quotation saved = quotationRepository.save(quotation);
         logEvent(saved, QuotationEventType.PUBLISHED,
-                "Cotação publicada — prazo até " + fmtEvent(saved.getExpirationDate()) + ".");
+                "Cotação publicada — prazo até " + fmtEvent(saved.getExpirationDate()) + ".", performedBy);
 
         notifyEligibleRepresentativesOfPublish(saved);
 
@@ -418,7 +418,7 @@ public class QuotationService {
     // um prazo que nunca mais bate com ele). reminderSentAt volta pra null pra o lembrete
     // de 3h poder disparar de novo nesse novo ciclo.
     @Transactional
-    public QuotationResponse republish(Long id, QuotationExtendRequest request) {
+    public QuotationResponse republish(Long id, QuotationExtendRequest request, String performedBy) {
         Quotation quotation = findEntityById(id);
 
         if (quotation.getStatus() != QuotationStatus.EXPIRED) {
@@ -438,7 +438,7 @@ public class QuotationService {
         quotation.setReminderSentAt(null);
         Quotation saved = quotationRepository.save(quotation);
         logEvent(saved, QuotationEventType.REPUBLISHED,
-                "Cotação republicada (mesmo Nº) — prazo até " + fmtEvent(saved.getExpirationDate()) + ".");
+                "Cotação republicada (mesmo Nº) — prazo até " + fmtEvent(saved.getExpirationDate()) + ".", performedBy);
 
         notifyEligibleRepresentativesOfPublish(saved);
 
@@ -515,7 +515,7 @@ public class QuotationService {
     // prorrogação vai pra TODO representante elegível — quem já respondeu também pode
     // querer revisar agora que sobrou mais tempo.
     @Transactional
-    public QuotationResponse extendDeadline(Long id, QuotationExtendRequest request) {
+    public QuotationResponse extendDeadline(Long id, QuotationExtendRequest request, String performedBy) {
         Quotation quotation = findEntityById(id);
 
         if (quotation.getStatus() != QuotationStatus.AVAILABLE) {
@@ -533,7 +533,7 @@ public class QuotationService {
         quotation.setExpirationDate(request.expirationDate());
         Quotation saved = quotationRepository.save(quotation);
         logEvent(saved, QuotationEventType.DEADLINE_EXTENDED,
-                "Prazo prorrogado de " + fmtEvent(previousExpiration) + " para " + fmtEvent(saved.getExpirationDate()) + ".");
+                "Prazo prorrogado de " + fmtEvent(previousExpiration) + " para " + fmtEvent(saved.getExpirationDate()) + ".", performedBy);
 
         notifyEligibleRepresentativesOfExtension(saved);
 
@@ -719,7 +719,7 @@ public class QuotationService {
     // de virar CLOSED de vez (não dá mais pra editar depois) é intencional, não sobra de
     // implementação.
     @Transactional
-    public QuotationCloseResult confirmClose(Long id, ConfirmCloseRequest request) {
+    public QuotationCloseResult confirmClose(Long id, ConfirmCloseRequest request, String performedBy) {
         Quotation quotation = findEntityById(id);
 
         if (quotation.getStatus() != QuotationStatus.REVIEWING) {
@@ -758,7 +758,7 @@ public class QuotationService {
 
         quotation.setStatus(QuotationStatus.CLOSED);
         Quotation saved = quotationRepository.save(quotation);
-        logEvent(saved, QuotationEventType.CLOSED, "Cotação fechada — vencedores confirmados.");
+        logEvent(saved, QuotationEventType.CLOSED, "Cotação fechada — vencedores confirmados.", performedBy);
 
         notifyEligibleRepresentativesOfClose(saved, items);
         purchaseOrderService.createForClosedQuotation(saved, items);
@@ -1690,15 +1690,23 @@ public class QuotationService {
     @Transactional(readOnly = true)
     public List<QuotationEventResponse> getEvents(Long quotationId) {
         return quotationEventRepository.findByQuotationIdOrderByOccurredAtAsc(quotationId).stream()
-                .map(e -> new QuotationEventResponse(e.getId(), e.getType(), e.getDescription(), e.getOccurredAt()))
+                .map(e -> new QuotationEventResponse(e.getId(), e.getType(), e.getDescription(), e.getOccurredAt(), e.getPerformedBy()))
                 .toList();
     }
 
     private void logEvent(Quotation quotation, QuotationEventType type, String description) {
+        logEvent(quotation, type, description, null);
+    }
+
+    // performedBy = e-mail de quem disparou a ação (vem do AuthPrincipal, via
+    // controller) — null pra eventos sem admin por trás (lembrete automático do
+    // scheduler, lance recebido de representante).
+    private void logEvent(Quotation quotation, QuotationEventType type, String description, String performedBy) {
         quotationEventRepository.save(QuotationEvent.builder()
                 .quotation(quotation)
                 .type(type)
                 .description(description)
+                .performedBy(performedBy)
                 .build());
     }
 

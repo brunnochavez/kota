@@ -53,4 +53,11 @@ public class QuotationEvent {
     @Column(name = "occurred_at", nullable = false)
     @Builder.Default
     private LocalDateTime occurredAt = LocalDateTime.now();
+
+    // E-mail de quem executou a ação — só preenchido pra ações de admin (criar,
+    // publicar, prorrogar, fechar, republicar); null pra eventos automáticos/sem um
+    // admin específico por trás (lembrete disparado pelo scheduler, lance recebido de
+    // um representante — esse já tem o próprio nome do representante na "description").
+    @Column(name = "performed_by")
+    private String performedBy;
 }

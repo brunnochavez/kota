@@ -17,7 +17,6 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import org.hibernate.annotations.SQLDelete;
 import org.hibernate.annotations.SQLRestriction;
-import org.hibernate.validator.constraints.br.CPF;
 
 @Entity
 @Table(name = "representatives")
@@ -34,11 +33,6 @@ public class Representative {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @CPF(message = "CPF inválido!")
-    @NotBlank(message = "CPF é obrigatório")
-    @Column(nullable = false, unique = true, length = 11)
-    private String cpf;
-
     @NotBlank(message = "Nome é obrigatório")
     @Column(nullable = false)
     private String name;
@@ -47,9 +41,12 @@ public class Representative {
     @Column(nullable = false)
     private String phone;
 
+    // unique=true: agora é a chave de negócio pra detectar duplicidade/reativação no
+    // cadastro (RepresentativeService.create), no lugar do CPF que foi retirado da
+    // coleta de dados — menos dado pessoal sensível guardado, por decisão do Bruno.
     @NotBlank(message = "E-mail é obrigatório")
     @Email(message = "E-mail inválido")
-    @Column(nullable = false)
+    @Column(nullable = false, unique = true)
     private String email;
 
     @OneToOne(fetch = FetchType.LAZY)

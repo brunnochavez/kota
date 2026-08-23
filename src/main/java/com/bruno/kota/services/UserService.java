@@ -20,7 +20,7 @@ import com.bruno.kota.repositories.UserRepository;
 
 import lombok.RequiredArgsConstructor;
 
-// Cadastro de Representative (dado de negócio: nome, cpf, telefone) e criação de acesso
+// Cadastro de Representative (dado de negócio: nome, telefone, e-mail) e criação de acesso
 // de login (email + senha) são intencionalmente duas ações separadas — o admin cadastra
 // o representante primeiro, e só cria o acesso quando fizer sentido (pode nunca precisar,
 // se o representante nunca for logar direto no sistema).

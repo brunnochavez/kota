@@ -118,7 +118,7 @@ function closeOkPopover() {
   document.removeEventListener('mousedown', handleOutsideOkPopoverClick);
 }
 
-// ---------- máscaras (CNPJ, CPF, telefone, valor monetário) ----------
+// ---------- máscaras (CNPJ, telefone, valor monetário) ----------
 function maskCnpj(raw) {
   const d = (raw || '').replace(/\D/g, '').slice(0, 14);
   let out = d;
@@ -126,14 +126,6 @@ function maskCnpj(raw) {
   if (d.length > 5) out = d.slice(0, 2) + '.' + d.slice(2, 5) + '.' + d.slice(5);
   if (d.length > 8) out = d.slice(0, 2) + '.' + d.slice(2, 5) + '.' + d.slice(5, 8) + '/' + d.slice(8);
   if (d.length > 12) out = d.slice(0, 2) + '.' + d.slice(2, 5) + '.' + d.slice(5, 8) + '/' + d.slice(8, 12) + '-' + d.slice(12);
-  return out;
-}
-function maskCpf(raw) {
-  const d = (raw || '').replace(/\D/g, '').slice(0, 11);
-  let out = d;
-  if (d.length > 3) out = d.slice(0, 3) + '.' + d.slice(3);
-  if (d.length > 6) out = d.slice(0, 3) + '.' + d.slice(3, 6) + '.' + d.slice(6);
-  if (d.length > 9) out = d.slice(0, 3) + '.' + d.slice(3, 6) + '.' + d.slice(6, 9) + '-' + d.slice(9);
   return out;
 }
 function maskPhone(raw) {
@@ -178,7 +170,7 @@ function formatCurrencyFromNumber(n) {
 
 // Usado pelas 4 telas de cadastro (Produto, Representante, Fornecedor, Grupo):
 // tenta criar/atualizar; se o backend disser que existe um cadastro INATIVO com a
-// mesma chave (CPF/CNPJ/barcode/nome), oferece reativá-lo em vez de falhar com erro cru de banco.
+// mesma chave (CNPJ/barcode/e-mail), oferece reativá-lo em vez de falhar com erro cru de banco.
 // fieldMap (opcional): { nomeDoCampoNoBackend: 'id-do-input-no-html' } — distribui cada erro de
 // validação pro campo certo (o backend manda "campo: mensagem; campo2: mensagem2" quando são
 // vários campos inválidos ao mesmo tempo).

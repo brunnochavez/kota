@@ -56,7 +56,8 @@ public class QuotationImportService {
             Integer defaultSalesProjectionDays,
             Integer descriptionColumnOverride,
             Integer barcodeColumnOverride,
-            Integer quantityColumnOverride) {
+            Integer quantityColumnOverride,
+            String performedBy) {
 
         List<CSVRecord> rows;
         List<String> headers;
@@ -131,6 +132,7 @@ public class QuotationImportService {
                 .quotation(quotation)
                 .type(QuotationEventType.CREATED)
                 .description("Cotação criada via importação de planilha.")
+                .performedBy(performedBy)
                 .build());
 
         for (CSVRecord row : rows) {

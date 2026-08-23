@@ -191,8 +191,8 @@ public class QuotationController {
 
     @PostMapping
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<QuotationResponse> createManually(@Valid @RequestBody QuotationCreateRequest request) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(quotationService.createManually(request));
+    public ResponseEntity<QuotationResponse> createManually(@AuthenticationPrincipal AuthPrincipal principal, @Valid @RequestBody QuotationCreateRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(quotationService.createManually(request, principal.email()));
     }
 
     @PutMapping("/{id}")
@@ -203,8 +203,8 @@ public class QuotationController {
 
     @PostMapping("/{id}/extend")
     @PreAuthorize("hasRole('ADMIN')")
-    public QuotationResponse extendDeadline(@PathVariable Long id, @Valid @RequestBody QuotationExtendRequest request) {
-        return quotationService.extendDeadline(id, request);
+    public QuotationResponse extendDeadline(@AuthenticationPrincipal AuthPrincipal principal, @PathVariable Long id, @Valid @RequestBody QuotationExtendRequest request) {
+        return quotationService.extendDeadline(id, request, principal.email());
     }
 
     // Republicar (mesmo Nº) — só pra cotação Expirada sem nenhum lance. Reaproveita o
@@ -212,8 +212,8 @@ public class QuotationController {
     // extra necessária é o novo prazo.
     @PostMapping("/{id}/republish")
     @PreAuthorize("hasRole('ADMIN')")
-    public QuotationResponse republish(@PathVariable Long id, @Valid @RequestBody QuotationExtendRequest request) {
-        return quotationService.republish(id, request);
+    public QuotationResponse republish(@AuthenticationPrincipal AuthPrincipal principal, @PathVariable Long id, @Valid @RequestBody QuotationExtendRequest request) {
+        return quotationService.republish(id, request, principal.email());
     }
 
     @DeleteMapping("/{id}")
@@ -225,8 +225,8 @@ public class QuotationController {
 
     @PostMapping("/{id}/publish")
     @PreAuthorize("hasRole('ADMIN')")
-    public QuotationResponse publish(@PathVariable Long id) {
-        return quotationService.publish(id);
+    public QuotationResponse publish(@AuthenticationPrincipal AuthPrincipal principal, @PathVariable Long id) {
+        return quotationService.publish(id, principal.email());
     }
 
     @PostMapping("/{id}/duplicate")
@@ -250,8 +250,8 @@ public class QuotationController {
 
     @PostMapping("/{id}/confirm-close")
     @PreAuthorize("hasRole('ADMIN')")
-    public QuotationCloseResult confirmClose(@PathVariable Long id, @RequestBody(required = false) ConfirmCloseRequest request) {
-        return quotationService.confirmClose(id, request);
+    public QuotationCloseResult confirmClose(@AuthenticationPrincipal AuthPrincipal principal, @PathVariable Long id, @RequestBody(required = false) ConfirmCloseRequest request) {
+        return quotationService.confirmClose(id, request, principal.email());
     }
 
     @GetMapping("/{id}/result-pdf")
@@ -268,6 +268,7 @@ public class QuotationController {
     @PostMapping(value = "/import", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @PreAuthorize("hasRole('ADMIN')")
     public QuotationImportResult importFile(
+            @AuthenticationPrincipal AuthPrincipal principal,
             @RequestParam("file") MultipartFile file,
             @RequestParam String name,
             @RequestParam(required = false) Long supplierGroupId,
@@ -278,7 +279,7 @@ public class QuotationController {
             @RequestParam(required = false) Integer quantityColumn) {
         return quotationImportService.importFile(
                 file, name, supplierGroupId, expirationDate, defaultSalesProjectionDays,
-                descriptionColumn, barcodeColumn, quantityColumn);
+                descriptionColumn, barcodeColumn, quantityColumn, principal.email());
     }
 
     @PostMapping("/{id}/items")
