@@ -97,43 +97,21 @@ public class EmailService {
 
     // Manda pra TODO representante elegível, tenha ele vencido algo ou não — quem não
     // venceu nada também precisa saber que fechou, senão fica esperando resposta de uma
-    // cotação que já não existe mais pra responder.
+    // cotação que já não existe mais pra responder. NÃO detalha o que foi ganho (nem
+    // tabela, nem valores) — só avisa que fechou e manda pro login; o representante vê
+    // os itens/valores de verdade dentro do sistema, não no e-mail.
     @Async
     public void notifyQuotationClosed(String quotationName, RepContact rep, List<WonItemLine> wonItems) {
         String subject = wonItems.isEmpty()
                 ? "Resultado da cotação: " + quotationName
                 : "Você venceu itens na cotação: " + quotationName;
+        String link = APP_URL + "/login.html";
 
         StringBuilder content = new StringBuilder();
         content.append("<p style=\"margin:0 0 12px\">Olá, ").append(escapeHtml(firstName(rep.name()))).append("!</p>");
-        content.append("<p style=\"margin:0 0 16px\">A cotação <strong>").append(escapeHtml(quotationName))
-                .append("</strong> foi fechada.</p>");
-
-        if (wonItems.isEmpty()) {
-            content.append("<p style=\"margin:0\">Dessa vez você não venceu nenhum item — mas fica de olho nas próximas cotações disponíveis!</p>");
-        } else {
-            BigDecimal total = BigDecimal.ZERO;
-            content.append("<p style=\"margin:0 0 12px\">Você venceu ").append(wonItems.size())
-                    .append(wonItems.size() == 1 ? " item:</p>" : " itens:</p>");
-            content.append("<table style=\"border-collapse:collapse; width:100%; font-size:13px\">");
-            content.append("<tr style=\"background:#f0f4fb; text-align:left\">")
-                    .append("<th style=\"padding:6px 10px; border-bottom:1px solid #ddd\">Produto</th>")
-                    .append("<th style=\"padding:6px 10px; border-bottom:1px solid #ddd\">Qtd.</th>")
-                    .append("<th style=\"padding:6px 10px; border-bottom:1px solid #ddd\">Preço (R$)</th>")
-                    .append("<th style=\"padding:6px 10px; border-bottom:1px solid #ddd\">Subtotal (R$)</th></tr>");
-            for (WonItemLine item : wonItems) {
-                BigDecimal subtotal = item.unitPrice().multiply(item.quantity());
-                total = total.add(subtotal);
-                content.append("<tr>")
-                        .append("<td style=\"padding:6px 10px; border-bottom:1px solid #eee\">").append(escapeHtml(item.productName())).append("</td>")
-                        .append("<td style=\"padding:6px 10px; border-bottom:1px solid #eee\">").append(item.quantity()).append("</td>")
-                        .append("<td style=\"padding:6px 10px; border-bottom:1px solid #eee\">").append(item.unitPrice()).append("</td>")
-                        .append("<td style=\"padding:6px 10px; border-bottom:1px solid #eee\">").append(subtotal).append("</td>")
-                        .append("</tr>");
-            }
-            content.append("</table>");
-            content.append("<p style=\"margin-top:14px; font-size:15px\"><strong>Total: R$ ").append(total).append("</strong></p>");
-        }
+        content.append("<p style=\"margin:0 0 20px\">A cotação <strong>").append(escapeHtml(quotationName))
+                .append("</strong> foi fechada. Acesse o sistema pra conferir o resultado.</p>");
+        content.append(buttonHtml(link, "Acessar o sistema"));
 
         send(rep.email(), subject, wrapInLayout(content.toString()));
     }
