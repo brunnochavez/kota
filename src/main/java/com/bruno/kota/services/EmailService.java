@@ -172,12 +172,23 @@ public class EmailService {
             log.warn("Representante sem e-mail cadastrado — não foi possível notificar.");
             return;
         }
+        // Uma consulta só, reaproveitada tanto pro nome de exibição do remetente quanto
+        // pro prefixo do assunto — evita bater no banco duas vezes por e-mail enviado.
+        String companyName = companySettingsService.getOrCreate().getName();
         try {
             MimeMessage message = mailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(message, false, "UTF-8");
-            helper.setFrom(fromAddress);
+            if (companyName != null && !companyName.isBlank()) {
+                // setFrom(endereço, nome) — sem o nome, o cliente de e-mail (Gmail, Outlook
+                // etc.) não tem o que mostrar na lista de conversas além da parte antes do
+                // @ do endereço ("no-reply"), já que o cabeçalho From não carregava nome
+                // nenhum associado ao endereço.
+                helper.setFrom(fromAddress, companyName);
+            } else {
+                helper.setFrom(fromAddress);
+            }
             helper.setTo(to);
-            helper.setSubject(prefixWithCompanyName(subject));
+            helper.setSubject(prefixWithCompanyName(companyName, subject));
             helper.setText(htmlBody, true);
             mailSender.send(message);
         } catch (Exception e) {
@@ -188,11 +199,9 @@ public class EmailService {
     // Assunto sempre começa com o nome da empresa contratante (CompanySettings — a
     // mesma fonte usada no PDF e na mensagem de WhatsApp), nunca hardcoded aqui: se o
     // nome mudar em "Dados da Empresa", os próximos e-mails já saem com o nome novo,
-    // sem precisar editar código. getOrCreate() é @Transactional(REQUIRES_NEW) — seguro
-    // de chamar mesmo daqui, rodando numa thread @Async sem sessão do Hibernate da
-    // requisição original.
-    private String prefixWithCompanyName(String subject) {
-        String companyName = companySettingsService.getOrCreate().getName();
+    // sem precisar editar código. Recebe o nome já buscado por send() — não busca de
+    // novo aqui, pra não duplicar a consulta.
+    private String prefixWithCompanyName(String companyName, String subject) {
         if (companyName == null || companyName.isBlank()) {
             return subject;
         }
