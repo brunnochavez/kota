@@ -103,6 +103,7 @@ function loadSectionData(section) {
   if (section === 'quotation-reports') loadQuotations();
   if (section === 'reports') loadReportsFilters();
   if (section === 'reorder-points') loadReorderPointReport();
+  if (section === 'purchase-orders') loadPurchaseOrders();
   if (section === 'company-settings') loadCompanySettingsForm();
 }
 

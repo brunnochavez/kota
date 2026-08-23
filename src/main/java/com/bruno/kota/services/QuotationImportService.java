@@ -21,12 +21,15 @@ import com.bruno.kota.dtos.QuotationResponse;
 import com.bruno.kota.entities.ImportProfile;
 import com.bruno.kota.entities.Product;
 import com.bruno.kota.entities.Quotation;
+import com.bruno.kota.entities.QuotationEvent;
+import com.bruno.kota.entities.QuotationEventType;
 import com.bruno.kota.entities.QuotationItem;
 import com.bruno.kota.entities.SupplierGroup;
 import com.bruno.kota.exceptions.BusinessRuleException;
 import com.bruno.kota.exceptions.ResourceNotFoundException;
 import com.bruno.kota.repositories.ImportProfileRepository;
 import com.bruno.kota.repositories.ProductRepository;
+import com.bruno.kota.repositories.QuotationEventRepository;
 import com.bruno.kota.repositories.QuotationItemRepository;
 import com.bruno.kota.repositories.QuotationRepository;
 import com.bruno.kota.repositories.SupplierGroupRepository;
@@ -42,6 +45,7 @@ public class QuotationImportService {
     private final ProductRepository productRepository;
     private final ImportProfileRepository importProfileRepository;
     private final SupplierGroupRepository supplierGroupRepository;
+    private final QuotationEventRepository quotationEventRepository;
 
     @Transactional
     public QuotationImportResult importFile(
@@ -123,6 +127,11 @@ public class QuotationImportService {
                 .defaultSalesProjectionDays(defaultSalesProjectionDays)
                 .build();
         quotation = quotationRepository.save(quotation);
+        quotationEventRepository.save(QuotationEvent.builder()
+                .quotation(quotation)
+                .type(QuotationEventType.CREATED)
+                .description("Cotação criada via importação de planilha.")
+                .build());
 
         for (CSVRecord row : rows) {
             String description = row.get(descriptionColumn).trim();

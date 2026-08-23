@@ -35,12 +35,15 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.bruno.kota.dtos.CompanySettingsResponse;
 import com.bruno.kota.entities.Bid;
+import com.bruno.kota.entities.PurchaseOrder;
+import com.bruno.kota.entities.PurchaseOrderStatus;
 import com.bruno.kota.entities.Quotation;
 import com.bruno.kota.entities.QuotationItem;
 import com.bruno.kota.entities.QuotationStatus;
 import com.bruno.kota.entities.Supplier;
 import com.bruno.kota.exceptions.BusinessRuleException;
 import com.bruno.kota.exceptions.ResourceNotFoundException;
+import com.bruno.kota.repositories.PurchaseOrderRepository;
 import com.bruno.kota.repositories.QuotationItemRepository;
 import com.bruno.kota.repositories.QuotationRepository;
 
@@ -53,6 +56,7 @@ public class QuotationPdfService {
     private final QuotationRepository quotationRepository;
     private final QuotationItemRepository quotationItemRepository;
     private final CompanySettingsService companySettingsService;
+    private final PurchaseOrderRepository purchaseOrderRepository;
 
     // Locale, Color e DateTimeFormatter são todos imutáveis/thread-safe — dá pra
     // deixar como campo estático sem risco. DecimalFormat NÃO é thread-safe (é um
@@ -414,6 +418,86 @@ public class QuotationPdfService {
         } catch (DocumentException e) {
             throw new BusinessRuleException("Erro ao gerar o PDF: " + e.getMessage());
         }
+    }
+
+    // Documento formal da Ordem de Compra — diferente do PDF de resultado (que é sobre
+    // a cotação como um todo), esse é sobre UM pedido específico já fechado: número
+    // próprio, dados fiscais da empresa, previsão de entrega e status de recebimento.
+    // Reaproveita os mesmos helpers visuais (cabeçalho, faixa de título, tabela de
+    // itens, total) — mesma identidade visual do PDF de resultado, documento diferente.
+    @Transactional(readOnly = true)
+    public byte[] generatePurchaseOrderPdf(Long purchaseOrderId) {
+        PurchaseOrder order = purchaseOrderRepository.findById(purchaseOrderId)
+                .orElseThrow(() -> new ResourceNotFoundException("Ordem de compra não encontrada: id " + purchaseOrderId));
+
+        Quotation quotation = order.getQuotation();
+        Supplier supplier = order.getSupplier();
+
+        DecimalFormat moneyFormat = new DecimalFormat("#,##0.00", DecimalFormatSymbols.getInstance(PT_BR));
+        DecimalFormat qtyFormat = new DecimalFormat("#,##0.###", DecimalFormatSymbols.getInstance(PT_BR));
+
+        // Todos os itens ganhos por esse fornecedor nessa cotação — ignora
+        // fulfillmentCut de propósito: a OC registra o que foi PEDIDO originalmente,
+        // não o estado atual de atendimento (isso já é papel do PDF de resultado e da
+        // tela "Resultado da cotação" do representante).
+        List<QuotationItem> supplierItems = new ArrayList<>();
+        for (QuotationItem item : quotationItemRepository.findByQuotationId(quotation.getId())) {
+            Bid winner = item.getWinningBid();
+            if (winner != null && winner.getSupplier().getId().equals(supplier.getId())) {
+                supplierItems.add(item);
+            }
+        }
+
+        try {
+            ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+            Document document = new Document(org.openpdf.text.PageSize.A4, 36, 36, 36, 54);
+            PdfWriter writer = PdfWriter.getInstance(document, outputStream);
+            writer.setPageEvent(new KotaFooterEvent());
+            document.open();
+            addCompanyHeader(document);
+            addTitleBand(document, "Ordem de Compra Nº " + formatOrderNumber(order.getId()),
+                    "Gerada em " + order.getCreatedAt().format(DATE_FORMAT));
+
+            Font labelFont = new Font(Font.HELVETICA, 9.5f, Font.BOLD, new Color(31, 41, 55));
+            Font valueFont = new Font(Font.HELVETICA, 9.5f, Font.NORMAL, TEXT_DIM);
+
+            addInfoLine(document, "Cotação de origem: ", "#" + quotation.getId() + " — " + quotation.getName(), labelFont, valueFont);
+            addInfoLine(document, "Previsão de entrega: ",
+                    order.getEstimatedDeliveryDate() != null ? order.getEstimatedDeliveryDate().format(DATE_FORMAT) : "Não informada",
+                    labelFont, valueFont);
+            addInfoLine(document, "Status: ",
+                    order.getStatus() == PurchaseOrderStatus.RECEIVED
+                            ? "Recebida em " + order.getReceivedAt().format(DATE_FORMAT)
+                            : "Pendente de recebimento",
+                    labelFont, valueFont);
+
+            addSupplierHeading(document, "Fornecedor: " + supplier.getName());
+            document.add(buildItemsTable(supplierItems, moneyFormat, qtyFormat));
+
+            BigDecimal total = supplierItems.stream()
+                    .map(item -> item.getWinningBid().getValue().multiply(item.getQuantity()))
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            addTotalCallout(document, "Total da ordem de compra:", total, moneyFormat, true);
+
+            document.close();
+            return outputStream.toByteArray();
+        } catch (DocumentException e) {
+            throw new BusinessRuleException("Erro ao gerar o PDF: " + e.getMessage());
+        }
+    }
+
+    // Mesmo padrão do número de cotação exibido no frontend (formatQuotationNumber) —
+    // zero à esquerda até 6 dígitos, visual de documento formal.
+    private String formatOrderNumber(Long id) {
+        return String.format("%06d", id);
+    }
+
+    private void addInfoLine(Document document, String label, String value, Font labelFont, Font valueFont) throws DocumentException {
+        Paragraph p = new Paragraph();
+        p.add(new Phrase(label, labelFont));
+        p.add(new Phrase(value, valueFont));
+        p.setSpacingAfter(3);
+        document.add(p);
     }
 
     private void addHeaderCell(PdfPTable table, String text, Font font, int align) {

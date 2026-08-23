@@ -11,6 +11,8 @@ import com.bruno.kota.dtos.BidRequest;
 import com.bruno.kota.dtos.BidResponse;
 import com.bruno.kota.entities.Bid;
 import com.bruno.kota.entities.Quotation;
+import com.bruno.kota.entities.QuotationEvent;
+import com.bruno.kota.entities.QuotationEventType;
 import com.bruno.kota.entities.QuotationItem;
 import com.bruno.kota.entities.QuotationStatus;
 import com.bruno.kota.entities.Representative;
@@ -19,6 +21,7 @@ import com.bruno.kota.entities.SupplierGroup;
 import com.bruno.kota.exceptions.BusinessRuleException;
 import com.bruno.kota.exceptions.ResourceNotFoundException;
 import com.bruno.kota.repositories.BidRepository;
+import com.bruno.kota.repositories.QuotationEventRepository;
 import com.bruno.kota.repositories.QuotationItemRepository;
 import com.bruno.kota.repositories.QuotationRepository;
 import com.bruno.kota.repositories.RepresentativeRepository;
@@ -35,6 +38,7 @@ public class BidService {
     private final QuotationRepository quotationRepository;
     private final SupplierRepository supplierRepository;
     private final RepresentativeRepository representativeRepository;
+    private final QuotationEventRepository quotationEventRepository;
 
     @Transactional(readOnly = true)
     public List<BidResponse> findByQuotationItem(Long quotationItemId) {
@@ -77,7 +81,18 @@ public class BidService {
         bid.setDeliveryDeadlineDays(request.deliveryDeadlineDays());
         bid.setNotes(request.notes());
 
-        return toResponse(bidRepository.save(bid));
+        Bid saved = bidRepository.save(bid);
+        // "Recebido" no histórico independe de ser lance novo ou atualização de um já
+        // existente — pro admin, o que importa é "esse fornecedor mexeu na cotação
+        // agora", não a distinção técnica de insert vs update.
+        quotationEventRepository.save(QuotationEvent.builder()
+                .quotation(quotationItem.getQuotation())
+                .type(QuotationEventType.BID_RECEIVED)
+                .description("Lance recebido de " + supplier.getName() + " (" + submittedBy.getName() + ") no item "
+                        + quotationItem.getProduct().getName() + ": R$ " + saved.getValue() + ".")
+                .build());
+
+        return toResponse(saved);
     }
 
     // Edição/exclusão feita pelo ADMIN (não pelo representante) — usada na tela de revisão

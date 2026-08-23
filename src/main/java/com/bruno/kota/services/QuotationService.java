@@ -24,6 +24,8 @@ import com.bruno.kota.entities.OrderFulfillmentConfirmation;
 import com.bruno.kota.entities.Product;
 import com.bruno.kota.entities.Quotation;
 import com.bruno.kota.entities.QuotationDecline;
+import com.bruno.kota.entities.QuotationEvent;
+import com.bruno.kota.entities.QuotationEventType;
 import com.bruno.kota.entities.QuotationItem;
 import com.bruno.kota.entities.QuotationStatus;
 import com.bruno.kota.entities.Representative;
@@ -33,6 +35,7 @@ import com.bruno.kota.exceptions.BusinessRuleException;
 import com.bruno.kota.exceptions.ResourceNotFoundException;
 import com.bruno.kota.repositories.BidRepository;
 import com.bruno.kota.repositories.OrderFulfillmentConfirmationRepository;
+import com.bruno.kota.repositories.QuotationEventRepository;
 import com.bruno.kota.repositories.QuotationDeclineRepository;
 import com.bruno.kota.repositories.ProductRepository;
 import com.bruno.kota.repositories.QuotationItemRepository;
@@ -57,6 +60,8 @@ public class QuotationService {
     private final OrderFulfillmentConfirmationRepository orderFulfillmentConfirmationRepository;
     private final QuotationDeclineRepository quotationDeclineRepository;
     private final EmailService emailService;
+    private final QuotationEventRepository quotationEventRepository;
+    private final PurchaseOrderService purchaseOrderService;
 
     @Transactional(readOnly = true)
     public List<QuotationResponse> findAll() {
@@ -139,6 +144,7 @@ public class QuotationService {
                 .defaultSalesProjectionDays(request.defaultSalesProjectionDays())
                 .build();
         quotation = quotationRepository.save(quotation);
+        logEvent(quotation, QuotationEventType.CREATED, "Cotação criada manualmente.");
 
         for (QuotationItemCreateRequest itemRequest : request.items()) {
             Product product = productRepository.findById(itemRequest.productId())
@@ -274,6 +280,8 @@ public class QuotationService {
         quotation.setStatus(QuotationStatus.AVAILABLE);
         quotation.setPublishedAt(LocalDateTime.now());
         Quotation saved = quotationRepository.save(quotation);
+        logEvent(saved, QuotationEventType.PUBLISHED,
+                "Cotação publicada — prazo até " + fmtEvent(saved.getExpirationDate()) + ".");
 
         notifyEligibleRepresentativesOfPublish(saved);
 
@@ -336,6 +344,8 @@ public class QuotationService {
                     .map(r -> new EmailService.RepContact(r.getName(), r.getEmail()))
                     .toList();
             emailService.notifyDeadlineApproaching(quotation.getId(), quotation.getName(), quotation.getExpirationDate(), contacts);
+            logEvent(quotation, QuotationEventType.REMINDER_SENT,
+                    "Lembrete de prazo enviado a " + pendingReps.size() + " representante" + (pendingReps.size() == 1 ? "" : "s") + " pendente" + (pendingReps.size() == 1 ? "" : "s") + ".");
         }
     }
 
@@ -361,9 +371,12 @@ public class QuotationService {
         // Mesmo motivo do update(): se o lembrete de 3h-antes já saiu pro prazo antigo,
         // libera de novo pro prazo novo — senão o scheduler nunca mais notificaria essa
         // cotação, mesmo com um prazo bem mais longe do que gerou o lembrete original.
+        LocalDateTime previousExpiration = quotation.getExpirationDate();
         quotation.setReminderSentAt(null);
         quotation.setExpirationDate(request.expirationDate());
         Quotation saved = quotationRepository.save(quotation);
+        logEvent(saved, QuotationEventType.DEADLINE_EXTENDED,
+                "Prazo prorrogado de " + fmtEvent(previousExpiration) + " para " + fmtEvent(saved.getExpirationDate()) + ".");
 
         notifyEligibleRepresentativesOfExtension(saved);
 
@@ -588,8 +601,10 @@ public class QuotationService {
 
         quotation.setStatus(QuotationStatus.CLOSED);
         Quotation saved = quotationRepository.save(quotation);
+        logEvent(saved, QuotationEventType.CLOSED, "Cotação fechada — vencedores confirmados.");
 
         notifyEligibleRepresentativesOfClose(saved, items);
+        purchaseOrderService.createForClosedQuotation(saved, items);
 
         return new QuotationCloseResult(true, toResponse(saved), List.of(), List.of());
     }
@@ -1511,6 +1526,28 @@ public class QuotationService {
     private Quotation findEntityById(Long id) {
         return quotationRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Cotação não encontrada: id " + id));
+    }
+
+    // Histórico/timeline da cotação — lista de eventos gravados por logEvent() em cada
+    // marco importante do ciclo de vida, do mais antigo pro mais recente.
+    @Transactional(readOnly = true)
+    public List<QuotationEventResponse> getEvents(Long quotationId) {
+        return quotationEventRepository.findByQuotationIdOrderByOccurredAtAsc(quotationId).stream()
+                .map(e -> new QuotationEventResponse(e.getId(), e.getType(), e.getDescription(), e.getOccurredAt()))
+                .toList();
+    }
+
+    private void logEvent(Quotation quotation, QuotationEventType type, String description) {
+        quotationEventRepository.save(QuotationEvent.builder()
+                .quotation(quotation)
+                .type(type)
+                .description(description)
+                .build());
+    }
+
+    private String fmtEvent(LocalDateTime date) {
+        if (date == null) return "—";
+        return date.format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy 'às' HH:mm"));
     }
 
     private QuotationResponse toResponse(Quotation quotation) {

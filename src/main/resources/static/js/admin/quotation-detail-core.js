@@ -65,6 +65,7 @@ async function abrirDetalheCotacao(id) {
       <button id="qd-whatsapp-btn" class="secondary" onclick="copyPublishMessage(this)" style="display:none">Copiar mensagem para WhatsApp</button>
       <button id="qd-whatsapp-result-btn" class="secondary" onclick="copyResultMessage(this)" style="display:none">Copiar mensagem para WhatsApp</button>
       <button id="qd-response-status-btn" class="secondary" onclick="openRepresentativeStatusModal()" style="display:none">Ver quem já respondeu</button>
+      <button id="qd-history-btn" class="secondary" onclick="openQuotationHistoryModal()" style="display:none">Ver Histórico</button>
       <button id="qd-review-bids-btn" class="secondary" onclick="openReviewBidsModal()" style="display:none">Revisar Cotações Enviadas</button>
       <button id="qd-confirm-close-btn" class="success" onclick="confirmCloseQuotation(this)" style="display:none">Confirmar Fechamento (gerar PDF)</button>
       <button id="qd-pdf-link" class="secondary" style="display:${q.status === 'CLOSED' ? 'inline-block' : 'none'}" onclick="downloadPdfWithAuth('/quotations/' + currentQuotationId + '/result-pdf', 'cotacao-' + currentQuotationId + '.pdf')">Baixar PDF do resultado</button>
@@ -244,6 +245,7 @@ function applyQdEditLock(status) {
   document.getElementById('qd-whatsapp-btn').style.display = status === 'AVAILABLE' ? 'inline-block' : 'none';
   document.getElementById('qd-whatsapp-result-btn').style.display = status === 'CLOSED' ? 'inline-block' : 'none';
   document.getElementById('qd-response-status-btn').style.display = !isDraft ? 'inline-block' : 'none';
+  document.getElementById('qd-history-btn').style.display = 'inline-block';
   document.getElementById('qd-review-bids-btn').style.display = isReviewing ? 'inline-block' : 'none';
   document.getElementById('qd-confirm-close-btn').style.display = isReviewing ? 'inline-block' : 'none';
   document.getElementById('qd-duplicate-btn').style.display = isExpired ? 'inline-block' : 'none';
@@ -420,6 +422,50 @@ async function confirmAddUnquotedToExisting() {
     toast(`${added} produto${added !== 1 ? 's' : ''} adicionado${added !== 1 ? 's' : ''} à cotação escolhida.`);
   }
   closeModal2();
+}
+
+// Histórico/timeline da cotação — lista de eventos (criada, publicada, lance recebido,
+// lembrete enviado, prazo prorrogado, fechada) em ordem cronológica, montada a partir
+// do que o backend já registrou em cada transição (não é reconstruído aqui no front).
+const QD_EVENT_LABELS = {
+  CREATED: 'Criada',
+  PUBLISHED: 'Publicada',
+  BID_RECEIVED: 'Lance recebido',
+  REMINDER_SENT: 'Lembrete enviado',
+  DEADLINE_EXTENDED: 'Prazo prorrogado',
+  CLOSED: 'Concluída'
+};
+const QD_EVENT_COLORS = {
+  CREATED: 'var(--text-dim)',
+  PUBLISHED: 'var(--accent)',
+  BID_RECEIVED: 'var(--success)',
+  REMINDER_SENT: 'var(--warning)',
+  DEADLINE_EXTENDED: 'var(--warning)',
+  CLOSED: 'var(--accent)'
+};
+
+async function openQuotationHistoryModal() {
+  const events = await safeCall(() => api('GET', `/quotations/${currentQuotationId}/events`));
+
+  const rowsHtml = events.length
+    ? events.map(e => `
+        <div style="display:flex; gap:10px; padding:8px 0; border-bottom:1px solid var(--surface-2)">
+          <div style="width:8px; height:8px; border-radius:50%; margin-top:5px; flex-shrink:0; background:${QD_EVENT_COLORS[e.type] || 'var(--text-dim)'}"></div>
+          <div style="flex:1; min-width:0">
+            <div style="font-size:11px; font-weight:700; color:var(--text-dim); text-transform:uppercase; letter-spacing:0.03em">${QD_EVENT_LABELS[e.type] || e.type}</div>
+            <div style="font-size:13px; margin-top:2px">${escapeHtml(e.description)}</div>
+            <div style="font-size:11px; color:var(--text-dim); margin-top:2px">${fmtDate(e.occurredAt)}</div>
+          </div>
+        </div>`).join('')
+    : '<div class="empty">Nenhum evento registrado ainda.</div>';
+
+  openModal2(`
+    <h2>Histórico da cotação</h2>
+    <div class="scroll-box" style="max-height:60vh">${rowsHtml}</div>
+    <div class="btn-row" style="margin-top:16px">
+      <button class="secondary" onclick="closeModal2()">Fechar</button>
+    </div>
+  `);
 }
 
 // Revisão em modal separado (segunda camada), sob demanda — só busca lances quando o

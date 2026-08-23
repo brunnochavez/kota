@@ -28,6 +28,7 @@ import com.bruno.kota.dtos.RepresentativeStatusPageResponse;
 import com.bruno.kota.dtos.QuotationCloseRequest;
 import com.bruno.kota.dtos.QuotationCloseResult;
 import com.bruno.kota.dtos.QuotationCreateRequest;
+import com.bruno.kota.dtos.QuotationEventResponse;
 import com.bruno.kota.dtos.QuotationExtendRequest;
 import com.bruno.kota.dtos.QuotationImportResult;
 import com.bruno.kota.dtos.QuotationItemCreateRequest;
@@ -140,6 +141,12 @@ public class QuotationController {
     public ResponseEntity<Void> finalizeFulfillment(@AuthenticationPrincipal AuthPrincipal principal, @PathVariable Long id, @RequestParam Long supplierId) {
         quotationService.finalizeFulfillment(id, supplierId, repIdOrNull(principal));
         return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/{id}/events")
+    @PreAuthorize("hasRole('ADMIN')")
+    public List<QuotationEventResponse> getEvents(@PathVariable Long id) {
+        return quotationService.getEvents(id);
     }
 
     @GetMapping("/{id}")
