@@ -121,18 +121,26 @@ public class EmailService {
     // venceu nada também precisa saber que fechou, senão fica esperando resposta de uma
     // cotação que já não existe mais pra responder. NÃO detalha o que foi ganho (nem
     // tabela, nem valores) — só avisa que fechou e manda pro login; o representante vê
-    // os itens/valores de verdade dentro do sistema, não no e-mail.
+    // os itens/valores de verdade dentro do sistema, não no e-mail. Quem não venceu nada
+    // recebe um texto diferente (agradecendo a participação, sem soar como "você
+    // perdeu") em vez do texto genérico de "acesse pra conferir".
     @Async
     public void notifyQuotationClosed(String quotationName, RepContact rep, List<WonItemLine> wonItems) {
-        String subject = wonItems.isEmpty()
-                ? "Resultado da cotação: " + quotationName
-                : "Você venceu itens na cotação: " + quotationName;
+        boolean won = !wonItems.isEmpty();
+        String subject = won
+                ? "Você venceu itens na cotação: " + quotationName
+                : "Resultado da cotação: " + quotationName;
         String link = APP_URL + "/login.html";
 
         StringBuilder content = new StringBuilder();
         content.append("<p style=\"margin:0 0 12px\">Olá, ").append(escapeHtml(firstName(rep.name()))).append("!</p>");
-        content.append("<p style=\"margin:0 0 20px\">A cotação <strong>").append(escapeHtml(quotationName))
-                .append("</strong> foi fechada. Acesse o sistema pra conferir o resultado.</p>");
+        if (won) {
+            content.append("<p style=\"margin:0 0 20px\">A cotação <strong>").append(escapeHtml(quotationName))
+                    .append("</strong> foi fechada e você venceu pelo menos um item. Acesse o sistema pra conferir o resultado.</p>");
+        } else {
+            content.append("<p style=\"margin:0 0 20px\">A cotação <strong>").append(escapeHtml(quotationName))
+                    .append("</strong> foi fechada e, dessa vez, nenhum item ficou com você. Obrigado por participar — fique de olho nas próximas cotações.</p>");
+        }
         content.append(buttonHtml(link, "Acessar o sistema"));
 
         send(rep.email(), subject, wrapInLayout(content.toString()));
