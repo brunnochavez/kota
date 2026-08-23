@@ -8,6 +8,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.bruno.kota.dtos.AdminUserResponse;
 import com.bruno.kota.dtos.CreateAccessRequest;
+import com.bruno.kota.dtos.CreateAdminUserRequest;
+import com.bruno.kota.dtos.LoginResponse;
 import com.bruno.kota.dtos.RepresentativeAccessResponse;
 import com.bruno.kota.entities.Representative;
 import com.bruno.kota.entities.User;
@@ -17,6 +19,7 @@ import com.bruno.kota.exceptions.DuplicateResourceException;
 import com.bruno.kota.exceptions.ResourceNotFoundException;
 import com.bruno.kota.repositories.RepresentativeRepository;
 import com.bruno.kota.repositories.UserRepository;
+import com.bruno.kota.security.JwtService;
 
 import lombok.RequiredArgsConstructor;
 
@@ -31,6 +34,7 @@ public class UserService {
     private final UserRepository userRepository;
     private final RepresentativeRepository representativeRepository;
     private final PasswordEncoder passwordEncoder;
+    private final JwtService jwtService;
 
     @Transactional(readOnly = true)
     public RepresentativeAccessResponse getAccessStatus(Long representativeId) {
@@ -96,6 +100,28 @@ public class UserService {
         return toResponse(representativeId, user);
     }
 
+    // "Ver como esse representante" — gera um token de sessão pro representante SEM o
+    // admin precisar saber a senha dele (nem redefini-la, o que trocaria a senha de
+    // verdade e avisaria/confundiria o representante). O token carrega a marca de quem
+    // gerou (impersonatedBy, ver JwtService) só pra rastro — a sessão em si é uma sessão
+    // REPRESENTATIVE de verdade, com tudo que ele veria. mustChangePassword sempre false
+    // aqui: forçar troca de senha durante uma visualização do admin não faz sentido, e
+    // trocaria a senha real do representante sem ele saber.
+    @Transactional(readOnly = true)
+    public LoginResponse impersonateRepresentative(Long representativeId, String impersonatedByLabel) {
+        Representative representative = findRepresentative(representativeId);
+        User user = representative.getUser();
+        if (user == null) {
+            throw new BusinessRuleException("Esse representante ainda não tem acesso criado — crie o acesso antes de visualizar como ele.");
+        }
+        if (!Boolean.TRUE.equals(user.getEnabled())) {
+            throw new BusinessRuleException("O acesso desse representante está desativado.");
+        }
+
+        String token = jwtService.generateToken(user, representativeId, impersonatedByLabel);
+        return new LoginResponse(token, user.getRole().name(), representative.getName(), representativeId, false);
+    }
+
     // ---------- Usuários Administradores ----------
     // Diferente do acesso de representante (1:1 com um Representative já cadastrado),
     // aqui o usuário É a conta — não existe cadastro de "pessoa" separado por trás.
@@ -111,19 +137,31 @@ public class UserService {
     }
 
     @Transactional
-    public AdminUserResponse createAdmin(CreateAccessRequest request) {
+    public AdminUserResponse createAdmin(CreateAdminUserRequest request) {
         String email = request.email().trim().toLowerCase();
         if (userRepository.findByEmail(email).isPresent()) {
             throw new DuplicateResourceException("Já existe um usuário cadastrado com esse e-mail.");
         }
 
         User user = User.builder()
+                .name(request.name().trim())
                 .email(email)
                 .passwordHash(passwordEncoder.encode(request.password()))
                 .role(UserRole.ADMIN)
                 .enabled(true)
                 .build();
         user = userRepository.save(user);
+        return toAdminResponse(user);
+    }
+
+    // Só pra dar nome a contas ADMIN que já existiam antes desse campo (o
+    // admin@kota.com do AdminBootstrap, ou qualquer uma criada antes de "Nome" existir
+    // no formulário) — sem isso, elas ficariam mostrando e-mail pra sempre no histórico.
+    @Transactional
+    public AdminUserResponse updateAdminName(Long userId, String name) {
+        User user = findAdmin(userId);
+        user.setName(name != null ? name.trim() : null);
+        userRepository.save(user);
         return toAdminResponse(user);
     }
 
@@ -172,7 +210,7 @@ public class UserService {
     }
 
     private AdminUserResponse toAdminResponse(User user) {
-        return new AdminUserResponse(user.getId(), user.getEmail(), user.getEnabled(), user.getMustChangePassword());
+        return new AdminUserResponse(user.getId(), user.getName(), user.getEmail(), user.getEnabled(), user.getMustChangePassword());
     }
 
     private Representative findRepresentative(Long id) {

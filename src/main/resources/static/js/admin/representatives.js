@@ -117,10 +117,38 @@ async function refreshRepAccessModal(id) {
 
     <div class="btn-row" style="margin-top:20px">
       ${status.enabled
+        ? `<button class="secondary" onclick="viewAsRepresentative(${id}, this)">Ver como este representante</button>`
+        : ''}
+      ${status.enabled
         ? `<button class="danger" onclick="setRepAccessEnabled(${id}, false)">Desativar acesso</button>`
         : `<button class="success" onclick="setRepAccessEnabled(${id}, true)">Reativar acesso</button>`}
       <button class="secondary" onclick="closeModal2()">Fechar</button>
     </div>`;
+}
+
+// Abre representante.html numa aba nova, já logado como esse representante — sem o
+// admin precisar saber (ou redefinir) a senha dele. O token vem pronto do backend
+// (POST .../impersonate) e é passado só pela URL dessa aba nova; o script no início do
+// representante.html lê esses parâmetros, guarda no sessionStorage DAQUELA aba (isolado
+// da sessão admin desta aba) e limpa a URL. Só funciona com acesso ativo — por isso o
+// botão nem aparece quando status.enabled é false.
+async function viewAsRepresentative(id, buttonEl) {
+  buttonEl.disabled = true;
+  let result;
+  try {
+    result = await api('POST', `/representatives/${id}/access/impersonate`);
+  } catch (e) {
+    toast(e.message, true);
+    buttonEl.disabled = false;
+    return;
+  }
+  const params = new URLSearchParams({
+    impersonate_token: result.token,
+    impersonate_name: result.name || '',
+    impersonate_rep_id: result.representativeId || ''
+  });
+  window.open(`/representante.html?${params.toString()}`, '_blank');
+  buttonEl.disabled = false;
 }
 
 async function createRepAccess(id) {

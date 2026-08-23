@@ -1,6 +1,7 @@
 package com.bruno.kota.controllers;
 
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -11,7 +12,9 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.bruno.kota.dtos.CreateAccessRequest;
+import com.bruno.kota.dtos.LoginResponse;
 import com.bruno.kota.dtos.RepresentativeAccessResponse;
+import com.bruno.kota.security.AuthPrincipal;
 import com.bruno.kota.services.UserService;
 
 import jakarta.validation.Valid;
@@ -46,5 +49,13 @@ public class RepresentativeAccessController {
     @PutMapping("/enabled")
     public RepresentativeAccessResponse setEnabled(@PathVariable Long representativeId, @RequestParam boolean enabled) {
         return userService.setEnabled(representativeId, enabled);
+    }
+
+    // "Ver como esse representante" — devolve um token de sessão REPRESENTATIVE pra o
+    // admin abrir representante.html enxergando exatamente o que aquele representante
+    // vê, sem precisar saber (ou redefinir) a senha dele.
+    @PostMapping("/impersonate")
+    public LoginResponse impersonate(@AuthenticationPrincipal AuthPrincipal principal, @PathVariable Long representativeId) {
+        return userService.impersonateRepresentative(representativeId, principal.displayName());
     }
 }

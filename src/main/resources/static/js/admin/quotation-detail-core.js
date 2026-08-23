@@ -439,7 +439,9 @@ const QD_EVENT_LABELS = {
   REMINDER_SENT: 'Lembrete enviado',
   DEADLINE_EXTENDED: 'Prazo prorrogado',
   CLOSED: 'Concluída',
-  REPUBLISHED: 'Republicada'
+  REPUBLISHED: 'Republicada',
+  DECLINED: 'Recusada (Não Cotar)',
+  FULFILLMENT_CONFIRMED: 'Atendimento confirmado'
 };
 const QD_EVENT_COLORS = {
   CREATED: 'var(--text-dim)',
@@ -448,14 +450,39 @@ const QD_EVENT_COLORS = {
   REMINDER_SENT: 'var(--warning)',
   DEADLINE_EXTENDED: 'var(--warning)',
   CLOSED: 'var(--accent)',
-  REPUBLISHED: 'var(--accent)'
+  REPUBLISHED: 'var(--accent)',
+  DECLINED: 'var(--danger)',
+  FULFILLMENT_CONFIRMED: 'var(--success)'
 };
 
-async function openQuotationHistoryModal() {
-  const events = await safeCall(() => api('GET', `/quotations/${currentQuotationId}/events`));
+let qdHistoryEvents = [];
+let qdHistoryPage = 0;
+const QD_HISTORY_PAGE_SIZE = 5;
 
-  const rowsHtml = events.length
-    ? events.map(e => `
+async function openQuotationHistoryModal() {
+  qdHistoryEvents = await safeCall(() => api('GET', `/quotations/${currentQuotationId}/events`));
+  qdHistoryPage = 0;
+
+  openModal2(`
+    <h2>Histórico da cotação</h2>
+    <div class="scroll-box" style="max-height:60vh" id="qd-history-body"></div>
+    ${paginationControlsHtml('qd-history')}
+    <div class="btn-row" style="margin-top:16px">
+      <button class="secondary" onclick="closeModal2()">Fechar</button>
+    </div>
+  `);
+  renderQdHistoryPage();
+}
+
+function renderQdHistoryPage() {
+  const { items, page, totalPages } = paginateSlice(qdHistoryEvents, qdHistoryPage, QD_HISTORY_PAGE_SIZE);
+  qdHistoryPage = page;
+
+  const bodyEl = document.getElementById('qd-history-body');
+  if (!bodyEl) return;
+
+  bodyEl.innerHTML = items.length
+    ? items.map(e => `
         <div style="display:flex; gap:10px; padding:8px 0; border-bottom:1px solid var(--surface-2)">
           <div style="width:8px; height:8px; border-radius:50%; margin-top:5px; flex-shrink:0; background:${QD_EVENT_COLORS[e.type] || 'var(--text-dim)'}"></div>
           <div style="flex:1; min-width:0">
@@ -466,13 +493,10 @@ async function openQuotationHistoryModal() {
         </div>`).join('')
     : '<div class="empty">Nenhum evento registrado ainda.</div>';
 
-  openModal2(`
-    <h2>Histórico da cotação</h2>
-    <div class="scroll-box" style="max-height:60vh">${rowsHtml}</div>
-    <div class="btn-row" style="margin-top:16px">
-      <button class="secondary" onclick="closeModal2()">Fechar</button>
-    </div>
-  `);
+  updatePaginationControls('qd-history', page, totalPages, qdHistoryEvents.length, (newPage) => {
+    qdHistoryPage = newPage;
+    renderQdHistoryPage();
+  });
 }
 
 // Revisão em modal separado (segunda camada), sob demanda — só busca lances quando o

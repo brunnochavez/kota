@@ -14,7 +14,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.bruno.kota.dtos.AdminUserResponse;
-import com.bruno.kota.dtos.CreateAccessRequest;
+import com.bruno.kota.dtos.CreateAdminUserRequest;
 import com.bruno.kota.security.AuthPrincipal;
 import com.bruno.kota.services.UserService;
 
@@ -41,8 +41,13 @@ public class AdminUserController {
     }
 
     @PostMapping
-    public AdminUserResponse create(@Valid @RequestBody CreateAccessRequest request) {
+    public AdminUserResponse create(@Valid @RequestBody CreateAdminUserRequest request) {
         return userService.createAdmin(request);
+    }
+
+    @PutMapping("/{id}/name")
+    public AdminUserResponse updateName(@PathVariable Long id, @RequestParam String name) {
+        return userService.updateAdminName(id, name);
     }
 
     @PutMapping("/{id}/password")

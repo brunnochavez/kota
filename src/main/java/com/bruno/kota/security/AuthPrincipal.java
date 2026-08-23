@@ -8,9 +8,23 @@ public record AuthPrincipal(
         Long userId,
         String email,
         String role,
-        Long representativeId
+        Long representativeId,
+        String name,
+        String impersonatedBy
 ) {
     public boolean isAdmin() {
         return "ADMIN".equals(role);
+    }
+
+    // Usado em todo lugar que precisa mostrar "quem fez a ação" (ex: performedBy no
+    // histórico da cotação) — nome se tiver sido cadastrado, e-mail como fallback pra
+    // contas ADMIN antigas (o admin@kota.com do AdminBootstrap, ou qualquer uma criada
+    // antes do campo "nome" existir em Usuários Administradores).
+    public String displayName() {
+        return (name != null && !name.isBlank()) ? name : email;
+    }
+
+    public boolean isImpersonated() {
+        return impersonatedBy != null && !impersonatedBy.isBlank();
     }
 }

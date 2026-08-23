@@ -55,7 +55,11 @@ public class BidService {
     // fecha a brecha de um representante conseguir enviar lance em nome de outro só
     // mudando um número no JSON. null significa "quem chamou é admin", caso em que o
     // submittedById declarado no corpo ainda é respeitado (admin já tem acesso total).
-    public BidResponse submit(BidRequest request, Long authenticatedRepresentativeId) {
+    // impersonatedBy vem do AuthPrincipal quando a sessão foi aberta via "Ver como este
+    // representante" (RepresentativeAccessController.impersonate) — não afeta a regra de
+    // negócio em nada, só marca o evento gravado abaixo pra deixar rastro de que foi um
+    // admin agindo em nome do representante, não o representante de verdade.
+    public BidResponse submit(BidRequest request, Long authenticatedRepresentativeId, String impersonatedBy) {
         QuotationItem quotationItem = quotationItemRepository.findById(request.quotationItemId())
                 .orElseThrow(() -> new ResourceNotFoundException("Item de cotação não encontrado: id " + request.quotationItemId()));
 
@@ -90,6 +94,7 @@ public class BidService {
                 .type(QuotationEventType.BID_RECEIVED)
                 .description("Lance recebido de " + supplier.getName() + " (" + submittedBy.getName() + ") no item "
                         + quotationItem.getProduct().getName() + ": R$ " + saved.getValue() + ".")
+                .performedBy(impersonatedBy != null ? impersonatedBy + " (via \"Ver como\" o representante)" : null)
                 .build());
 
         return toResponse(saved);

@@ -738,6 +738,7 @@
     <div class="card">
       <h2>Novo usuário</h2>
       <div class="inline-form">
+        <div style="flex:1; min-width:180px"><label>Nome</label><input type="text" id="au-name" placeholder="Nome completo"></div>
         <div style="flex:1; min-width:220px"><label>E-mail</label><input type="email" id="au-email" placeholder="pessoa@empresa.com"></div>
         <div style="flex:1; min-width:180px"><label>Senha provisória</label><input type="text" id="au-password" placeholder="Mínimo 6 caracteres"></div>
         <button onclick="createAdminUser()" style="align-self:flex-end">Criar acesso</button>
@@ -746,7 +747,7 @@
 
     <div class="card">
       <h2>Usuários com acesso</h2>
-      <table><thead><tr><th>E-mail</th><th>Status</th><th></th></tr></thead>
+      <table><thead><tr><th>Nome</th><th>E-mail</th><th>Status</th><th></th></tr></thead>
         <tbody id="admin-users-tbody"></tbody></table>
       <div class="empty" id="admin-users-empty" style="display:none">Nenhum outro usuário administrador cadastrado ainda.</div>
     </div>

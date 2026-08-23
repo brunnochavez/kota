@@ -41,6 +41,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 Long userId = Long.valueOf(claims.getSubject());
                 String email = claims.get("email", String.class);
                 String role = claims.get("role", String.class);
+                String name = claims.get("name", String.class);
+                String impersonatedBy = claims.get("impersonatedBy", String.class);
 
                 // Número em claim de JWT às vezes vem desserializado como Integer, não
                 // Long — pedir Long.class direto pode estourar ClassCastException.
@@ -48,7 +50,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 Object repIdClaim = claims.get("representativeId");
                 Long representativeId = repIdClaim != null ? Long.valueOf(repIdClaim.toString()) : null;
 
-                AuthPrincipal principal = new AuthPrincipal(userId, email, role, representativeId);
+                AuthPrincipal principal = new AuthPrincipal(userId, email, role, representativeId, name, impersonatedBy);
                 List<GrantedAuthority> authorities = List.of(new SimpleGrantedAuthority("ROLE_" + role));
 
                 var authentication = new UsernamePasswordAuthenticationToken(principal, null, authorities);

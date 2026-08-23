@@ -7,5 +7,7 @@ public enum QuotationEventType {
     REMINDER_SENT,
     DEADLINE_EXTENDED,
     CLOSED,
-    REPUBLISHED
+    REPUBLISHED,
+    DECLINED,
+    FULFILLMENT_CONFIRMED
 }

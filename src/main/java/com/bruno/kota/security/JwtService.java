@@ -33,6 +33,14 @@ public class JwtService {
     // banco a cada requisição — id do usuário, papel, e o id do representante (só pra
     // quem tem um vinculado). representativeId fica de fora do token pra admin.
     public String generateToken(User user, Long representativeId) {
+        return generateToken(user, representativeId, null);
+    }
+
+    // impersonatedBy: só preenchido no fluxo de "ver como esse representante" (admin
+    // vendo a tela do representante sem saber a senha dele) — deixa uma marca dentro do
+    // próprio token de quem gerou aquela sessão em nome de outra pessoa, útil se algo
+    // precisar ser auditado depois. null no login normal.
+    public String generateToken(User user, Long representativeId, String impersonatedBy) {
         Instant now = Instant.now();
         var builder = Jwts.builder()
                 .subject(String.valueOf(user.getId()))
@@ -41,8 +49,14 @@ public class JwtService {
                 .issuedAt(Date.from(now))
                 .expiration(Date.from(now.plusSeconds(expirationHours * 3600)));
 
+        if (user.getName() != null && !user.getName().isBlank()) {
+            builder.claim("name", user.getName());
+        }
         if (representativeId != null) {
             builder.claim("representativeId", representativeId);
+        }
+        if (impersonatedBy != null && !impersonatedBy.isBlank()) {
+            builder.claim("impersonatedBy", impersonatedBy);
         }
 
         return builder.signWith(key).compact();

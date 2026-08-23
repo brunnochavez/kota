@@ -163,13 +163,13 @@ public class QuotationController {
 
     @PostMapping("/{id}/decline")
     public ResponseEntity<Void> declineQuotation(@AuthenticationPrincipal AuthPrincipal principal, @PathVariable Long id, @RequestParam Long supplierId) {
-        quotationService.declineQuotation(id, supplierId, repIdOrNull(principal));
+        quotationService.declineQuotation(id, supplierId, repIdOrNull(principal), principal != null ? principal.impersonatedBy() : null);
         return ResponseEntity.noContent().build();
     }
 
     @PostMapping("/{id}/finalize-fulfillment")
     public ResponseEntity<Void> finalizeFulfillment(@AuthenticationPrincipal AuthPrincipal principal, @PathVariable Long id, @RequestParam Long supplierId) {
-        quotationService.finalizeFulfillment(id, supplierId, repIdOrNull(principal));
+        quotationService.finalizeFulfillment(id, supplierId, repIdOrNull(principal), principal != null ? principal.impersonatedBy() : null);
         return ResponseEntity.noContent().build();
     }
 
@@ -192,7 +192,7 @@ public class QuotationController {
     @PostMapping
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<QuotationResponse> createManually(@AuthenticationPrincipal AuthPrincipal principal, @Valid @RequestBody QuotationCreateRequest request) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(quotationService.createManually(request, principal.email()));
+        return ResponseEntity.status(HttpStatus.CREATED).body(quotationService.createManually(request, principal.displayName()));
     }
 
     @PutMapping("/{id}")
@@ -204,7 +204,7 @@ public class QuotationController {
     @PostMapping("/{id}/extend")
     @PreAuthorize("hasRole('ADMIN')")
     public QuotationResponse extendDeadline(@AuthenticationPrincipal AuthPrincipal principal, @PathVariable Long id, @Valid @RequestBody QuotationExtendRequest request) {
-        return quotationService.extendDeadline(id, request, principal.email());
+        return quotationService.extendDeadline(id, request, principal.displayName());
     }
 
     // Republicar (mesmo Nº) — só pra cotação Expirada sem nenhum lance. Reaproveita o
@@ -213,7 +213,7 @@ public class QuotationController {
     @PostMapping("/{id}/republish")
     @PreAuthorize("hasRole('ADMIN')")
     public QuotationResponse republish(@AuthenticationPrincipal AuthPrincipal principal, @PathVariable Long id, @Valid @RequestBody QuotationExtendRequest request) {
-        return quotationService.republish(id, request, principal.email());
+        return quotationService.republish(id, request, principal.displayName());
     }
 
     @DeleteMapping("/{id}")
@@ -226,7 +226,7 @@ public class QuotationController {
     @PostMapping("/{id}/publish")
     @PreAuthorize("hasRole('ADMIN')")
     public QuotationResponse publish(@AuthenticationPrincipal AuthPrincipal principal, @PathVariable Long id) {
-        return quotationService.publish(id, principal.email());
+        return quotationService.publish(id, principal.displayName());
     }
 
     @PostMapping("/{id}/duplicate")
@@ -251,7 +251,7 @@ public class QuotationController {
     @PostMapping("/{id}/confirm-close")
     @PreAuthorize("hasRole('ADMIN')")
     public QuotationCloseResult confirmClose(@AuthenticationPrincipal AuthPrincipal principal, @PathVariable Long id, @RequestBody(required = false) ConfirmCloseRequest request) {
-        return quotationService.confirmClose(id, request, principal.email());
+        return quotationService.confirmClose(id, request, principal.displayName());
     }
 
     @GetMapping("/{id}/result-pdf")
@@ -279,7 +279,7 @@ public class QuotationController {
             @RequestParam(required = false) Integer quantityColumn) {
         return quotationImportService.importFile(
                 file, name, supplierGroupId, expirationDate, defaultSalesProjectionDays,
-                descriptionColumn, barcodeColumn, quantityColumn, principal.email());
+                descriptionColumn, barcodeColumn, quantityColumn, principal.displayName());
     }
 
     @PostMapping("/{id}/items")

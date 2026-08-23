@@ -39,7 +39,8 @@ public class BidController {
     @PostMapping
     public ResponseEntity<BidResponse> submit(@AuthenticationPrincipal AuthPrincipal principal, @Valid @RequestBody BidRequest request) {
         Long authenticatedRepresentativeId = (principal != null && !principal.isAdmin()) ? principal.representativeId() : null;
-        return ResponseEntity.ok(bidService.submit(request, authenticatedRepresentativeId));
+        String impersonatedBy = principal != null ? principal.impersonatedBy() : null;
+        return ResponseEntity.ok(bidService.submit(request, authenticatedRepresentativeId, impersonatedBy));
     }
 
     @PutMapping("/{id}")

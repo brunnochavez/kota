@@ -70,7 +70,12 @@ public class AuthService {
             userRepository.save(user);
         }
 
-        String name = user.getEmail();
+        // Nome de exibição no login: representante sempre usa o nome cadastrado em
+        // Representative (nunca teve outra opção). Admin agora também — usa o nome
+        // definido em "Usuários Administradores" (User.name) quando existir, e só cai
+        // pro e-mail como fallback pra contas antigas que ainda não tiveram nome
+        // definido (ex: o admin@kota.com criado pelo AdminBootstrap).
+        String name = (user.getName() != null && !user.getName().isBlank()) ? user.getName() : user.getEmail();
         Long representativeId = null;
 
         if (user.getRole() == UserRole.REPRESENTATIVE) {

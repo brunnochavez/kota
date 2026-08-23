@@ -28,7 +28,7 @@ function paginationControlsHtml(idPrefix) {
 function updatePaginationControls(idPrefix, page, totalPages, totalItems, onChange) {
   const wrap = document.getElementById(idPrefix + '-pagination');
   if (!wrap) return;
-  wrap.style.display = totalItems > DEFAULT_PAGE_SIZE ? 'flex' : 'none';
+  wrap.style.display = totalPages > 1 ? 'flex' : 'none';
   document.getElementById(idPrefix + '-page-info').textContent = `Página ${page + 1} de ${totalPages}`;
   const prevBtn = document.getElementById(idPrefix + '-prev-btn');
   const nextBtn = document.getElementById(idPrefix + '-next-btn');

@@ -32,6 +32,14 @@ public class User {
     @Column(nullable = false, unique = true)
     private String email;
 
+    // Nome de exibição — hoje só preenchido pra usuário ADMIN criado via "Usuários
+    // Administradores" (AdminUserController). Representante não usa esse campo: o nome
+    // dele já vive em Representative.name, associado via User.representative. Fica
+    // nullable porque contas ADMIN antigas (o admin@kota.com do AdminBootstrap, e
+    // qualquer uma criada antes desse campo existir) não têm nome ainda — nesses casos
+    // o histórico da cotação e o resto da UI caem de volta pro e-mail.
+    private String name;
+
     @Column(name = "password_hash", nullable = false)
     private String passwordHash;
 

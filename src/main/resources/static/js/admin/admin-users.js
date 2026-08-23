@@ -26,10 +26,15 @@ function renderAdminUsersList(users) {
     const toggleBtn = u.enabled
       ? `<button class="danger small" onclick="toggleAdminUserEnabled(${u.id}, false, this)">Desativar</button>`
       : `<button class="secondary small" onclick="toggleAdminUserEnabled(${u.id}, true, this)">Reativar</button>`;
+    const nameCell = u.name
+      ? escapeHtml(u.name)
+      : '<span style="color:var(--text-dim)">— sem nome —</span>';
     tr.innerHTML = `
+      <td>${nameCell}</td>
       <td>${escapeHtml(u.email)}</td>
       <td>${statusBadge}</td>
       <td class="btn-row">
+        <button class="secondary small" onclick="openEditAdminUserNamePopover(${u.id}, '${escapeHtml((u.name || '')).replace(/'/g, "\\'")}', this)">${u.name ? 'Editar nome' : 'Definir nome'}</button>
         <button class="secondary small" onclick="openResetAdminUserPasswordPopover(${u.id}, this)">Redefinir senha</button>
         ${toggleBtn}
       </td>`;
@@ -38,22 +43,78 @@ function renderAdminUsersList(users) {
 }
 
 async function createAdminUser() {
+  const nameInput = document.getElementById('au-name');
   const emailInput = document.getElementById('au-email');
   const passwordInput = document.getElementById('au-password');
+  clearFieldError('au-name');
   clearFieldError('au-email');
   clearFieldError('au-password');
 
   try {
-    await api('POST', '/users', { email: emailInput.value.trim(), password: passwordInput.value });
+    await api('POST', '/users', { name: nameInput.value.trim(), email: emailInput.value.trim(), password: passwordInput.value });
   } catch (e) {
-    distributeFieldErrors(e.message, { email: 'au-email', password: 'au-password' });
+    distributeFieldErrors(e.message, { name: 'au-name', email: 'au-email', password: 'au-password' });
     return;
   }
 
   toast('Usuário administrador criado — a senha informada é provisória.');
+  nameInput.value = '';
   emailInput.value = '';
   passwordInput.value = '';
   loadAdminUsers();
+}
+
+// Popover com um campo de texto pra definir/editar o nome de exibição — mesmo padrão
+// visual do popover de redefinir senha, ancorado no botão da linha. Nome é o que passa
+// a aparecer no "Ver Histórico" da cotação (performedBy) no lugar do e-mail.
+function openEditAdminUserNamePopover(id, currentName, anchorEl) {
+  const existing = document.getElementById('edit-admin-name-popover');
+  if (existing) existing.remove();
+
+  const pop = document.createElement('div');
+  pop.className = 'confirm-popover';
+  pop.id = 'edit-admin-name-popover';
+  pop.innerHTML = `
+    <div class="confirm-popover-msg">Nome de exibição</div>
+    <input type="text" id="edit-admin-name-input" value="${escapeHtml(currentName)}" placeholder="Nome completo" style="margin-top:8px; width:220px">
+    <div class="btn-row" style="justify-content:flex-end; margin-top:10px">
+      <button class="secondary small" type="button" id="edit-admin-name-cancel">Cancelar</button>
+      <button class="small" type="button" id="edit-admin-name-confirm">Salvar</button>
+    </div>`;
+  document.body.appendChild(pop);
+
+  const close = () => pop.remove();
+  document.getElementById('edit-admin-name-cancel').onclick = close;
+  document.getElementById('edit-admin-name-confirm').onclick = async () => {
+    const name = document.getElementById('edit-admin-name-input').value.trim();
+    if (!name) { toast('Digite um nome.', true); return; }
+    try {
+      await api('PUT', `/users/${id}/name?name=${encodeURIComponent(name)}`);
+    } catch (e) {
+      toast(e.message, true);
+      return;
+    }
+    toast('Nome atualizado.');
+    close();
+    loadAdminUsers();
+  };
+
+  const anchor = anchorEl.getBoundingClientRect();
+  const popRect = pop.getBoundingClientRect();
+  let top = anchor.bottom + 6;
+  let left = anchor.right - popRect.width;
+  if (top + popRect.height > window.innerHeight - 8) top = anchor.top - popRect.height - 6;
+  if (left < 8) left = anchor.left;
+  if (left + popRect.width > window.innerWidth - 8) left = window.innerWidth - popRect.width - 8;
+  pop.style.top = Math.max(8, top) + 'px';
+  pop.style.left = Math.max(8, left) + 'px';
+
+  setTimeout(() => document.addEventListener('mousedown', function handler(e) {
+    if (!pop.contains(e.target)) {
+      pop.remove();
+      document.removeEventListener('mousedown', handler);
+    }
+  }), 0);
 }
 
 // Reaproveita o mesmo popover de confirmação usado em outras telas (fechar cotação,

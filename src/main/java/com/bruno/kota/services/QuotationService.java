@@ -1586,7 +1586,7 @@ public class QuotationService {
     // já existir algum lance desse fornecedor nessa cotação — não faz sentido "declinar"
     // depois de já ter enviado preço pra pelo menos um item.
     @Transactional
-    public void declineQuotation(Long quotationId, Long supplierId, Long authenticatedRepresentativeId) {
+    public void declineQuotation(Long quotationId, Long supplierId, Long authenticatedRepresentativeId, String impersonatedBy) {
         validateSupplierOwnership(supplierId, authenticatedRepresentativeId);
 
         Quotation quotation = findEntityById(quotationId);
@@ -1617,6 +1617,16 @@ public class QuotationService {
                 .declinedBy(supplier.getRepresentative())
                 .declinedAt(LocalDateTime.now())
                 .build());
+
+        // Só grava evento quando foi via impersonação — declínio normal do representante
+        // não precisa aparecer no "Ver Histórico" (esse timeline é focado em marcos da
+        // cotação em si, não em cada ação de fornecedor); a exceção é justamente pra
+        // deixar rastro de que foi um admin agindo em nome dele.
+        if (impersonatedBy != null && !impersonatedBy.isBlank()) {
+            logEvent(quotation, QuotationEventType.DECLINED,
+                    "Cotação recusada (\"Não Cotar\") em nome de " + supplier.getName() + ".",
+                    impersonatedBy + " (via \"Ver como\" o representante)");
+        }
     }
 
     // Marca "não tenho isso em estoque" — some da relação pro representante (não conta
@@ -1652,7 +1662,7 @@ public class QuotationService {
     // Idempotente de propósito — clicar em "Finalizar Pedido" duas vezes (duplo toque,
     // rede lenta) não deve dar erro, só não faz nada na segunda vez.
     @Transactional
-    public void finalizeFulfillment(Long quotationId, Long supplierId, Long authenticatedRepresentativeId) {
+    public void finalizeFulfillment(Long quotationId, Long supplierId, Long authenticatedRepresentativeId, String impersonatedBy) {
         validateSupplierOwnership(supplierId, authenticatedRepresentativeId);
         Quotation quotation = findEntityById(quotationId);
 
@@ -1670,6 +1680,15 @@ public class QuotationService {
         orderFulfillmentConfirmationRepository.save(
                 OrderFulfillmentConfirmation.builder().quotation(quotation).supplier(supplier).build()
         );
+
+        // Mesmo raciocínio do declineQuotation: só grava evento no "Ver Histórico" quando
+        // foi via impersonação — confirmação normal do representante não precisa aparecer
+        // ali, a exceção é justamente pra deixar rastro de admin agindo em nome dele.
+        if (impersonatedBy != null && !impersonatedBy.isBlank()) {
+            logEvent(quotation, QuotationEventType.FULFILLMENT_CONFIRMED,
+                    "Atendimento do pedido confirmado em nome de " + supplier.getName() + ".",
+                    impersonatedBy + " (via \"Ver como\" o representante)");
+        }
     }
 
     private SupplierGroup resolveSupplierGroup(Long supplierGroupId) {
