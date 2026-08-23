@@ -59,9 +59,10 @@ async function abrirDetalheCotacao(id) {
     </div>
 
     <div class="btn-row" style="margin-top:16px">
-      <button id="qd-publish-btn" class="success" onclick="publishQuotation()">Publicar (Rascunho → Disponível)</button>
+      <button id="qd-publish-btn" class="success" onclick="publishQuotation()">Publicar (Rascunho → Publicada)</button>
       <button id="qd-close-btn" class="secondary" onclick="closeQuotation(this)">Fechar (calcular vencedores)</button>
       <button id="qd-extend-btn" class="secondary" style="display:none" onclick="openExtendDeadlineModal()">Prorrogar Prazo</button>
+      <button id="qd-republish-btn" class="success" style="display:none" onclick="openRepublishModal()">Republicar (mesmo Nº)</button>
       <button id="qd-whatsapp-btn" class="secondary" onclick="copyPublishMessage(this)" style="display:none">Copiar mensagem para WhatsApp</button>
       <button id="qd-whatsapp-result-btn" class="secondary" onclick="copyResultMessage(this)" style="display:none">Copiar mensagem para WhatsApp</button>
       <button id="qd-response-status-btn" class="secondary" onclick="openRepresentativeStatusModal()" style="display:none">Ver quem já respondeu</button>
@@ -131,7 +132,7 @@ async function abrirDetalheCotacao(id) {
 
   setExpirationValue('qd-expiration', q.expirationDate);
   renderQdStepper(q.status, q.hasBids);
-  applyQdEditLock(q.status);
+  applyQdEditLock(q.status, q.hasBids);
   document.getElementById('qd-items-filter').value = '';
   renderQdItemsRows(items);
   renderQdFulfillmentIssues(items, q.status);
@@ -150,7 +151,7 @@ async function abrirDetalheCotacao(id) {
 function renderQdStepper(status, hasBids) {
   const steps = [
     { key: 'DRAFT', label: 'Rascunho' },
-    { key: 'AVAILABLE', label: 'Disponível' },
+    { key: 'AVAILABLE', label: 'Publicada' },
     { key: 'REVIEWING', label: 'Em Revisão' },
     { key: 'CLOSED', label: 'Concluída' }
   ];
@@ -203,10 +204,13 @@ async function renderQdInfoBar(q) {
   if (q.status === 'DRAFT') {
     stats.push({ label: 'Criada em', value: fmtDate(q.createdAt) });
   } else if (q.status === 'CLOSED') {
+    stats.push({ label: 'Publicada em', value: fmtDate(q.publishedAt) });
     stats.push({ label: 'Concluída em', value: fmtDate(q.updatedAt) });
   } else if (q.status === 'EXPIRED') {
+    stats.push({ label: 'Publicada em', value: fmtDate(q.publishedAt) });
     stats.push({ label: 'Expirou em', value: fmtDate(q.expirationDate) });
   } else {
+    stats.push({ label: 'Publicada em', value: fmtDate(q.publishedAt) });
     stats.push({ label: 'Expira em', value: fmtDate(q.expirationDate) });
   }
 
@@ -228,7 +232,7 @@ async function renderQdInfoBar(q) {
 // fica travada nesse meio-tempo (ver qdCurrentItemsIsDraft mais abaixo); os ajustes finos
 // de quantidade/preço/item de cada representante passam a ser feitos exclusivamente pelo
 // modal "Revisar Lances Enviados", de forma individual por vencedor.
-function applyQdEditLock(status) {
+function applyQdEditLock(status, hasBids) {
   const isDraft = status === 'DRAFT';
   const isReviewing = status === 'REVIEWING';
   const isExpired = status === 'EXPIRED';
@@ -242,6 +246,7 @@ function applyQdEditLock(status) {
   document.getElementById('qd-publish-btn').disabled = !isDraft;
   document.getElementById('qd-close-btn').style.display = canClose ? 'inline-block' : 'none';
   document.getElementById('qd-extend-btn').style.display = status === 'AVAILABLE' ? 'inline-block' : 'none';
+  document.getElementById('qd-republish-btn').style.display = (isExpired && !hasBids) ? 'inline-block' : 'none';
   document.getElementById('qd-whatsapp-btn').style.display = status === 'AVAILABLE' ? 'inline-block' : 'none';
   document.getElementById('qd-whatsapp-result-btn').style.display = status === 'CLOSED' ? 'inline-block' : 'none';
   document.getElementById('qd-response-status-btn').style.display = !isDraft ? 'inline-block' : 'none';
@@ -433,7 +438,8 @@ const QD_EVENT_LABELS = {
   BID_RECEIVED: 'Lance recebido',
   REMINDER_SENT: 'Lembrete enviado',
   DEADLINE_EXTENDED: 'Prazo prorrogado',
-  CLOSED: 'Concluída'
+  CLOSED: 'Concluída',
+  REPUBLISHED: 'Republicada'
 };
 const QD_EVENT_COLORS = {
   CREATED: 'var(--text-dim)',
@@ -441,7 +447,8 @@ const QD_EVENT_COLORS = {
   BID_RECEIVED: 'var(--success)',
   REMINDER_SENT: 'var(--warning)',
   DEADLINE_EXTENDED: 'var(--warning)',
-  CLOSED: 'var(--accent)'
+  CLOSED: 'var(--accent)',
+  REPUBLISHED: 'var(--accent)'
 };
 
 async function openQuotationHistoryModal() {

@@ -6,9 +6,12 @@
 // ============================================================
 let quotationsCache = [];
 let currentStatusFilter = 'DRAFT';
+let quotationsPage = 0;
+let quotationsTotalPages = 1;
+const QUOTATIONS_PAGE_SIZE = 15;
 
-const STATUS_LABELS = { DRAFT: 'Rascunho', AVAILABLE: 'Disponível', REVIEWING: 'Em Revisão', CLOSED: 'Concluída', EXPIRED: 'Expirada' };
-const STATUS_LABELS_PLURAL = { DRAFT: 'Rascunhos', AVAILABLE: 'Disponíveis', REVIEWING: 'Em Revisão', CLOSED: 'Concluídas', EXPIRED: 'Expiradas', AWAITING_CLOSE: 'Aguardando Fechamento' };
+const STATUS_LABELS = { DRAFT: 'Rascunho', AVAILABLE: 'Publicada', REVIEWING: 'Em Revisão', CLOSED: 'Concluída', EXPIRED: 'Expirada' };
+const STATUS_LABELS_PLURAL = { DRAFT: 'Rascunhos', AVAILABLE: 'Publicadas', REVIEWING: 'Em Revisão', CLOSED: 'Concluídas', EXPIRED: 'Expiradas', AWAITING_CLOSE: 'Aguardando Fechamento' };
 const STATUS_CLASSES = { DRAFT: 'draft', AVAILABLE: 'available', REVIEWING: 'reviewing', CLOSED: 'closed', EXPIRED: 'expired' };
 
 // Recebe a cotação inteira (não só o status) porque EXPIRED precisa saber se já tem
@@ -25,14 +28,21 @@ function statusBadge(q) {
 
 let quotationFillRates = new Map();
 
+// "Aguardando Fechamento" e "Expiradas" não são status de verdade no banco pra fins de
+// filtro — as duas são QuotationStatus.EXPIRED por baixo, separadas por hasBids (ver
+// findExpiredWithGroupPaged no backend). O front só precisa mandar o nome certo da aba;
+// quem decide qual metade de EXPIRED buscar é o backend.
 async function loadQuotations() {
-  const [quotations, fillRates] = await Promise.all([
-    safeCall(() => api('GET', '/quotations')),
+  const [result, fillRates] = await Promise.all([
+    safeCall(() => api('GET', `/quotations/by-status?status=${currentStatusFilter}&page=${quotationsPage}&size=${QUOTATIONS_PAGE_SIZE}`)),
     safeCall(() => api('GET', '/quotations/representative-fill-rate'))
   ]);
-  quotationsCache = quotations;
+  quotationsCache = result.content;
+  quotationsPage = result.page;
+  quotationsTotalPages = result.totalPages;
   quotationFillRates = new Map(fillRates.map(f => [f.quotationId, f]));
   renderQuotationsList();
+  updateQuotationsPaginationControls(result.totalElements);
 }
 
 // Vermelho (0%) → laranja (50%) → verde (100%), interpolado em RGB — não dá pra fazer
@@ -58,27 +68,19 @@ function fillRateBarHtml(quotationId) {
   </div>`;
 }
 
-// "Aguardando Fechamento" não é um status de verdade no banco — é sempre EXPIRED com
-// hasBids=true por baixo. Ganhou aba própria (em vez de ficar misturado com as
-// "Expiradas" de verdade) porque as duas situações pedem ações completamente
-// diferentes: uma cotação aqui ainda dá pra fechar e calcular vencedores; uma Expirada
-// de verdade (sem nenhum lance) não tem mais o que fazer, só arquivar mentalmente.
+// A página já vem filtrada e paginada pelo backend (ver loadQuotations) — aqui é só
+// desenhar o que já chegou, sem filtrar de novo no front.
 function renderQuotationsList() {
-  const filtered = quotationsCache.filter(q => {
-    if (currentStatusFilter === 'AWAITING_CLOSE') return q.status === 'EXPIRED' && q.hasBids;
-    if (currentStatusFilter === 'EXPIRED') return q.status === 'EXPIRED' && !q.hasBids;
-    return q.status === currentStatusFilter;
-  });
   const tbody = document.getElementById('quotations-tbody');
   tbody.innerHTML = '';
-  document.getElementById('quotations-empty').style.display = filtered.length ? 'none' : 'block';
-  filtered.forEach(q => {
+  document.getElementById('quotations-empty').style.display = quotationsCache.length ? 'none' : 'block';
+  quotationsCache.forEach(q => {
     const tr = document.createElement('tr');
     const deleteBtn = q.status === 'DRAFT'
       ? `<button class="danger small" onclick="deleteQuotationFromList(${q.id}, this)">Excluir</button>`
       : '';
-    tr.innerHTML = `<td>${q.id}</td><td>${q.name}</td><td>${statusBadge(q)}</td>
-      <td>${q.supplierGroupName || '—'}</td><td>${fmtDate(q.expirationDate)}</td>
+    tr.innerHTML = `<td>${formatQuotationNumber(q.id)}</td><td>${q.name}</td><td>${statusBadge(q)}</td>
+      <td>${q.supplierGroupName || '—'}</td><td>${fmtDate(q.publishedAt)}</td><td>${fmtDate(q.expirationDate)}</td>
       <td class="btn-row"><button class="secondary small" onclick="abrirDetalheCotacao(${q.id})">Ver Detalhe</button>${deleteBtn}</td>`;
     tbody.appendChild(tr);
 
@@ -86,10 +88,26 @@ function renderQuotationsList() {
       const bar = fillRateBarHtml(q.id);
       if (bar) {
         const barTr = document.createElement('tr');
-        barTr.innerHTML = `<td colspan="6" style="padding-top:0; padding-bottom:0">${bar}</td>`;
+        barTr.innerHTML = `<td colspan="7" style="padding-top:0; padding-bottom:0">${bar}</td>`;
         tbody.appendChild(barTr);
       }
     }
   });
 }
 
+function goToQuotationsPage(page) {
+  quotationsPage = page;
+  loadQuotations();
+}
+
+function updateQuotationsPaginationControls(totalItems) {
+  const wrap = document.getElementById('quotations-pagination');
+  wrap.style.display = quotationsTotalPages > 1 ? 'flex' : 'none';
+  document.getElementById('quotations-page-info').textContent = `Página ${quotationsPage + 1} de ${quotationsTotalPages} (${totalItems} no total)`;
+  const prevBtn = document.getElementById('quotations-prev-btn');
+  const nextBtn = document.getElementById('quotations-next-btn');
+  prevBtn.disabled = quotationsPage === 0;
+  nextBtn.disabled = quotationsPage >= quotationsTotalPages - 1;
+  prevBtn.onclick = () => goToQuotationsPage(quotationsPage - 1);
+  nextBtn.onclick = () => goToQuotationsPage(quotationsPage + 1);
+}

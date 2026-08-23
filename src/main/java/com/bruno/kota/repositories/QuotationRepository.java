@@ -3,6 +3,8 @@ package com.bruno.kota.repositories;
 import java.time.LocalDateTime;
 import java.util.List;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -48,4 +50,29 @@ public interface QuotationRepository extends JpaRepository<Quotation, Long> {
             + "AND q.expirationDate IS NOT NULL "
             + "AND q.expirationDate BETWEEN :now AND :reminderThreshold")
     List<Quotation> findDueForReminder(@Param("now") LocalDateTime now, @Param("reminderThreshold") LocalDateTime reminderThreshold);
+
+    // Paginação no backend da tela "Cotações" (GET /quotations/by-status) — usada por
+    // todas as abas com status real (Rascunhos, Publicadas/AVAILABLE, Em Revisão,
+    // Concluídas). "Expiradas"/"Aguardando Fechamento" NÃO usam esse método: são as duas
+    // metades de QuotationStatus.EXPIRED, separadas por hasBids (ver
+    // findExpiredWithGroupPaged abaixo). ORDER BY explícito é obrigatório aqui — sem ele
+    // o MySQL não garante a mesma ordem entre duas páginas da mesma aba, podendo repetir
+    // ou pular linha ao trocar de página.
+    @Query(value = "SELECT q FROM Quotation q LEFT JOIN FETCH q.supplierGroup WHERE q.status = :status ORDER BY q.id DESC",
+            countQuery = "SELECT COUNT(q) FROM Quotation q WHERE q.status = :status")
+    Page<Quotation> findByStatusWithGroupPaged(@Param("status") QuotationStatus status, Pageable pageable);
+
+    // Mesma paginação, só que pra dentro de QuotationStatus.EXPIRED, dividido pela aba
+    // virtual: hasBids=true → "Aguardando Fechamento" (ainda dá pra calcular vencedores),
+    // hasBids=false → "Expiradas" de verdade (ninguém respondeu, só arquivar/republicar).
+    @Query(value = "SELECT q FROM Quotation q LEFT JOIN FETCH q.supplierGroup "
+            + "WHERE q.status = com.bruno.kota.entities.QuotationStatus.EXPIRED "
+            + "AND ((:hasBids = true AND EXISTS (SELECT 1 FROM Bid b WHERE b.quotationItem.quotation.id = q.id)) "
+            + "OR (:hasBids = false AND NOT EXISTS (SELECT 1 FROM Bid b WHERE b.quotationItem.quotation.id = q.id))) "
+            + "ORDER BY q.id DESC",
+            countQuery = "SELECT COUNT(q) FROM Quotation q "
+            + "WHERE q.status = com.bruno.kota.entities.QuotationStatus.EXPIRED "
+            + "AND ((:hasBids = true AND EXISTS (SELECT 1 FROM Bid b WHERE b.quotationItem.quotation.id = q.id)) "
+            + "OR (:hasBids = false AND NOT EXISTS (SELECT 1 FROM Bid b WHERE b.quotationItem.quotation.id = q.id)))")
+    Page<Quotation> findExpiredWithGroupPaged(@Param("hasBids") boolean hasBids, Pageable pageable);
 }

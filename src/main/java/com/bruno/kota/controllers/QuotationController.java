@@ -24,6 +24,7 @@ import org.springframework.web.multipart.MultipartFile;
 import com.bruno.kota.dtos.AddItemWithWinnerRequest;
 import com.bruno.kota.dtos.ConfirmCloseRequest;
 import com.bruno.kota.dtos.ManualWinnerAssignRequest;
+import com.bruno.kota.dtos.PagedResponse;
 import com.bruno.kota.dtos.RepresentativeStatusPageResponse;
 import com.bruno.kota.dtos.QuotationCloseRequest;
 import com.bruno.kota.dtos.QuotationCloseResult;
@@ -43,6 +44,7 @@ import com.bruno.kota.dtos.ReorderPointRow;
 import com.bruno.kota.dtos.RepresentativeResponseStatus;
 import com.bruno.kota.dtos.ReviewBatchUpdateRequest;
 import com.bruno.kota.dtos.SalesProjectionUpdateRequest;
+import com.bruno.kota.dtos.SpendSavingsSummary;
 import com.bruno.kota.dtos.WonQuotationSummary;
 import com.bruno.kota.security.AuthPrincipal;
 import com.bruno.kota.services.QuotationImportService;
@@ -64,6 +66,18 @@ public class QuotationController {
     @GetMapping
     public List<QuotationResponse> findAll() {
         return quotationService.findAll();
+    }
+
+    // Paginado no backend (15 por página) — usado pela tela "Cotações" (aba por status).
+    // Continua existindo o GET /quotations sem paginar acima, pra quem precisa da lista
+    // inteira de uma vez (Dashboard, dropdown de rascunhos etc) — não mexi nesses.
+    @GetMapping("/by-status")
+    @PreAuthorize("hasRole('ADMIN')")
+    public PagedResponse<QuotationResponse> findByStatusPaged(
+            @RequestParam String status,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "15") int size) {
+        return quotationService.findByStatusPaged(status, page, size);
     }
 
     // Path literal ("representative-fill-rate") sempre vence sobre /{id} no roteamento do
@@ -112,6 +126,22 @@ public class QuotationController {
         LocalDateTime fromDt = (from != null && !from.isBlank()) ? LocalDate.parse(from).atStartOfDay() : null;
         LocalDateTime toDt = (to != null && !to.isBlank()) ? LocalDate.parse(to).atTime(23, 59, 59) : null;
         return quotationService.getQuotationReport(fromDt, toDt, supplierId, representativeId, product, onlyWinners);
+    }
+
+    // Dashboard de Economia — sem from/to, usa o mês corrente (dia 1 até agora), que é
+    // o período que o pedido original ("quanto economizei esse mês") pede por padrão.
+    // Aceita from/to (mesmo formato yyyy-MM-dd do /report) pra quem quiser outro período.
+    @GetMapping("/spend-savings")
+    @PreAuthorize("hasRole('ADMIN')")
+    public SpendSavingsSummary getSpendSavings(
+            @RequestParam(required = false) String from,
+            @RequestParam(required = false) String to
+    ) {
+        LocalDateTime fromDt = (from != null && !from.isBlank())
+                ? LocalDate.parse(from).atStartOfDay()
+                : LocalDate.now().withDayOfMonth(1).atStartOfDay();
+        LocalDateTime toDt = (to != null && !to.isBlank()) ? LocalDate.parse(to).atTime(23, 59, 59) : LocalDateTime.now();
+        return quotationService.getSpendSavings(fromDt, toDt);
     }
 
     @GetMapping("/reorder-points")
@@ -175,6 +205,15 @@ public class QuotationController {
     @PreAuthorize("hasRole('ADMIN')")
     public QuotationResponse extendDeadline(@PathVariable Long id, @Valid @RequestBody QuotationExtendRequest request) {
         return quotationService.extendDeadline(id, request);
+    }
+
+    // Republicar (mesmo Nº) — só pra cotação Expirada sem nenhum lance. Reaproveita o
+    // mesmo DTO de "Prorrogar Prazo" (só pede a nova data), já que a única informação
+    // extra necessária é o novo prazo.
+    @PostMapping("/{id}/republish")
+    @PreAuthorize("hasRole('ADMIN')")
+    public QuotationResponse republish(@PathVariable Long id, @Valid @RequestBody QuotationExtendRequest request) {
+        return quotationService.republish(id, request);
     }
 
     @DeleteMapping("/{id}")

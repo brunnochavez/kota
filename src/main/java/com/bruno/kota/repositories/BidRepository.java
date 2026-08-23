@@ -75,4 +75,16 @@ public interface BidRepository extends JpaRepository<Bid, Long> {
     // dentre um lote de cotações.
     @Query("SELECT DISTINCT qi.quotation.id FROM Bid b JOIN b.quotationItem qi WHERE qi.quotation.id IN :quotationIds")
     List<Long> findDistinctQuotationIdsWithBids(@Param("quotationIds") List<Long> quotationIds);
+
+    // Usado pelo Dashboard de Economia (spend savings) — mesma ideia de
+    // findByQuotationItem_QuotationIdInWithReportDetails, mas trazendo o grupo de
+    // fornecedores da cotação junto (pra agrupar a economia por grupo sem N+1) e sem
+    // precisar do fornecedor/representante de cada lance, que esse cálculo não usa.
+    @Query("SELECT b FROM Bid b "
+            + "JOIN FETCH b.quotationItem qi "
+            + "JOIN FETCH qi.quotation q "
+            + "LEFT JOIN FETCH q.supplierGroup "
+            + "LEFT JOIN FETCH qi.winningBid "
+            + "WHERE qi.quotation.id IN :quotationIds")
+    List<Bid> findByQuotationItem_QuotationIdInWithGroupAndWinner(@Param("quotationIds") List<Long> quotationIds);
 }

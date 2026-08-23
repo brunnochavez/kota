@@ -16,6 +16,9 @@ import java.util.stream.Collectors;
 
 import com.bruno.kota.dtos.*;
 import com.bruno.kota.dtos.RepresentativePerformance;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -85,6 +88,43 @@ public class QuotationService {
                 .toList();
     }
 
+    // Paginação no backend pra tela "Cotações" (GET /quotations/by-status) — 15 por
+    // página. statusFilter aceita os 5 status reais (DRAFT/AVAILABLE/REVIEWING/CLOSED/
+    // EXPIRED) e os 2 nomes virtuais que o front usa nas abas "Publicadas"... na real só
+    // "AWAITING_CLOSE" é virtual (a aba EXPIRED de verdade já é o status EXPIRED com
+    // hasBids=false). Continua existindo o findAll() sem paginar — usado por telas que
+    // precisam da lista inteira de uma vez (Dashboard, dropdown de rascunhos etc).
+    @Transactional(readOnly = true)
+    public PagedResponse<QuotationResponse> findByStatusPaged(String statusFilter, int page, int size) {
+        Pageable pageable = PageRequest.of(Math.max(page, 0), Math.min(Math.max(size, 1), 100));
+        Page<Quotation> result;
+        if ("AWAITING_CLOSE".equals(statusFilter)) {
+            result = quotationRepository.findExpiredWithGroupPaged(true, pageable);
+        } else if ("EXPIRED".equals(statusFilter)) {
+            result = quotationRepository.findExpiredWithGroupPaged(false, pageable);
+        } else {
+            QuotationStatus status;
+            try {
+                status = QuotationStatus.valueOf(statusFilter);
+            } catch (IllegalArgumentException ex) {
+                throw new BusinessRuleException("Status inválido: " + statusFilter);
+            }
+            result = quotationRepository.findByStatusWithGroupPaged(status, pageable);
+        }
+
+        List<Quotation> content = result.getContent();
+        List<Long> ids = content.stream().map(Quotation::getId).toList();
+        Set<Long> idsWithBids = ids.isEmpty()
+                ? Set.of()
+                : new HashSet<>(bidRepository.findDistinctQuotationIdsWithBids(ids));
+
+        List<QuotationResponse> responses = content.stream()
+                .map(q -> toResponse(q, idsWithBids.contains(q.getId())))
+                .toList();
+
+        return new PagedResponse<>(responses, result.getNumber(), result.getSize(), result.getTotalElements(), result.getTotalPages());
+    }
+
     @Transactional(readOnly = true)
     public QuotationResponse findById(Long id) {
         return toResponse(findEntityById(id));
@@ -93,6 +133,88 @@ public class QuotationService {
     @Transactional(readOnly = true)
     public List<QuotationItemResponse> findItems(Long quotationId) {
         return findItems(quotationId, null);
+    }
+
+    // Dashboard de Economia — "quanto economizei comparando o menor lance com a média
+    // dos lances", agrupado por grupo de fornecedores. Só entra item que teve vencedor
+    // definido E mais de 1 lance (com 1 lance só, média == vencedor, economia zero por
+    // definição — não tem com o que comparar). from/to filtram pela data de FECHAMENTO
+    // da cotação (updatedAt quando virou CLOSED), igual ao Relatório de Cotações — sem
+    // filtro, o controller já manda o mês corrente por padrão.
+    @Transactional(readOnly = true)
+    public SpendSavingsSummary getSpendSavings(LocalDateTime from, LocalDateTime to) {
+        List<Quotation> closedQuotations = quotationRepository.findByStatus(QuotationStatus.CLOSED);
+
+        List<Long> quotationIds = closedQuotations.stream()
+                .filter(q -> {
+                    LocalDateTime closedAt = q.getUpdatedAt();
+                    if (from != null && (closedAt == null || closedAt.isBefore(from))) return false;
+                    if (to != null && (closedAt == null || closedAt.isAfter(to))) return false;
+                    return true;
+                })
+                .map(Quotation::getId)
+                .toList();
+
+        if (quotationIds.isEmpty()) {
+            return new SpendSavingsSummary(BigDecimal.ZERO, BigDecimal.ZERO, 0, List.of());
+        }
+
+        List<Bid> bids = bidRepository.findByQuotationItem_QuotationIdInWithGroupAndWinner(quotationIds);
+
+        // Agrupa lances por item — precisa ver TODOS os lances de um item de uma vez só
+        // pra tirar a média (não dá pra calcular incrementalmente lance a lance).
+        Map<Long, List<Bid>> bidsByItem = bids.stream()
+                .collect(Collectors.groupingBy(b -> b.getQuotationItem().getId()));
+
+        // -1L representa "sem grupo definido" — chave simples pra não precisar de Long
+        // nulo em Map (que dá NPE em merge/getOrDefault dependendo do uso).
+        Map<Long, BigDecimal> savingsByGroup = new LinkedHashMap<>();
+        Map<Long, BigDecimal> spendByGroup = new LinkedHashMap<>();
+        Map<Long, String> groupNames = new LinkedHashMap<>();
+        Map<Long, Integer> itemCountByGroup = new LinkedHashMap<>();
+
+        BigDecimal totalSavings = BigDecimal.ZERO;
+        BigDecimal totalSpend = BigDecimal.ZERO;
+        int totalItems = 0;
+
+        for (List<Bid> itemBids : bidsByItem.values()) {
+            QuotationItem item = itemBids.get(0).getQuotationItem();
+            Bid winningBid = item.getWinningBid();
+            if (winningBid == null || itemBids.size() < 2) continue;
+
+            BigDecimal sum = itemBids.stream().map(Bid::getValue).reduce(BigDecimal.ZERO, BigDecimal::add);
+            BigDecimal average = sum.divide(BigDecimal.valueOf(itemBids.size()), 4, RoundingMode.HALF_UP);
+            BigDecimal quantity = item.getQuantity();
+            BigDecimal itemSavings = average.subtract(winningBid.getValue()).multiply(quantity).max(BigDecimal.ZERO);
+            BigDecimal itemSpend = winningBid.getValue().multiply(quantity);
+
+            Quotation quotation = item.getQuotation();
+            SupplierGroup group = safeGetSupplierGroup(quotation);
+            Long groupId = group != null ? group.getId() : -1L;
+            String groupName = group != null ? group.getName() : "Sem grupo";
+
+            savingsByGroup.merge(groupId, itemSavings, BigDecimal::add);
+            spendByGroup.merge(groupId, itemSpend, BigDecimal::add);
+            groupNames.putIfAbsent(groupId, groupName);
+            itemCountByGroup.merge(groupId, 1, Integer::sum);
+
+            totalSavings = totalSavings.add(itemSavings);
+            totalSpend = totalSpend.add(itemSpend);
+            totalItems++;
+        }
+
+        List<SpendSavingsRow> rows = savingsByGroup.entrySet().stream()
+                .map(e -> new SpendSavingsRow(
+                        e.getKey() == -1L ? null : e.getKey(),
+                        groupNames.get(e.getKey()),
+                        e.getValue(),
+                        spendByGroup.get(e.getKey()),
+                        itemCountByGroup.get(e.getKey())
+                ))
+                .sorted(Comparator.comparing(SpendSavingsRow::totalSavings).reversed())
+                .toList();
+
+        return new SpendSavingsSummary(totalSavings, totalSpend, totalItems, rows);
     }
 
     // Com supplierId: busca TODOS os lances desse fornecedor nessa cotação numa consulta
@@ -282,6 +404,41 @@ public class QuotationService {
         Quotation saved = quotationRepository.save(quotation);
         logEvent(saved, QuotationEventType.PUBLISHED,
                 "Cotação publicada — prazo até " + fmtEvent(saved.getExpirationDate()) + ".");
+
+        notifyEligibleRepresentativesOfPublish(saved);
+
+        return toResponse(saved);
+    }
+
+    // Republicar (mesmo Nº) — só pra cotação Expirada de verdade (ninguém respondeu a
+    // tempo). Diferente de duplicate(): não cria uma cotação nova, reabre a mesma linha
+    // (mesmo id, mesmos itens já cadastrados) direto pra AVAILABLE com um novo prazo.
+    // Se já tiver lance registrado é a aba "Aguardando Fechamento" — ali o certo é Fechar
+    // pra calcular vencedores, não republicar (senão o lance que já chegou fica órfão de
+    // um prazo que nunca mais bate com ele). reminderSentAt volta pra null pra o lembrete
+    // de 3h poder disparar de novo nesse novo ciclo.
+    @Transactional
+    public QuotationResponse republish(Long id, QuotationExtendRequest request) {
+        Quotation quotation = findEntityById(id);
+
+        if (quotation.getStatus() != QuotationStatus.EXPIRED) {
+            throw new BusinessRuleException("Só é possível republicar uma cotação Expirada.");
+        }
+        boolean hasBids = bidRepository.existsByQuotationItem_QuotationId(id);
+        if (hasBids) {
+            throw new BusinessRuleException("Essa cotação já recebeu lances — use \"Fechar\" para calcular os vencedores, em vez de republicar.");
+        }
+        if (request.expirationDate().isBefore(LocalDateTime.now())) {
+            throw new BusinessRuleException("O novo prazo de expiração precisa ser no futuro.");
+        }
+
+        quotation.setStatus(QuotationStatus.AVAILABLE);
+        quotation.setExpirationDate(request.expirationDate());
+        quotation.setPublishedAt(LocalDateTime.now());
+        quotation.setReminderSentAt(null);
+        Quotation saved = quotationRepository.save(quotation);
+        logEvent(saved, QuotationEventType.REPUBLISHED,
+                "Cotação republicada (mesmo Nº) — prazo até " + fmtEvent(saved.getExpirationDate()) + ".");
 
         notifyEligibleRepresentativesOfPublish(saved);
 

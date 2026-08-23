@@ -6,5 +6,6 @@ public enum QuotationEventType {
     BID_RECEIVED,
     REMINDER_SENT,
     DEADLINE_EXTENDED,
-    CLOSED
+    CLOSED,
+    REPUBLISHED
 }

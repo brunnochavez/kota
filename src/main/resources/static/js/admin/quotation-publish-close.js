@@ -234,6 +234,48 @@ async function confirmExtendDeadline() {
   abrirDetalheCotacao(currentQuotationId);
 }
 
+// Republicar (mesmo Nº) — só aparece pra cotação Expirada sem nenhum lance registrado
+// (ver applyQdEditLock). Diferente de "Gerar Outra Cotação" (duplicateQuotation), que
+// cria uma cotação NOVA em Rascunho a partir dos itens desta: aqui é a mesma linha,
+// mesmo id/Nº, reaberta direto pra Publicada com um novo prazo — sem duplicar nada.
+async function openRepublishModal() {
+  const q = await safeCall(() => api('GET', `/quotations/${currentQuotationId}`));
+  openModal2(`
+    <h2>Republicar cotação Nº ${formatQuotationNumber(q.id)}</h2>
+    <div class="subtitle" style="margin-bottom:14px">Reabre esta mesma cotação (mesmo número, mesmos itens) direto para Publicada, com um novo prazo. Um e-mail avisando será enviado a todos os representantes elegíveis do grupo.</div>
+    <label>Novo prazo</label>
+    <div style="display:flex; gap:6px; flex-wrap:wrap">
+      <input type="date" id="republish-expiration-date" style="flex:1.3">
+      <input type="time" id="republish-expiration-time" style="flex:1">
+    </div>
+    <div class="btn-row" style="margin-top:16px; justify-content:space-between">
+      <button class="secondary" onclick="closeModal2()">Cancelar</button>
+      <button id="republish-confirm-btn" class="success" onclick="confirmRepublish()">Republicar e avisar</button>
+    </div>
+  `);
+}
+
+async function confirmRepublish() {
+  const btn = document.getElementById('republish-confirm-btn');
+  const expirationDate = getExpirationValue('republish-expiration');
+  if (!expirationDate) {
+    toast('Escolha a nova data do prazo.', true);
+    return;
+  }
+  btn.disabled = true;
+  try {
+    await api('POST', `/quotations/${currentQuotationId}/republish`, { expirationDate });
+  } catch (e) {
+    toast(e.message, true);
+    btn.disabled = false;
+    return;
+  }
+  toast('Cotação republicada — representantes avisados por e-mail.');
+  closeModal2();
+  loadQuotations();
+  abrirDetalheCotacao(currentQuotationId);
+}
+
 async function publishQuotation() {
   await safeCall(() => api('POST', `/quotations/${currentQuotationId}/publish`));
   toast('Cotação publicada.');

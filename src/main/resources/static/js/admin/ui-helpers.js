@@ -64,7 +64,7 @@ function clearFieldError(inputId) {
 // grupo flex compartilhado com o campo de hora, onde inserir texto ali dentro
 // empurrava/quebrava o layout dos campos vizinhos. distributeFieldErrors() consulta
 // essa lista pra decidir qual dos dois jeitos usar, campo por campo.
-const POPOVER_ERROR_FIELDS = new Set(['mq-expiration-date', 'qd-expiration-date', 'extend-expiration-date']);
+const POPOVER_ERROR_FIELDS = new Set(['mq-expiration-date', 'qd-expiration-date', 'extend-expiration-date', 'republish-expiration-date']);
 
 function showFieldErrorSmart(inputId, message) {
   const input = document.getElementById(inputId);

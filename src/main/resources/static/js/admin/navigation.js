@@ -80,8 +80,9 @@ document.querySelectorAll('#status-filter-tabs .tab').forEach(tab => {
     document.querySelectorAll('#status-filter-tabs .tab').forEach(t => t.classList.remove('active'));
     tab.classList.add('active');
     currentStatusFilter = tab.dataset.status;
+    quotationsPage = 0;
     document.getElementById('quotations-list-title').textContent = STATUS_LABELS_PLURAL[currentStatusFilter];
-    renderQuotationsList();
+    loadQuotations();
   });
 });
 
@@ -102,9 +103,11 @@ function loadSectionData(section) {
   if (section === 'quotation-start') { loadGroupsForSelects(); loadProductsForManualItems(); }
   if (section === 'quotation-reports') loadQuotations();
   if (section === 'reports') loadReportsFilters();
+  if (section === 'spend-savings') loadSpendSavings();
   if (section === 'reorder-points') loadReorderPointReport();
   if (section === 'purchase-orders') loadPurchaseOrders();
   if (section === 'company-settings') loadCompanySettingsForm();
+  if (section === 'admin-users') loadAdminUsers();
 }
 
 function goToQuotationsFiltered(status) {

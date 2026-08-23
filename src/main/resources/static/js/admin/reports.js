@@ -78,7 +78,7 @@ function clearReportFilters() {
 // de documento formal, tipo número de pedido/nota. Só formatação de exibição, o id
 // continua o mesmo por baixo (é ele que abre o detalhe ao clicar).
 function formatQuotationNumber(id) {
-  return String(id).padStart(6, '0');
+  return String(id).padStart(7, '0');
 }
 
 function groupReportRows() {
