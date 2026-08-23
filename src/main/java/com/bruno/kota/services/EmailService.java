@@ -1,17 +1,14 @@
 package com.bruno.kota.services;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
-
-import com.bruno.kota.entities.Bid;
-import com.bruno.kota.entities.Quotation;
-import com.bruno.kota.entities.QuotationItem;
-import com.bruno.kota.entities.Representative;
 
 import jakarta.mail.internet.MimeMessage;
 import lombok.RequiredArgsConstructor;
@@ -22,10 +19,29 @@ import lombok.extern.slf4j.Slf4j;
 // válido. Por isso todo envio fica dentro de try/catch que só loga, nunca propaga —
 // quem chama esse service (QuotationService) não precisa (nem deve) se preocupar com
 // falha de e-mail.
+//
+// @Async nos 3 métodos de notificação: sem isso, publicar/fechar uma cotação ficava
+// esperando o Brevo responder — um e-mail por vez, um representante de cada vez —
+// antes da requisição HTTP devolver qualquer coisa pro navegador. @Async devolve a
+// resposta pro admin na hora, e os e-mails saem numa thread separada, em segundo plano.
+//
+// IMPORTANTE: por causa disso, os métodos abaixo recebem RepContact/WonItemLine (records
+// simples, só texto/número) em vez das entidades JPA (Quotation/Representative/
+// QuotationItem) direto. Um método @Async roda numa thread própria, SEM a sessão do
+// Hibernate da requisição original — se essa thread tentasse ler um campo "preguiçoso"
+// (lazy) de uma entidade (tipo representative.getName() vindo de uma relação lazy, ou
+// item.getProduct()), estouraria LazyInitializationException, e o e-mail simplesmente
+// não sairia (silenciosamente, já que send() só loga erro). QuotationService já extrai
+// esses valores simples ANTES de chamar esse service, ainda dentro da transação original
+// — é lá, não aqui, que os dados "de verdade" saem do banco.
 @Service
 @RequiredArgsConstructor
 @Slf4j
 public class EmailService {
+
+    public record RepContact(String name, String email) {}
+
+    public record WonItemLine(String productName, BigDecimal quantity, BigDecimal unitPrice) {}
 
     private final JavaMailSender mailSender;
 
@@ -39,34 +55,58 @@ public class EmailService {
     private static final String LOGO_URL = APP_URL + "/img/kota-wordmark.png";
     private static final String BRAND_COLOR = "#2f6fed";
 
-    public void notifyQuotationPublished(Quotation quotation, List<Representative> eligibleReps) {
-        String subject = "Nova cotação disponível: " + quotation.getName();
-        String link = APP_URL + "/representante.html?cotacao=" + quotation.getId();
+    @Async
+    public void notifyQuotationPublished(Long quotationId, String quotationName, LocalDateTime expirationDate, List<RepContact> eligibleReps) {
+        String subject = "Nova cotação disponível: " + quotationName;
+        String link = APP_URL + "/representante.html?cotacao=" + quotationId;
 
-        for (Representative rep : eligibleReps) {
+        for (RepContact rep : eligibleReps) {
             StringBuilder content = new StringBuilder();
-            content.append("<p style=\"margin:0 0 12px\">Olá, ").append(escapeHtml(firstName(rep.getName()))).append("!</p>");
+            content.append("<p style=\"margin:0 0 12px\">Olá, ").append(escapeHtml(firstName(rep.name()))).append("!</p>");
             content.append("<p style=\"margin:0 0 12px\">Uma nova cotação está disponível pra você enviar seus preços:</p>");
-            content.append("<p style=\"margin:0 0 12px; font-size:16px\"><strong>").append(escapeHtml(quotation.getName())).append("</strong></p>");
-            content.append("<p style=\"margin:0 0 20px\">Prazo para enviar preços: <strong>").append(fmtDate(quotation.getExpirationDate())).append("</strong></p>");
+            content.append("<p style=\"margin:0 0 12px; font-size:16px\"><strong>").append(escapeHtml(quotationName)).append("</strong></p>");
+            content.append("<p style=\"margin:0 0 20px\">Prazo para enviar preços: <strong>").append(fmtDate(expirationDate)).append("</strong></p>");
             content.append(buttonHtml(link, "Acessar cotação"));
             content.append("<p style=\"color:#888; font-size:12px; margin:20px 0 0\">Cotações enviadas depois do prazo não são consideradas.</p>");
 
-            send(rep.getEmail(), subject, wrapInLayout(content.toString()));
+            send(rep.email(), subject, wrapInLayout(content.toString()));
+        }
+    }
+
+    // Só vai pra quem ainda NÃO respondeu (nem lance, nem "Não Cotar") — quem já
+    // respondeu não precisa de lembrete nenhum, já fez a parte dele. Disparado uma vez
+    // só por cotação (QuotationReminderScheduler marca reminderSentAt depois de chamar
+    // isso), então não vira spam mesmo que o job rode toda hora.
+    @Async
+    public void notifyDeadlineApproaching(Long quotationId, String quotationName, LocalDateTime expirationDate, List<RepContact> pendingReps) {
+        String subject = "Prazo terminando: " + quotationName;
+        String link = APP_URL + "/representante.html?cotacao=" + quotationId;
+
+        for (RepContact rep : pendingReps) {
+            StringBuilder content = new StringBuilder();
+            content.append("<p style=\"margin:0 0 12px\">Olá, ").append(escapeHtml(firstName(rep.name()))).append("!</p>");
+            content.append("<p style=\"margin:0 0 12px\">O prazo pra enviar seus preços na cotação abaixo está terminando:</p>");
+            content.append("<p style=\"margin:0 0 12px; font-size:16px\"><strong>").append(escapeHtml(quotationName)).append("</strong></p>");
+            content.append("<p style=\"margin:0 0 20px\">Prazo final: <strong>").append(fmtDate(expirationDate)).append("</strong></p>");
+            content.append(buttonHtml(link, "Enviar meus preços"));
+            content.append("<p style=\"color:#888; font-size:12px; margin:20px 0 0\">Se você não tem o que ofertar dessa vez, toque em \"Não Cotar\" na cotação — assim quem está comprando sabe que você viu.</p>");
+
+            send(rep.email(), subject, wrapInLayout(content.toString()));
         }
     }
 
     // Manda pra TODO representante elegível, tenha ele vencido algo ou não — quem não
     // venceu nada também precisa saber que fechou, senão fica esperando resposta de uma
     // cotação que já não existe mais pra responder.
-    public void notifyQuotationClosed(Quotation quotation, Representative rep, List<QuotationItem> wonItems) {
+    @Async
+    public void notifyQuotationClosed(String quotationName, RepContact rep, List<WonItemLine> wonItems) {
         String subject = wonItems.isEmpty()
-                ? "Resultado da cotação: " + quotation.getName()
-                : "Você venceu itens na cotação: " + quotation.getName();
+                ? "Resultado da cotação: " + quotationName
+                : "Você venceu itens na cotação: " + quotationName;
 
         StringBuilder content = new StringBuilder();
-        content.append("<p style=\"margin:0 0 12px\">Olá, ").append(escapeHtml(firstName(rep.getName()))).append("!</p>");
-        content.append("<p style=\"margin:0 0 16px\">A cotação <strong>").append(escapeHtml(quotation.getName()))
+        content.append("<p style=\"margin:0 0 12px\">Olá, ").append(escapeHtml(firstName(rep.name()))).append("!</p>");
+        content.append("<p style=\"margin:0 0 16px\">A cotação <strong>").append(escapeHtml(quotationName))
                 .append("</strong> foi fechada.</p>");
 
         if (wonItems.isEmpty()) {
@@ -81,14 +121,13 @@ public class EmailService {
                     .append("<th style=\"padding:6px 10px; border-bottom:1px solid #ddd\">Qtd.</th>")
                     .append("<th style=\"padding:6px 10px; border-bottom:1px solid #ddd\">Preço (R$)</th>")
                     .append("<th style=\"padding:6px 10px; border-bottom:1px solid #ddd\">Subtotal (R$)</th></tr>");
-            for (QuotationItem item : wonItems) {
-                Bid winningBid = item.getWinningBid();
-                BigDecimal subtotal = winningBid.getValue().multiply(item.getQuantity());
+            for (WonItemLine item : wonItems) {
+                BigDecimal subtotal = item.unitPrice().multiply(item.quantity());
                 total = total.add(subtotal);
                 content.append("<tr>")
-                        .append("<td style=\"padding:6px 10px; border-bottom:1px solid #eee\">").append(escapeHtml(item.getProduct().getName())).append("</td>")
-                        .append("<td style=\"padding:6px 10px; border-bottom:1px solid #eee\">").append(item.getQuantity()).append("</td>")
-                        .append("<td style=\"padding:6px 10px; border-bottom:1px solid #eee\">").append(winningBid.getValue()).append("</td>")
+                        .append("<td style=\"padding:6px 10px; border-bottom:1px solid #eee\">").append(escapeHtml(item.productName())).append("</td>")
+                        .append("<td style=\"padding:6px 10px; border-bottom:1px solid #eee\">").append(item.quantity()).append("</td>")
+                        .append("<td style=\"padding:6px 10px; border-bottom:1px solid #eee\">").append(item.unitPrice()).append("</td>")
                         .append("<td style=\"padding:6px 10px; border-bottom:1px solid #eee\">").append(subtotal).append("</td>")
                         .append("</tr>");
             }
@@ -96,7 +135,7 @@ public class EmailService {
             content.append("<p style=\"margin-top:14px; font-size:15px\"><strong>Total: R$ ").append(total).append("</strong></p>");
         }
 
-        send(rep.getEmail(), subject, wrapInLayout(content.toString()));
+        send(rep.email(), subject, wrapInLayout(content.toString()));
     }
 
     // Cartão branco centralizado com logo no topo e rodapé padrão — dá uma cara mais
@@ -151,7 +190,7 @@ public class EmailService {
         return fullName.trim().split(" ")[0];
     }
 
-    private String fmtDate(java.time.LocalDateTime date) {
+    private String fmtDate(LocalDateTime date) {
         if (date == null) return "—";
         return date.format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy 'às' HH:mm"));
     }

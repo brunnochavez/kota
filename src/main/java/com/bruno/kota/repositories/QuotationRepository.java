@@ -35,4 +35,17 @@ public interface QuotationRepository extends JpaRepository<Quotation, Long> {
             + "WHERE q.status <> com.bruno.kota.entities.QuotationStatus.DRAFT "
             + "AND q.publishedAt IS NOT NULL AND q.publishedAt > :since")
     List<Quotation> findPublishedSince(@Param("since") LocalDateTime since);
+
+    // Usado pelo lembrete de prazo (QuotationReminderScheduler) — cotações Disponíveis
+    // cujo prazo cai dentro da janela de aviso (entre agora e "daqui a N horas") e que
+    // ainda não tiveram lembrete disparado. reminderSentAt IS NULL garante que cada
+    // cotação só entra nessa lista uma vez, mesmo com o job rodando a cada minuto.
+    // LEFT JOIN FETCH no grupo, pelo mesmo motivo de sempre: quem chama essa lista
+    // precisa saber quem são os fornecedores do grupo pra achar os representantes.
+    @Query("SELECT q FROM Quotation q LEFT JOIN FETCH q.supplierGroup "
+            + "WHERE q.status = com.bruno.kota.entities.QuotationStatus.AVAILABLE "
+            + "AND q.reminderSentAt IS NULL "
+            + "AND q.expirationDate IS NOT NULL "
+            + "AND q.expirationDate BETWEEN :now AND :reminderThreshold")
+    List<Quotation> findDueForReminder(@Param("now") LocalDateTime now, @Param("reminderThreshold") LocalDateTime reminderThreshold);
 }

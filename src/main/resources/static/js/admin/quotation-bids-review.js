@@ -22,16 +22,18 @@ async function openRepresentativeStatusModal() {
   repStatusSearch = '';
   repStatusPage = 0;
   openModal2(`
+    <div class="rep-status-modal">
     <h2>Quem já respondeu</h2>
-    <div class="subtitle" id="rep-status-summary" style="margin-bottom:14px">Carregando…</div>
+    <div class="subtitle" id="rep-status-summary" style="margin-bottom:10px">Carregando…</div>
     <input type="text" id="rep-status-search" placeholder="Buscar por representante ou fornecedor..."
-      oninput="onRepStatusSearchInput()" style="margin-bottom:12px">
+      oninput="onRepStatusSearchInput()" style="margin-bottom:9px">
     <div id="rep-status-body">Carregando…</div>
     ${paginationControlsHtml('rep-status')}
-    <div class="btn-row" style="margin-top:16px">
+    <div class="btn-row" style="margin-top:12px">
       <button class="secondary" onclick="closeModal2()">Fechar</button>
     </div>
-  `);
+    </div>
+  `, 'medium');
   await loadRepStatusPage();
 }
 

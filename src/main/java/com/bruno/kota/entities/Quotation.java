@@ -73,4 +73,12 @@ public class Quotation {
     @Column(nullable = false, length = 20)
     @Builder.Default
     private QuotationStatus status = QuotationStatus.DRAFT;
+
+    // Marca quando o lembrete de prazo já foi disparado pra essa cotação — sem isso, o
+    // job que roda a cada minuto (QuotationReminderScheduler) mandaria o mesmo e-mail de
+    // novo a cada execução, pra sempre que a cotação continuasse dentro da janela de
+    // lembrete. null = ainda não mandou; preenchido = já mandou, não manda de novo pra
+    // essa cotação (mesmo que ela seja reaberta/editada depois).
+    @Column(name = "reminder_sent_at")
+    private LocalDateTime reminderSentAt;
 }

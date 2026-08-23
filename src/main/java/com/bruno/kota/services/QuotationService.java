@@ -211,6 +211,16 @@ public class QuotationService {
             throw new BusinessRuleException("Não é permitido encurtar o prazo de uma cotação já publicada.");
         }
 
+        // Prazo adiado depois que o lembrete já foi mandado pro prazo antigo? Libera de
+        // novo — senão ninguém recebe aviso nenhum do prazo novo (reminderSentAt
+        // continuaria preenchido pra sempre, e o scheduler nunca mais pegaria essa
+        // cotação, mesmo com um prazo novo bem diferente do que gerou o lembrete original).
+        if (quotation.getReminderSentAt() != null
+                && request.expirationDate() != null
+                && !request.expirationDate().isEqual(quotation.getExpirationDate())) {
+            quotation.setReminderSentAt(null);
+        }
+
         quotation.setName(request.name());
         quotation.setSupplierGroup(resolveSupplierGroup(request.supplierGroupId()));
         quotation.setExpirationDate(request.expirationDate());
@@ -266,12 +276,54 @@ public class QuotationService {
         if (group == null) {
             return;
         }
-        List<Representative> eligibleReps = supplierRepository.findByGroup(group).stream()
+        // Extrai nome/e-mail AQUI, dentro da transação — é a última chance segura de ler
+        // esses campos das entidades. O envio em si roda em outra thread (@Async), sem
+        // acesso à sessão do Hibernate; passar as entidades direto pra lá arriscaria
+        // LazyInitializationException na hora de ler representative.getName().
+        List<EmailService.RepContact> eligibleReps = supplierRepository.findByGroup(group).stream()
+                .map(Supplier::getRepresentative)
+                .filter(Objects::nonNull)
+                .distinct()
+                .map(r -> new EmailService.RepContact(r.getName(), r.getEmail()))
+                .toList();
+        emailService.notifyQuotationPublished(quotation.getId(), quotation.getName(), quotation.getExpirationDate(), eligibleReps);
+    }
+
+    // Chamado pelo QuotationReminderScheduler — 1 vez por cotação (o scheduler já filtra
+    // pra só trazer cotações com reminderSentAt nulo, e marca depois de chamar isso).
+    // "Ainda não respondeu" = nem lance, nem "Não Cotar" — mesma definição de PENDING
+    // usada em getRepresentativeResponseStatus e getRepresentativeFillRate, só que aqui
+    // devolvendo os representantes de verdade (com e-mail), não o DTO de status.
+    @Transactional
+    public void sendDeadlineReminder(Long quotationId) {
+        Quotation quotation = findEntityById(quotationId);
+        SupplierGroup group = safeGetSupplierGroup(quotation);
+        if (group == null) {
+            return;
+        }
+
+        Set<Long> submittedSupplierIds = bidRepository.findByQuotationItem_QuotationId(quotationId).stream()
+                .map(bid -> bid.getSupplier().getId())
+                .collect(Collectors.toSet());
+        Set<Long> declinedSupplierIds = quotationDeclineRepository.findByQuotationId(quotationId).stream()
+                .map(d -> d.getSupplier().getId())
+                .collect(Collectors.toSet());
+
+        List<Representative> pendingReps = supplierRepository.findByGroup(group).stream()
+                .filter(s -> !submittedSupplierIds.contains(s.getId()) && !declinedSupplierIds.contains(s.getId()))
                 .map(Supplier::getRepresentative)
                 .filter(Objects::nonNull)
                 .distinct()
                 .toList();
-        emailService.notifyQuotationPublished(quotation, eligibleReps);
+
+        if (!pendingReps.isEmpty()) {
+            // Mesma lógica de notifyEligibleRepresentativesOfPublish: extrai nome/e-mail
+            // aqui dentro, antes de cruzar pra thread assíncrona do @Async.
+            List<EmailService.RepContact> contacts = pendingReps.stream()
+                    .map(r -> new EmailService.RepContact(r.getName(), r.getEmail()))
+                    .toList();
+            emailService.notifyDeadlineApproaching(quotation.getId(), quotation.getName(), quotation.getExpirationDate(), contacts);
+        }
     }
 
     @Transactional
@@ -503,7 +555,15 @@ public class QuotationService {
                             && item.getWinningBid().getSubmittedBy() != null
                             && item.getWinningBid().getSubmittedBy().getId().equals(rep.getId()))
                     .toList();
-            emailService.notifyQuotationClosed(quotation, rep, wonItems);
+            // Mesmo motivo de sempre: extrai os valores simples (nome do produto,
+            // quantidade, preço) aqui dentro, ainda na transação — o método @Async não
+            // teria como resolver item.getProduct() nem item.getWinningBid() sozinho
+            // numa thread separada, sem sessão do Hibernate.
+            List<EmailService.WonItemLine> wonLines = wonItems.stream()
+                    .map(item -> new EmailService.WonItemLine(
+                            item.getProduct().getName(), item.getQuantity(), item.getWinningBid().getValue()))
+                    .toList();
+            emailService.notifyQuotationClosed(quotation.getName(), new EmailService.RepContact(rep.getName(), rep.getEmail()), wonLines);
         }
     }
 
