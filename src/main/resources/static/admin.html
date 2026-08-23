@@ -141,15 +141,18 @@
     width: 100%; height: 9px; border-radius: 999px; background: var(--surface-3); overflow: hidden;
   }
   .fill-rate-fill { height: 100%; border-radius: 999px; transition: width 0.3s ease; }
-  .expiring-item { display: flex; justify-content: space-between; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--surface-2); font-size: 12.5px; }
+  .expiring-item { display: flex; justify-content: space-between; gap: 10px; padding: 2px 0; border-bottom: 1px solid var(--surface-2); font-size: 12.5px; }
   .expiring-item:last-child { border-bottom: none; }
   .expiring-item { border-bottom: 1px solid var(--surface-2); }
   .expiring-item:last-child { border-bottom: none; }
-  .expiring-row { display: flex; justify-content: space-between; align-items: center; gap: 14px; padding: 10px 4px; cursor: pointer; }
+  .expiring-row { display: flex; justify-content: space-between; align-items: center; gap: 14px; padding: 5px 4px; cursor: pointer; }
   .expiring-row:hover { background: var(--surface-2); }
-  .expiring-row-name { font-weight: 600; font-size: 13px; }
-  .expiring-row-group { font-size: 11.5px; color: var(--text-dim); margin-top: 2px; }
+  .expiring-row-main { flex: 1; min-width: 0; }
+  .expiring-row-name { font-weight: 600; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .expiring-row-group { font-size: 11.5px; color: var(--text-dim); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .expiring-row-date { text-align: right; flex-shrink: 0; }
+  .expiring-row.not-clickable { cursor: default; }
+  .expiring-row.not-clickable:hover { background: none; }
   .expiring-row-countdown { display: block; font-weight: 700; font-size: 12px; color: var(--warning); }
   .expiring-row-exact { display: block; font-size: 10.5px; color: var(--text-dim); margin-top: 2px; }
   .search-result-item { padding: 9px 13px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px; cursor: pointer; margin-bottom: 6px; }
@@ -422,6 +425,64 @@
     .pg-modal-grid { grid-template-columns: 1fr; }
     .pg-modal-col:last-child { border-left: none; padding-left: 0; border-top: 1px solid var(--border); padding-top: 16px; }
   }
+  .print-only { display: none; }
+
+  /* Impressão do relatório de Ponto de Compra — printReorderPointsReport() monta o
+     conteúdo em #reorder-points-print-area e marca o body com essa classe só durante
+     window.print(). Esconde TUDO que não seja essa área (sidebar, modais, o resto da
+     tela) e mostra só a área de impressão, formatada como um documento simples de
+     tabela — sem depender de nenhuma cor de tema (impressão é sempre em fundo branco). */
+  @media print {
+    @page { size: portrait; margin: 10mm; }
+    body.printing-reorder-points > *:not(#reorder-points-print-area) { display: none !important; }
+    #reorder-points-print-area {
+      display: block !important;
+      color: #1a1a1a; font-family: var(--sans, Arial, sans-serif); padding: 0;
+    }
+
+    /* Cabeçalho de marca — logo da empresa contratante à esquerda (CompanySettings),
+       título/metadados no meio, marca do Kota discreta à direita. border-bottom colorido
+       (mesmo tom de --accent do resto do produto) dá uma "linha de assinatura" ao topo
+       sem depender de nenhuma cor de tema, que não existe em modo impressão. */
+    #reorder-points-print-area .rp-print-header {
+      display: flex; align-items: center; justify-content: space-between; gap: 16px;
+      padding-bottom: 10px; margin-bottom: 12px; border-bottom: 2.5px solid #2f6fed;
+    }
+    #reorder-points-print-area .rp-print-brand { flex: 0 0 auto; min-width: 0; max-width: 160px; }
+    #reorder-points-print-area .rp-print-company-logo { max-height: 42px; max-width: 160px; object-fit: contain; }
+    #reorder-points-print-area .rp-print-company-name { font-size: 14px; font-weight: 700; color: #1a1a1a; }
+    #reorder-points-print-area .rp-print-title { flex: 1; text-align: center; }
+    #reorder-points-print-area .rp-print-title h1 {
+      font-size: 19px; margin: 0; color: #1e3a8a; letter-spacing: 0.01em;
+    }
+    #reorder-points-print-area .print-meta { font-size: 10.5px; color: #666; margin-top: 3px; }
+    #reorder-points-print-area .rp-print-kota-logo { height: 18px; flex: 0 0 auto; opacity: 0.85; }
+
+    /* Tabela compacta — fonte e padding reduzidos pra caber mais linhas por página
+       sem virar ilegível, com zebra striping suave (só cor de fundo, sem depender de
+       bordas grossas) pra facilitar acompanhar a linha com o olho numa lista longa. */
+    #reorder-points-print-area table { width: 100%; table-layout: fixed; border-collapse: collapse; font-size: 11px; }
+    #reorder-points-print-area thead tr { background: #2f6fed; }
+    #reorder-points-print-area th {
+      padding: 6px 8px; text-align: left; color: #fff; font-size: 10px;
+      text-transform: uppercase; letter-spacing: 0.03em; font-weight: 700; white-space: nowrap;
+    }
+    #reorder-points-print-area td {
+      padding: 4px 8px; border-bottom: 1px solid #e4e7ec; text-align: left; white-space: nowrap;
+    }
+    #reorder-points-print-area tr.stripe td { background: #eef3fd; }
+    #reorder-points-print-area .rp-print-center { text-align: center; }
+    #reorder-points-print-area .rp-print-barcode { font-family: monospace; color: #555; font-size: 10px; }
+    #reorder-points-print-area .rp-print-date { font-weight: 700; color: #1e3a8a; }
+
+    #reorder-points-print-area .rp-print-footer {
+      margin-top: 14px; text-align: center; font-size: 9.5px; color: #999;
+    }
+
+    /* Evita que uma linha da tabela seja cortada ao meio entre duas páginas — a linha
+       inteira pula pra próxima página em vez de ficar com metade em cada uma. */
+    #reorder-points-print-area tr { page-break-inside: avoid; }
+  }
 </style>
 </head>
 <body>
@@ -550,7 +611,7 @@
       </div>
       <div class="kpi-card" onclick="goToQuotationsFiltered('CLOSED')">
         <div class="kpi-value" id="kpi-closed-30d">—</div>
-        <div class="kpi-label">Fechadas (30 dias)</div>
+        <div class="kpi-label">Concluídas (30 dias)</div>
       </div>
       <div class="kpi-card" onclick="goToQuotationsFiltered('DRAFT')">
         <div class="kpi-value" id="kpi-stale-drafts">—</div>
@@ -822,7 +883,7 @@
         <div><label>Nome da cotação</label><input id="import-name" placeholder="Ex: Cotação de Limpeza"></div>
         <div><label>Grupo (opcional)</label><select id="import-group"><option value="">— definir depois —</option></select></div>
         <div><label>Prazo de expiração (opcional)</label>
-          <div style="display:flex; gap:6px">
+          <div style="display:flex; gap:6px; flex-wrap:wrap">
             <input type="date" id="import-expiration-date" style="flex:1.3">
             <input type="time" id="import-expiration-time" style="flex:1">
           </div>
@@ -847,7 +908,7 @@
         <div><label>Nome da cotação</label><input id="mq-name" placeholder="Ex: Cotação de Bebidas"></div>
         <div><label>Grupo (opcional)</label><select id="mq-group"><option value="">— definir depois —</option></select></div>
         <div><label>Prazo de expiração (opcional)</label>
-          <div style="display:flex; gap:6px">
+          <div style="display:flex; gap:6px; flex-wrap:wrap">
             <input type="date" id="mq-expiration-date" style="flex:1.3">
             <input type="time" id="mq-expiration-time" style="flex:1">
           </div>
@@ -877,7 +938,7 @@
       <div class="tab" data-status="AWAITING_CLOSE">Aguardando Fechamento</div>
       <div class="tab" data-status="EXPIRED">Expiradas</div>
       <div class="tab" data-status="REVIEWING">Em Revisão</div>
-      <div class="tab" data-status="CLOSED">Fechadas</div>
+      <div class="tab" data-status="CLOSED">Concluídas</div>
     </div>
 
     <div class="card">
@@ -916,7 +977,7 @@
       <h2>Resultado</h2>
       <div class="subtitle" id="report-summary" style="margin-bottom:12px">Configure os filtros acima e clique em "Gerar Relatório".</div>
       <table id="report-table" style="display:none"><thead><tr>
-        <th>Nº da Cotação</th><th>Nome</th><th>Fechada em</th><th>Fornecedor</th><th>Representante</th>
+        <th>Nº da Cotação</th><th>Nome</th><th>Concluída em</th><th>Fornecedor</th><th>Representante</th>
         <th>Total (R$)</th><th>Resultado</th><th>Pedido</th><th></th>
       </tr></thead>
         <tbody id="report-tbody"></tbody></table>
@@ -939,7 +1000,10 @@
     <div class="card">
       <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap">
         <h2 style="margin:0">Produtos a repor</h2>
-        <button class="secondary small" onclick="loadReorderPointReport()">Atualizar</button>
+        <div class="btn-row">
+          <button class="secondary small" onclick="printReorderPointsReport()">Imprimir</button>
+          <button class="secondary small" onclick="loadReorderPointReport()">Atualizar</button>
+        </div>
       </div>
       <div class="subtitle" id="reorder-points-summary" style="margin-bottom:12px">Carregando...</div>
       <div class="btn-row" id="reorder-points-actions" style="justify-content:space-between; align-items:center; margin-bottom:10px; display:none">
@@ -965,6 +1029,8 @@
     </div>
   </section>
 </main>
+
+<div id="reorder-points-print-area" class="print-only"></div>
 
   <script src="js/admin/core.js"></script>
   <script src="js/admin/ui-helpers.js"></script>

@@ -44,6 +44,7 @@ public class EmailService {
     public record WonItemLine(String productName, BigDecimal quantity, BigDecimal unitPrice) {}
 
     private final JavaMailSender mailSender;
+    private final CompanySettingsService companySettingsService;
 
     @Value("${app.mail.enabled:false}")
     private boolean mailEnabled;
@@ -90,6 +91,27 @@ public class EmailService {
             content.append("<p style=\"margin:0 0 20px\">Prazo final: <strong>").append(fmtDate(expirationDate)).append("</strong></p>");
             content.append(buttonHtml(link, "Enviar meus preços"));
             content.append("<p style=\"color:#888; font-size:12px; margin:20px 0 0\">Se você não tem o que ofertar dessa vez, toque em \"Não Cotar\" na cotação — assim quem está comprando sabe que você viu.</p>");
+
+            send(rep.email(), subject, wrapInLayout(content.toString()));
+        }
+    }
+
+    // Disparado quando o admin prorroga o prazo de uma cotação já Disponível — vai pra
+    // TODO representante elegível (não só quem ainda não respondeu, diferente do lembrete
+    // de prazo terminando): quem já enviou preço também pode querer revisar/ajustar
+    // agora que tem mais tempo.
+    @Async
+    public void notifyDeadlineExtended(Long quotationId, String quotationName, LocalDateTime newExpirationDate, List<RepContact> eligibleReps) {
+        String subject = "Prazo prorrogado: " + quotationName;
+        String link = APP_URL + "/representante.html?cotacao=" + quotationId;
+
+        for (RepContact rep : eligibleReps) {
+            StringBuilder content = new StringBuilder();
+            content.append("<p style=\"margin:0 0 12px\">Olá, ").append(escapeHtml(firstName(rep.name()))).append("!</p>");
+            content.append("<p style=\"margin:0 0 12px\">O prazo da cotação abaixo foi prorrogado:</p>");
+            content.append("<p style=\"margin:0 0 12px; font-size:16px\"><strong>").append(escapeHtml(quotationName)).append("</strong></p>");
+            content.append("<p style=\"margin:0 0 20px\">Novo prazo: <strong>").append(fmtDate(newExpirationDate)).append("</strong></p>");
+            content.append(buttonHtml(link, "Acessar cotação"));
 
             send(rep.email(), subject, wrapInLayout(content.toString()));
         }
@@ -155,12 +177,26 @@ public class EmailService {
             MimeMessageHelper helper = new MimeMessageHelper(message, false, "UTF-8");
             helper.setFrom(fromAddress);
             helper.setTo(to);
-            helper.setSubject(subject);
+            helper.setSubject(prefixWithCompanyName(subject));
             helper.setText(htmlBody, true);
             mailSender.send(message);
         } catch (Exception e) {
             log.error("Falha ao enviar e-mail pra {}: {}", to, e.getMessage());
         }
+    }
+
+    // Assunto sempre começa com o nome da empresa contratante (CompanySettings — a
+    // mesma fonte usada no PDF e na mensagem de WhatsApp), nunca hardcoded aqui: se o
+    // nome mudar em "Dados da Empresa", os próximos e-mails já saem com o nome novo,
+    // sem precisar editar código. getOrCreate() é @Transactional(REQUIRES_NEW) — seguro
+    // de chamar mesmo daqui, rodando numa thread @Async sem sessão do Hibernate da
+    // requisição original.
+    private String prefixWithCompanyName(String subject) {
+        String companyName = companySettingsService.getOrCreate().getName();
+        if (companyName == null || companyName.isBlank()) {
+            return subject;
+        }
+        return companyName + " - " + subject;
     }
 
     private String firstName(String fullName) {

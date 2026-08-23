@@ -191,6 +191,49 @@ function deleteQuotationFromModal(buttonEl) {
   deleteQuotation(currentQuotationId, buttonEl, () => { closeModal(); loadQuotations(); });
 }
 
+// Modal simples com data+hora pra escolher o novo prazo, pré-preenchido com o prazo
+// atual (o admin normalmente só quer empurrar um pouco pra frente, não redigitar do
+// zero). O backend já garante que a data escolhida é posterior à atual — aqui só
+// desabilita o botão enquanto salva, pra não disparar duas vezes num duplo clique.
+async function openExtendDeadlineModal() {
+  const q = await safeCall(() => api('GET', `/quotations/${currentQuotationId}`));
+  openModal2(`
+    <h2>Prorrogar prazo</h2>
+    <div class="subtitle" style="margin-bottom:14px">Um e-mail avisando o novo prazo será enviado a todos os representantes elegíveis dessa cotação.</div>
+    <label>Novo prazo</label>
+    <div style="display:flex; gap:6px; flex-wrap:wrap">
+      <input type="date" id="extend-expiration-date" style="flex:1.3">
+      <input type="time" id="extend-expiration-time" style="flex:1">
+    </div>
+    <div class="btn-row" style="margin-top:16px; justify-content:space-between">
+      <button class="secondary" onclick="closeModal2()">Cancelar</button>
+      <button id="extend-confirm-btn" onclick="confirmExtendDeadline()">Prorrogar e avisar</button>
+    </div>
+  `);
+  setExpirationValue('extend-expiration', q.expirationDate);
+}
+
+async function confirmExtendDeadline() {
+  const btn = document.getElementById('extend-confirm-btn');
+  const expirationDate = getExpirationValue('extend-expiration');
+  if (!expirationDate) {
+    toast('Escolha a nova data do prazo.', true);
+    return;
+  }
+  btn.disabled = true;
+  try {
+    await api('POST', `/quotations/${currentQuotationId}/extend`, { expirationDate });
+  } catch (e) {
+    toast(e.message, true);
+    btn.disabled = false;
+    return;
+  }
+  toast('Prazo prorrogado — representantes avisados por e-mail.');
+  closeModal2();
+  loadQuotations();
+  abrirDetalheCotacao(currentQuotationId);
+}
+
 async function publishQuotation() {
   await safeCall(() => api('POST', `/quotations/${currentQuotationId}/publish`));
   toast('Cotação publicada.');

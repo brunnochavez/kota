@@ -67,7 +67,7 @@ function renderReorderPointsTable() {
       <td><input type="checkbox" onchange="toggleReorderPointSelected(${r.quotationItemId}, this.checked)" ${checked}></td>
       <td>${escapeHtml(r.productBarcode)} — ${escapeHtml(r.productName)}</td>
       <td style="text-align:center">${r.quantity}</td>
-      <td style="font-weight:700">${fmtDate(r.reorderDate)}</td>`;
+      <td style="font-weight:700">${fmtDateOnly(r.reorderDate)}</td>`;
     tbody.appendChild(tr);
   });
 
@@ -234,3 +234,95 @@ async function confirmReorderPointsExistingQuotation() {
 // Tela focada só nos dados desse grupo (cotação + fornecedor) — não é o modal de edição
 // da cotação (abrirDetalheCotacao), que tem formulário, botão de publicar/fechar etc.
 // Aqui é só leitura: produto, quantidade, preço, subtotal e resultado de cada lance.
+
+// Impressão usa o diálogo nativo do navegador (Ctrl+P / window.print()), não geração
+// de PDF no backend — mais simples e já cobre o caso de uso (o admin quer uma via em
+// papel ou salvar como PDF direto do "Salvar como PDF" do próprio navegador). O nome
+// sugerido no "Salvar como" vem do document.title no momento do print — por isso troca
+// o título só durante a impressão e devolve o original logo depois (evento
+// 'afterprint', que dispara tanto ao confirmar quanto ao cancelar o diálogo).
+// Imprime a lista FILTRADA inteira (todos os produtos com ponto de compra em até 10
+// dias), não só a página atual da tabela — faria pouco sentido imprimir 10 de,
+// digamos, 23 produtos sem avisar que o resto ficou de fora.
+// Cabeçalho com as duas marcas — logo da empresa contratante (CompanySettings, a
+// mesma usada no PDF de resultado e no cabeçalho da barra lateral) à esquerda, e a
+// marca do software (Easy Kota) à direita, discreta — mesmo espírito do rodapé do PDF
+// de cotação (QuotationPdfService): reforça "gerado pelo Kota", sem competir com a
+// marca de quem está usando o sistema.
+async function printReorderPointsReport() {
+  if (!reorderPointsFiltered.length) {
+    toast('Nada para imprimir — nenhum produto com ponto de compra em até 10 dias no momento.', true);
+    return;
+  }
+
+  const company = await safeCall(() => api('GET', '/company-settings'));
+
+  const today = new Date();
+  const isoDate = today.toISOString().slice(0, 10); // YYYY-MM-DD
+  const printFilename = `ponto_de_compra_${isoDate}`;
+
+  const rowsHtml = reorderPointsFiltered.map((r, i) => `
+    <tr class="${i % 2 === 1 ? 'stripe' : ''}">
+      <td class="rp-print-barcode">${escapeHtml(r.productBarcode)}</td>
+      <td>${escapeHtml(r.productName)}</td>
+      <td class="rp-print-center">${r.quantity}</td>
+      <td class="rp-print-center rp-print-date">${fmtDateOnly(r.reorderDate)}</td>
+    </tr>`).join('');
+
+  const companyLogoHtml = company.logoUrl
+    ? `<img src="${company.logoUrl}?t=${Date.now()}" alt="${escapeHtml(company.name || '')}" class="rp-print-company-logo">`
+    : `<div class="rp-print-company-name">${escapeHtml(company.name || '')}</div>`;
+
+  const printArea = document.getElementById('reorder-points-print-area');
+  printArea.innerHTML = `
+    <div class="rp-print-header">
+      <div class="rp-print-brand">${companyLogoHtml}</div>
+      <div class="rp-print-title">
+        <h1>Ponto de Compra</h1>
+        <div class="print-meta">Gerado em ${fmtDate(today.toISOString())} — ${reorderPointsFiltered.length} produto${reorderPointsFiltered.length !== 1 ? 's' : ''}</div>
+      </div>
+      <img src="/img/kota-wordmark.png" alt="Easy Kota" class="rp-print-kota-logo">
+    </div>
+    <table>
+      <colgroup>
+        <col style="width:13%"><col style="width:68%"><col style="width:6%"><col style="width:13%">
+      </colgroup>
+      <thead><tr><th>Cód. de Barras</th><th>Produto</th><th class="rp-print-center">Qtd.</th><th class="rp-print-center">Ponto de compra</th></tr></thead>
+      <tbody>${rowsHtml}</tbody>
+    </table>
+    <div class="rp-print-footer">Relatório Gerado por Easy Kota</div>`;
+
+  const originalTitle = document.title;
+  document.title = printFilename;
+  document.body.classList.add('printing-reorder-points');
+
+  const restore = () => {
+    document.title = originalTitle;
+    document.body.classList.remove('printing-reorder-points');
+    printArea.innerHTML = '';
+    window.removeEventListener('afterprint', restore);
+  };
+  window.addEventListener('afterprint', restore);
+
+  // As duas logos (empresa + Kota) carregam via <img src="..."> — pedido de rede
+  // assíncrono, que pode ainda não ter terminado no instante em que window.print()
+  // seria chamado logo em seguida (a logo da empresa em especial, que não fica em
+  // cache do navegador como o wordmark do Kota já costuma ficar). Sem esperar,
+  // window.print() capturava a página com a logo ainda em branco. waitForImages
+  // espera cada <img> carregar (ou falhar, com timeout de segurança) antes de imprimir.
+  await waitForImages(printArea);
+  window.print();
+}
+
+function waitForImages(container, timeoutMs = 3000) {
+  const imgs = Array.from(container.querySelectorAll('img'));
+  return Promise.all(imgs.map(img => {
+    if (img.complete) return Promise.resolve();
+    return new Promise(resolve => {
+      const done = () => { img.removeEventListener('load', done); img.removeEventListener('error', done); resolve(); };
+      img.addEventListener('load', done);
+      img.addEventListener('error', done);
+      setTimeout(done, timeoutMs);
+    });
+  }));
+}

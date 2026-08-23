@@ -28,6 +28,7 @@ import com.bruno.kota.dtos.RepresentativeStatusPageResponse;
 import com.bruno.kota.dtos.QuotationCloseRequest;
 import com.bruno.kota.dtos.QuotationCloseResult;
 import com.bruno.kota.dtos.QuotationCreateRequest;
+import com.bruno.kota.dtos.QuotationExtendRequest;
 import com.bruno.kota.dtos.QuotationImportResult;
 import com.bruno.kota.dtos.QuotationItemCreateRequest;
 import com.bruno.kota.dtos.QuotationItemResponse;
@@ -161,6 +162,12 @@ public class QuotationController {
     @PreAuthorize("hasRole('ADMIN')")
     public QuotationResponse update(@PathVariable Long id, @Valid @RequestBody QuotationUpdateRequest request) {
         return quotationService.update(id, request);
+    }
+
+    @PostMapping("/{id}/extend")
+    @PreAuthorize("hasRole('ADMIN')")
+    public QuotationResponse extendDeadline(@PathVariable Long id, @Valid @RequestBody QuotationExtendRequest request) {
+        return quotationService.extendDeadline(id, request);
     }
 
     @DeleteMapping("/{id}")

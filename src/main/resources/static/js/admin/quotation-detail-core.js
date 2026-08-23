@@ -48,7 +48,7 @@ async function abrirDetalheCotacao(id) {
         ${groups.map(g => `<option value="${g.id}" ${g.id === q.supplierGroupId ? 'selected' : ''}>${escapeHtml(g.name)}</option>`).join('')}
       </select></div>
       <div><label>Prazo de expiração</label>
-        <div style="display:flex; gap:6px">
+        <div style="display:flex; gap:6px; flex-wrap:wrap">
           <input type="date" id="qd-expiration-date" style="flex:1.3">
           <input type="time" id="qd-expiration-time" style="flex:1">
         </div>
@@ -61,6 +61,7 @@ async function abrirDetalheCotacao(id) {
     <div class="btn-row" style="margin-top:16px">
       <button id="qd-publish-btn" class="success" onclick="publishQuotation()">Publicar (Rascunho → Disponível)</button>
       <button id="qd-close-btn" class="secondary" onclick="closeQuotation(this)">Fechar (calcular vencedores)</button>
+      <button id="qd-extend-btn" class="secondary" style="display:none" onclick="openExtendDeadlineModal()">Prorrogar Prazo</button>
       <button id="qd-whatsapp-btn" class="secondary" onclick="copyPublishMessage(this)" style="display:none">Copiar mensagem para WhatsApp</button>
       <button id="qd-whatsapp-result-btn" class="secondary" onclick="copyResultMessage(this)" style="display:none">Copiar mensagem para WhatsApp</button>
       <button id="qd-response-status-btn" class="secondary" onclick="openRepresentativeStatusModal()" style="display:none">Ver quem já respondeu</button>
@@ -150,7 +151,7 @@ function renderQdStepper(status, hasBids) {
     { key: 'DRAFT', label: 'Rascunho' },
     { key: 'AVAILABLE', label: 'Disponível' },
     { key: 'REVIEWING', label: 'Em Revisão' },
-    { key: 'CLOSED', label: 'Fechada' }
+    { key: 'CLOSED', label: 'Concluída' }
   ];
   const order = ['DRAFT', 'AVAILABLE', 'REVIEWING', 'CLOSED'];
   const isExpired = status === 'EXPIRED';
@@ -201,7 +202,7 @@ async function renderQdInfoBar(q) {
   if (q.status === 'DRAFT') {
     stats.push({ label: 'Criada em', value: fmtDate(q.createdAt) });
   } else if (q.status === 'CLOSED') {
-    stats.push({ label: 'Fechada em', value: fmtDate(q.updatedAt) });
+    stats.push({ label: 'Concluída em', value: fmtDate(q.updatedAt) });
   } else if (q.status === 'EXPIRED') {
     stats.push({ label: 'Expirou em', value: fmtDate(q.expirationDate) });
   } else {
@@ -239,6 +240,7 @@ function applyQdEditLock(status) {
   document.getElementById('qd-group-suppliers-btn').disabled = !isDraft;
   document.getElementById('qd-publish-btn').disabled = !isDraft;
   document.getElementById('qd-close-btn').style.display = canClose ? 'inline-block' : 'none';
+  document.getElementById('qd-extend-btn').style.display = status === 'AVAILABLE' ? 'inline-block' : 'none';
   document.getElementById('qd-whatsapp-btn').style.display = status === 'AVAILABLE' ? 'inline-block' : 'none';
   document.getElementById('qd-whatsapp-result-btn').style.display = status === 'CLOSED' ? 'inline-block' : 'none';
   document.getElementById('qd-response-status-btn').style.display = !isDraft ? 'inline-block' : 'none';

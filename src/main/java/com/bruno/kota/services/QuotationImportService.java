@@ -180,11 +180,18 @@ public class QuotationImportService {
         // <input type="datetime-local"> manda "yyyy-MM-ddTHH:mm" (16 caracteres), sem segundos.
         // LocalDateTime.parse exige segundos no formato ISO — completa se estiver faltando.
         String normalized = expirationDate.length() == 16 ? expirationDate + ":00" : expirationDate;
+        LocalDateTime parsed;
         try {
-            return LocalDateTime.parse(normalized);
+            parsed = LocalDateTime.parse(normalized);
         } catch (DateTimeParseException e) {
             throw new BusinessRuleException("Prazo de expiração inválido: " + expirationDate);
         }
+        // Mesma regra da criação manual: prazo é opcional na importação, mas se vier
+        // preenchido não pode estar no passado — evita nascer uma cotação já vencida.
+        if (parsed.isBefore(LocalDateTime.now())) {
+            throw new BusinessRuleException("O prazo de expiração não pode estar no passado.");
+        }
+        return parsed;
     }
 
     private void validateColumnIndex(Integer column, int headerCount, String fieldLabel) {

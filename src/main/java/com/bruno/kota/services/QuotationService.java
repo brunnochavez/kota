@@ -121,6 +121,16 @@ public class QuotationService {
         if (request.items() == null || request.items().isEmpty()) {
             throw new BusinessRuleException("Uma cotação precisa de pelo menos um item.");
         }
+        // Prazo é opcional na criação (o admin pode definir depois) — mas, quando
+        // informado, não pode já estar no passado. Sem essa checagem aqui, dava pra
+        // criar (e até publicar, se a validação de publish() checasse só o momento da
+        // publicação) uma cotação nascendo já vencida. Mensagem prefixada com
+        // "expirationDate:" de propósito — é o formato que distributeFieldErrors() no
+        // frontend espera pra rotear o erro pro campo certo (mq-expiration-date), em
+        // vez de cair no fallback e aparecer embaixo do campo Nome.
+        if (request.expirationDate() != null && request.expirationDate().isBefore(LocalDateTime.now())) {
+            throw new BusinessRuleException("expirationDate: O prazo de expiração não pode estar no passado.");
+        }
 
         Quotation quotation = Quotation.builder()
                 .name(request.name())
@@ -327,6 +337,52 @@ public class QuotationService {
                     .toList();
             emailService.notifyDeadlineApproaching(quotation.getId(), quotation.getName(), quotation.getExpirationDate(), contacts);
         }
+    }
+
+    // Prorrogação de prazo — ação própria, separada de update(), disponível só com a
+    // cotação Disponível (não faz sentido "prorrogar" um Rascunho, que ainda nem tem
+    // representante vendo prazo nenhum). Só aceita data POSTERIOR à atual (mesma regra
+    // de "não encurtar" do update(), só que aqui é a única coisa que essa ação faz,
+    // então vira erro direto em vez de silenciosamente ignorar). Ao contrário do
+    // lembrete de prazo terminando (só quem não respondeu), a notificação de
+    // prorrogação vai pra TODO representante elegível — quem já respondeu também pode
+    // querer revisar agora que sobrou mais tempo.
+    @Transactional
+    public QuotationResponse extendDeadline(Long id, QuotationExtendRequest request) {
+        Quotation quotation = findEntityById(id);
+
+        if (quotation.getStatus() != QuotationStatus.AVAILABLE) {
+            throw new BusinessRuleException("Só é possível prorrogar o prazo de uma cotação disponível.");
+        }
+        if (quotation.getExpirationDate() != null && !request.expirationDate().isAfter(quotation.getExpirationDate())) {
+            throw new BusinessRuleException("O novo prazo precisa ser posterior ao prazo atual.");
+        }
+
+        // Mesmo motivo do update(): se o lembrete de 3h-antes já saiu pro prazo antigo,
+        // libera de novo pro prazo novo — senão o scheduler nunca mais notificaria essa
+        // cotação, mesmo com um prazo bem mais longe do que gerou o lembrete original.
+        quotation.setReminderSentAt(null);
+        quotation.setExpirationDate(request.expirationDate());
+        Quotation saved = quotationRepository.save(quotation);
+
+        notifyEligibleRepresentativesOfExtension(saved);
+
+        return toResponse(saved);
+    }
+
+    private void notifyEligibleRepresentativesOfExtension(Quotation quotation) {
+        SupplierGroup group = safeGetSupplierGroup(quotation);
+        if (group == null) {
+            return;
+        }
+        List<Representative> reps = distinctById(supplierRepository.findByGroup(group).stream()
+                .map(Supplier::getRepresentative)
+                .filter(Objects::nonNull)
+                .toList());
+        List<EmailService.RepContact> eligibleReps = reps.stream()
+                .map(r -> new EmailService.RepContact(r.getName(), r.getEmail()))
+                .toList();
+        emailService.notifyDeadlineExtended(quotation.getId(), quotation.getName(), quotation.getExpirationDate(), eligibleReps);
     }
 
     @Transactional

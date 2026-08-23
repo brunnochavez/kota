@@ -642,7 +642,7 @@ function fmtDateTime(iso) {
   return iso ? new Date(iso).toLocaleString('pt-BR') : '—';
 }
 
-const STATUS_LABELS = { DRAFT: 'Rascunho', AVAILABLE: 'Disponível', CLOSED: 'Fechada', EXPIRED: 'Expirada' };
+const STATUS_LABELS = { DRAFT: 'Rascunho', AVAILABLE: 'Disponível', CLOSED: 'Concluída', EXPIRED: 'Expirada' };
 function statusBadge(status) {
   const map = { DRAFT: 'draft', AVAILABLE: 'available', CLOSED: 'closed', EXPIRED: 'expired' };
   return `<span class="badge badge-${map[status] || 'draft'}">${STATUS_LABELS[status] || status}</span>`;
@@ -1328,7 +1328,7 @@ function renderWonListPage() {
         <div>
           <h2>${escapeHtml(q.quotationName)}</h2>
           <div class="won-card-date-row">
-            <span class="won-card-date">Fechada em ${fmtDateTime(q.closedAt)}</span>
+            <span class="won-card-date">Concluída em ${fmtDateTime(q.closedAt)}</span>
             <span class="won-card-item-count">${itemCount} ${itemCount === 1 ? 'produto' : 'produtos'}</span>
           </div>
         </div>
@@ -1405,7 +1405,7 @@ function buildWonWhatsAppText(q) {
   }
   lines.push('');
   lines.push(`Pedido da cotação Nº ${formatQuotationNumber(q.quotationId)}`);
-  lines.push(`Fechada em ${fmtDateTime(q.closedAt)}`);
+  lines.push(`Concluída em ${fmtDateTime(q.closedAt)}`);
   lines.push('');
 
   q.items.forEach(i => {

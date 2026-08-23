@@ -56,6 +56,66 @@ function clearFieldError(inputId) {
   if (existing) existing.remove();
   const input = document.getElementById(inputId);
   if (input) input.classList.remove('input-error');
+  closeOkPopover();
+}
+
+// Campos onde o erro aparece num popover "OK" ancorado perto do campo, em vez do
+// texto vermelho inserido embaixo — usado nos campos de data que ficam dentro de um
+// grupo flex compartilhado com o campo de hora, onde inserir texto ali dentro
+// empurrava/quebrava o layout dos campos vizinhos. distributeFieldErrors() consulta
+// essa lista pra decidir qual dos dois jeitos usar, campo por campo.
+const POPOVER_ERROR_FIELDS = new Set(['mq-expiration-date', 'qd-expiration-date', 'extend-expiration-date']);
+
+function showFieldErrorSmart(inputId, message) {
+  const input = document.getElementById(inputId);
+  if (input && POPOVER_ERROR_FIELDS.has(inputId)) {
+    showOkPopover(input, message);
+    input.classList.add('input-error');
+    return;
+  }
+  showFieldError(inputId, message);
+}
+
+// Popover com só um botão "OK" pra fechar — mesmo padrão de posicionamento do
+// showConfirmPopover (perto do campo, ajustando pra não estourar a borda da tela),
+// mas pra avisos que só pedem "entendi", não uma decisão de sim/não.
+function showOkPopover(anchorEl, messageHtml) {
+  closeOkPopover();
+
+  const pop = document.createElement('div');
+  pop.className = 'confirm-popover';
+  pop.id = 'ok-popover';
+  pop.innerHTML = `
+    <div class="confirm-popover-msg" style="color:var(--danger)">${messageHtml}</div>
+    <div class="btn-row" style="justify-content:flex-end; margin-top:10px">
+      <button class="small" type="button">OK</button>
+    </div>`;
+  document.body.appendChild(pop);
+
+  pop.querySelector('button').onclick = closeOkPopover;
+
+  const anchor = anchorEl.getBoundingClientRect();
+  const popRect = pop.getBoundingClientRect();
+  let top = anchor.bottom + 6;
+  let left = anchor.left;
+  if (top + popRect.height > window.innerHeight - 8) top = anchor.top - popRect.height - 6;
+  if (left + popRect.width > window.innerWidth - 8) left = window.innerWidth - popRect.width - 8;
+  pop.style.top = Math.max(8, top) + 'px';
+  pop.style.left = Math.max(8, left) + 'px';
+
+  // setTimeout pra esse mesmo clique (o que gerou o erro) não ser lido como "clique fora"
+  setTimeout(() => document.addEventListener('mousedown', handleOutsideOkPopoverClick), 0);
+}
+
+function handleOutsideOkPopoverClick(e) {
+  const pop = document.getElementById('ok-popover');
+  if (pop && !pop.contains(e.target)) closeOkPopover();
+}
+
+function closeOkPopover() {
+  const pop = document.getElementById('ok-popover');
+  if (pop) pop.remove();
+  document.removeEventListener('mousedown', handleOutsideOkPopoverClick);
 }
 
 // ---------- máscaras (CNPJ, CPF, telefone, valor monetário) ----------
@@ -156,13 +216,13 @@ function distributeFieldErrors(message, fieldMap) {
     const msg = part.slice(idx + 1).trim();
     const inputId = fieldMap[fieldName];
     if (inputId) {
-      showFieldError(inputId, msg);
+      showFieldErrorSmart(inputId, msg);
       matchedAny = true;
     }
   });
   if (!matchedAny) {
     const firstFieldId = Object.values(fieldMap)[0];
-    if (firstFieldId) showFieldError(firstFieldId, message);
+    if (firstFieldId) showFieldErrorSmart(firstFieldId, message);
     else toast(message, true);
   }
 }
@@ -170,6 +230,13 @@ function distributeFieldErrors(message, fieldMap) {
 function fmtDate(iso) {
   if (!iso) return '—';
   return new Date(iso).toLocaleString('pt-BR');
+}
+
+// Só a data, sem hora — usado onde o horário exato não importa (ex: ponto de compra,
+// que é uma estimativa de dia, não um horário marcado).
+function fmtDateOnly(iso) {
+  if (!iso) return '—';
+  return new Date(iso).toLocaleDateString('pt-BR');
 }
 
 function toDatetimeLocal(iso) {

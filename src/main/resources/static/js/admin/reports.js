@@ -195,7 +195,7 @@ function openReportDetailModal(idx) {
 
   openModal2(`
     <h2>${formatQuotationNumber(g.quotationId)} — ${escapeHtml(g.quotationName)}</h2>
-    <div class="subtitle" style="margin-bottom:14px">${escapeHtml(g.supplierName)} · ${escapeHtml(g.representativeName)} · Fechada em ${fmtDate(g.closedAt)}</div>
+    <div class="subtitle" style="margin-bottom:14px">${escapeHtml(g.supplierName)} · ${escapeHtml(g.representativeName)} · Concluída em ${fmtDate(g.closedAt)}</div>
     <div style="margin-bottom:14px">${reportOrderBadge(g)}</div>
     <table><thead><tr><th>Produto</th><th>Qtd.</th><th>Preço Unit. (R$)</th><th>Subtotal (R$)</th><th>Resultado</th></tr></thead>
       <tbody>${rowsHtml}</tbody></table>
@@ -203,7 +203,7 @@ function openReportDetailModal(idx) {
     <div class="btn-row" style="margin-top:16px">
       <button class="secondary" onclick="closeModal2()">Fechar</button>
     </div>
-  `);
+  `, 'medium');
 }
 
 // CSV é montado no próprio navegador a partir do que já está carregado — não precisa ir
@@ -211,7 +211,7 @@ function openReportDetailModal(idx) {
 function exportReportCsv() {
   if (!reportHasSearched || !reportRowsCache.length) { toast('Gere o relatório antes de exportar.', true); return; }
 
-  const header = ['Nº da Cotação', 'Nome', 'Fechada em', 'Fornecedor', 'Representante', 'Produto', 'Quantidade', 'Preço Unit.', 'Subtotal', 'Resultado', 'Pedido Enviado'];
+  const header = ['Nº da Cotação', 'Nome', 'Concluída em', 'Fornecedor', 'Representante', 'Produto', 'Quantidade', 'Preço Unit.', 'Subtotal', 'Resultado', 'Pedido Enviado'];
   const csvEscape = (v) => `"${String(v).replace(/"/g, '""')}"`;
   const lines = [header.map(csvEscape).join(';')];
 

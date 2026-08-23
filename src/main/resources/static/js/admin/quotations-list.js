@@ -7,8 +7,8 @@
 let quotationsCache = [];
 let currentStatusFilter = 'DRAFT';
 
-const STATUS_LABELS = { DRAFT: 'Rascunho', AVAILABLE: 'Disponível', REVIEWING: 'Em Revisão', CLOSED: 'Fechada', EXPIRED: 'Expirada' };
-const STATUS_LABELS_PLURAL = { DRAFT: 'Rascunhos', AVAILABLE: 'Disponíveis', REVIEWING: 'Em Revisão', CLOSED: 'Fechadas', EXPIRED: 'Expiradas', AWAITING_CLOSE: 'Aguardando Fechamento' };
+const STATUS_LABELS = { DRAFT: 'Rascunho', AVAILABLE: 'Disponível', REVIEWING: 'Em Revisão', CLOSED: 'Concluída', EXPIRED: 'Expirada' };
+const STATUS_LABELS_PLURAL = { DRAFT: 'Rascunhos', AVAILABLE: 'Disponíveis', REVIEWING: 'Em Revisão', CLOSED: 'Concluídas', EXPIRED: 'Expiradas', AWAITING_CLOSE: 'Aguardando Fechamento' };
 const STATUS_CLASSES = { DRAFT: 'draft', AVAILABLE: 'available', REVIEWING: 'reviewing', CLOSED: 'closed', EXPIRED: 'expired' };
 
 // Recebe a cotação inteira (não só o status) porque EXPIRED precisa saber se já tem

@@ -85,12 +85,18 @@ function renderDashboardReorderPanel(reorderPoints) {
   }
 
   const visible = urgent.slice(0, 4);
+  // Sem onclick/cursor de link aqui de propósito: quotationId nesse relatório é a
+  // cotação FECHADA que originou esse ponto de compra, não uma cotação em aberto —
+  // clicar levava pra um detalhe antigo e sem ação nenhuma disponível, sem relação
+  // com "o que fazer agora". A única ação daqui é "Ver mais", que já leva pra tela de
+  // Ponto de Compra de verdade. Mostra só produto + urgência — sem fornecedor nem
+  // quantidade, esse resumo do dashboard é só pra sinalizar "o quê" e "quando",
+  // detalhe fica pra tela de Ponto de Compra em si.
   let html = visible.map(r => `
     <div class="expiring-item">
-      <div class="expiring-row" onclick="abrirDetalheCotacao(${r.quotationId})">
-        <div>
-          <div class="expiring-row-name">${escapeHtml(r.productName)}</div>
-          <div class="expiring-row-group">${escapeHtml(r.supplierName)} · ${r.quantity} un.</div>
+      <div class="expiring-row not-clickable">
+        <div class="expiring-row-main">
+          <div class="expiring-row-name" title="${escapeHtml(r.productName)}">${escapeHtml(r.productName)}</div>
         </div>
         <div class="expiring-row-date">${reorderUrgencyBadge(r.daysUntilReorder)}</div>
       </div>
@@ -147,9 +153,9 @@ function renderExpiringSoon(quotations) {
   let html = visible.map(q => `
     <div class="expiring-item">
       <div class="expiring-row" onclick="abrirDetalheCotacao(${q.id})">
-        <div>
-          <div class="expiring-row-name">${escapeHtml(q.name)}</div>
-          <div class="expiring-row-group">${q.supplierGroupName || 'sem grupo'}</div>
+        <div class="expiring-row-main">
+          <div class="expiring-row-name" title="${escapeHtml(q.name)}">${escapeHtml(q.name)}</div>
+          <div class="expiring-row-group" title="${escapeHtml(q.supplierGroupName || 'sem grupo')}">${escapeHtml(q.supplierGroupName || 'sem grupo')}</div>
         </div>
         <div class="expiring-row-date">
           <span class="expiring-row-countdown">${countdownLabel(q.expirationDate)}</span>
