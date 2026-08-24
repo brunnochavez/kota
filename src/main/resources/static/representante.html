@@ -832,7 +832,7 @@ async function openQuotationFromLink() {
 
   // Já não está na lista filtrada — descobre o motivo certo pra avisar direito, em vez
   // de um "não está disponível" genérico que esconde o caso real (removido do grupo).
-  const all = await safeCall(() => api('GET', '/quotations'));
+  const all = await safeCall(() => api('GET', `/quotations/for-supplier?supplierId=${currentSupplierId}`));
   const raw = all.find(q => q.id === linkedId);
   if (raw && raw.status === 'AVAILABLE' && !isQuotationEligibleForMe(raw)) {
     toast('Esse representante não faz parte do grupo autorizado a responder essa cotação.', true);
@@ -1190,8 +1190,8 @@ function isQuotationEligibleForMe(quotation) {
 let quotePage = 0;
 
 async function loadQuotations() {
-  const all = await safeCall(() => api('GET', '/quotations'));
-  quotationsCache = all.filter(q => q.status === 'AVAILABLE' && isQuotationEligibleForMe(q));
+  const all = await safeCall(() => api('GET', `/quotations/for-supplier?supplierId=${currentSupplierId}`));
+  quotationsCache = all.filter(q => q.status === 'AVAILABLE');
 
   const summary = document.getElementById('quote-list-summary');
   summary.textContent = quotationsCache.length
@@ -1236,7 +1236,7 @@ let historyCache = [];
 let historyPage = 0;
 
 async function loadHistory() {
-  const all = await safeCall(() => api('GET', '/quotations'));
+  const all = await safeCall(() => api('GET', `/quotations/for-supplier?supplierId=${currentSupplierId}`));
   historyCache = all
     .filter(q => q.status === 'CLOSED' || q.status === 'EXPIRED')
     .sort((a, b) => new Date(b.updatedAt || b.createdAt) - new Date(a.updatedAt || a.createdAt));

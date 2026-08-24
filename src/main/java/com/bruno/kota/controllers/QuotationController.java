@@ -185,6 +185,13 @@ public class QuotationController {
         return quotationService.getEvents(id);
     }
 
+    // Substitui o antigo GET /quotations (agora ADMIN-only) pra tela do representante —
+    // usado nas abas Disponíveis, Anteriores, e na abertura de link direto de WhatsApp.
+    @GetMapping("/for-supplier")
+    public List<QuotationResponse> findForSupplier(@AuthenticationPrincipal AuthPrincipal principal, @RequestParam Long supplierId) {
+        return quotationService.findForSupplier(supplierId, repIdOrNull(principal));
+    }
+
     // Antes não checava nada aqui: representante autenticado podia ver detalhe de
     // QUALQUER cotação por id, inclusive Rascunho e de outro grupo. Admin continua sem
     // restrição (repId vem null pra ele).

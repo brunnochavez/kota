@@ -130,6 +130,35 @@ public class QuotationService {
         return toResponse(findEntityById(id));
     }
 
+    // Lista de cotações da tela do representante — filtrada no backend (grupo do
+    // fornecedor dele), sem status fixo: quem chama filtra por status do jeito que
+    // precisar (Disponíveis, Histórico, ou achar uma específica pelo link do
+    // WhatsApp). Único requisito aqui é nunca devolver Rascunho, que o representante
+    // não pode ver em hipótese nenhuma. Faltou esse endpoint na leva de correções de
+    // segurança de ontem: o front chamava o GET /quotations (que virou ADMIN-only, e
+    // com razão — devolvia a lista inteira, de todo mundo, sem filtro nenhum) em três
+    // lugares diferentes (aba Disponíveis, aba Anteriores, e abertura de link direto).
+    @Transactional(readOnly = true)
+    public List<QuotationResponse> findForSupplier(Long supplierId, Long authenticatedRepresentativeId) {
+        validateSupplierOwnership(supplierId, authenticatedRepresentativeId);
+        Supplier supplier = supplierRepository.findById(supplierId)
+                .orElseThrow(() -> new ResourceNotFoundException("Fornecedor não encontrado: id " + supplierId));
+
+        Set<Long> groupIds = supplier.getGroups().stream().map(SupplierGroup::getId).collect(Collectors.toSet());
+        if (groupIds.isEmpty()) {
+            return List.of();
+        }
+
+        return quotationRepository.findAll().stream()
+                .filter(q -> q.getStatus() != QuotationStatus.DRAFT)
+                .filter(q -> {
+                    SupplierGroup g = safeGetSupplierGroup(q);
+                    return g != null && groupIds.contains(g.getId());
+                })
+                .map(this::toResponse)
+                .toList();
+    }
+
     // Checagem de acesso pra representante ver detalhe/itens/PDF de uma cotação —
     // ANTES não existia nenhuma (qualquer representante logado podia ver QUALQUER
     // cotação por id, inclusive Rascunho e de grupo que não é o dele). Devolve
