@@ -23,6 +23,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.bruno.kota.entities.Bid;
+import com.bruno.kota.entities.CompanyEmailContact;
 import com.bruno.kota.entities.OrderFulfillmentConfirmation;
 import com.bruno.kota.entities.Product;
 import com.bruno.kota.entities.Quotation;
@@ -39,6 +40,7 @@ import com.bruno.kota.exceptions.ResourceNotFoundException;
 import com.bruno.kota.repositories.BidRepository;
 import com.bruno.kota.repositories.OrderFulfillmentConfirmationRepository;
 import com.bruno.kota.repositories.QuotationEventRepository;
+import com.bruno.kota.repositories.CompanyEmailContactRepository;
 import com.bruno.kota.repositories.QuotationDeclineRepository;
 import com.bruno.kota.repositories.ProductRepository;
 import com.bruno.kota.repositories.QuotationItemRepository;
@@ -48,9 +50,11 @@ import com.bruno.kota.repositories.SupplierGroupRepository;
 import com.bruno.kota.repositories.SupplierRepository;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class QuotationService {
 
     private final QuotationRepository quotationRepository;
@@ -65,6 +69,8 @@ public class QuotationService {
     private final EmailService emailService;
     private final QuotationEventRepository quotationEventRepository;
     private final PurchaseOrderService purchaseOrderService;
+    private final CompanyEmailContactRepository companyEmailContactRepository;
+    private final QuotationPdfService quotationPdfService;
 
     @Transactional(readOnly = true)
     public List<QuotationResponse> findAll() {
@@ -831,6 +837,7 @@ public class QuotationService {
 
         notifyEligibleRepresentativesOfClose(saved, items);
         purchaseOrderService.createForClosedQuotation(saved, items);
+        notifyInternalContactsOfClose(saved);
 
         return new QuotationCloseResult(true, toResponse(saved), List.of(), List.of());
     }
@@ -867,6 +874,31 @@ public class QuotationService {
         if (!eligibleReps.isEmpty()) {
             logEvent(quotation, QuotationEventType.EMAIL_SENT,
                     "E-mail de resultado disparado para " + eligibleReps.size() + " representante" + (eligibleReps.size() == 1 ? "" : "s") + ".");
+        }
+    }
+
+    // Manda o PDF de resultado por e-mail pra quem estiver cadastrado em "Dados da
+    // Empresa → Contatos de E-mail" (pensado pro CPD/financeiro conferir pedidos sem
+    // precisar logar no sistema). Gera o MESMO PDF do botão "Baixar PDF do Resultado" —
+    // reaproveita QuotationPdfService.generateResultPdf(), não duplica lógica de
+    // montagem de documento nenhuma. "melhor esforço" de propósito: se não tiver
+    // nenhum contato cadastrado, ou se a geração do PDF falhar por qualquer motivo, o
+    // fechamento da cotação em si não pode ser afetado — por isso o try/catch aqui
+    // (diferente do EmailService, que já é melhor-esforço por padrão, gerar o PDF
+    // acontece SÍNCRONO, ainda dentro dessa transação, e uma falha ali não pode subir).
+    private void notifyInternalContactsOfClose(Quotation quotation) {
+        List<CompanyEmailContact> contacts = companyEmailContactRepository.findAll();
+        if (contacts.isEmpty()) {
+            return;
+        }
+        try {
+            byte[] pdfBytes = quotationPdfService.generateResultPdf(quotation.getId());
+            List<EmailService.RepContact> recipients = contacts.stream()
+                    .map(c -> new EmailService.RepContact(c.getName(), c.getEmail()))
+                    .toList();
+            emailService.notifyInternalContactsOfClose(String.valueOf(quotation.getId()), quotation.getName(), recipients, pdfBytes);
+        } catch (Exception e) {
+            log.error("Falha ao gerar/enviar PDF de resultado pros contatos internos (cotação {}): {}", quotation.getId(), e.getMessage());
         }
     }
 

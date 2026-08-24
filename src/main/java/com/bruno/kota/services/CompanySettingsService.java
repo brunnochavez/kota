@@ -3,6 +3,7 @@ package com.bruno.kota.services;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.UUID;
 
 import org.springframework.beans.factory.annotation.Value;
@@ -11,10 +12,15 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
+import com.bruno.kota.dtos.CompanyEmailContactRequest;
+import com.bruno.kota.dtos.CompanyEmailContactResponse;
 import com.bruno.kota.dtos.CompanySettingsRequest;
 import com.bruno.kota.dtos.CompanySettingsResponse;
+import com.bruno.kota.entities.CompanyEmailContact;
 import com.bruno.kota.entities.CompanySettings;
 import com.bruno.kota.exceptions.BusinessRuleException;
+import com.bruno.kota.exceptions.ResourceNotFoundException;
+import com.bruno.kota.repositories.CompanyEmailContactRepository;
 import com.bruno.kota.repositories.CompanySettingsRepository;
 
 import lombok.RequiredArgsConstructor;
@@ -24,6 +30,7 @@ import lombok.RequiredArgsConstructor;
 public class CompanySettingsService {
 
     private final CompanySettingsRepository companySettingsRepository;
+    private final CompanyEmailContactRepository companyEmailContactRepository;
 
     @Value("${app.upload-dir:./uploads}")
     private String uploadDir;
@@ -142,5 +149,30 @@ public class CompanySettingsService {
                 settings.getEmail(), settings.getPhone(), settings.getAddress(), settings.getNeighborhood(),
                 settings.getCity(), settings.getState(), settings.getZipCode(), logoUrl
         );
+    }
+
+    // ---------- Contatos de e-mail (recebem o PDF de resultado automaticamente quando
+    // uma cotação fecha — ver QuotationService.notifyInternalContactsOfClose) ----------
+
+    @Transactional(readOnly = true)
+    public List<CompanyEmailContactResponse> listEmailContacts() {
+        return companyEmailContactRepository.findAll().stream()
+                .map(c -> new CompanyEmailContactResponse(c.getId(), c.getName(), c.getEmail()))
+                .toList();
+    }
+
+    @Transactional
+    public CompanyEmailContactResponse addEmailContact(CompanyEmailContactRequest request) {
+        CompanyEmailContact saved = companyEmailContactRepository.save(
+                CompanyEmailContact.builder().name(request.name().trim()).email(request.email().trim()).build());
+        return new CompanyEmailContactResponse(saved.getId(), saved.getName(), saved.getEmail());
+    }
+
+    @Transactional
+    public void deleteEmailContact(Long id) {
+        if (!companyEmailContactRepository.existsById(id)) {
+            throw new ResourceNotFoundException("Contato não encontrado: id " + id);
+        }
+        companyEmailContactRepository.deleteById(id);
     }
 }

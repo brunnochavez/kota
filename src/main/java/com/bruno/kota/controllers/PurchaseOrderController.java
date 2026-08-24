@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.bruno.kota.dtos.PendingDeliveryItemResponse;
 import com.bruno.kota.dtos.PurchaseOrderResponse;
 import com.bruno.kota.services.PurchaseOrderService;
 import com.bruno.kota.services.QuotationPdfService;
@@ -48,5 +49,13 @@ public class PurchaseOrderController {
                 .contentType(MediaType.APPLICATION_PDF)
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=ordem-compra-" + id + ".pdf")
                 .body(pdf);
+    }
+
+    // "Produtos a Receber" — mesmos dados das Ordens de Compra, só que quebrados por
+    // item em vez de por fornecedor, e já filtrados pra só trazer quem ainda não passou
+    // do prazo de entrega (ver PurchaseOrderService.findPendingDeliveryItems).
+    @GetMapping("/pending-deliveries")
+    public List<PendingDeliveryItemResponse> findPendingDeliveries() {
+        return purchaseOrderService.findPendingDeliveryItems();
     }
 }

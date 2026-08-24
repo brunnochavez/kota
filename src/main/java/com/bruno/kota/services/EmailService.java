@@ -5,6 +5,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.io.ByteArrayResource;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.scheduling.annotation.Async;
@@ -147,6 +148,25 @@ public class EmailService {
         send(rep.email(), subject, wrapInLayout(content.toString()));
     }
 
+    // Manda o PDF de resultado (o mesmo que "Baixar PDF do Resultado" gera) em anexo
+    // pra quem estiver cadastrado em "Dados da Empresa → Contatos de E-mail" — pensado
+    // pro CPD/financeiro conferir pedidos sem precisar logar no sistema. pdfBytes já vem
+    // pronto de QuotationService (que chamou QuotationPdfService antes de disparar isso),
+    // por isso esse método não depende de nenhuma entidade JPA — só texto e bytes crus,
+    // seguro de rodar numa thread @Async sem sessão do Hibernate.
+    @Async
+    public void notifyInternalContactsOfClose(String quotationId, String quotationName, List<RepContact> contacts, byte[] pdfBytes) {
+        String subject = "Resultado da cotação: " + quotationName;
+        StringBuilder content = new StringBuilder();
+        content.append("<p style=\"margin:0 0 20px\">A cotação <strong>").append(escapeHtml(quotationName))
+                .append("</strong> foi fechada. O PDF com o resultado completo (vencedores, valores e fornecedores) está anexado a este e-mail.</p>");
+
+        String filename = "cotacao-" + quotationId + "-resultado.pdf";
+        for (RepContact contact : contacts) {
+            sendWithAttachment(contact.email(), subject, wrapInLayout(content.toString()), filename, pdfBytes);
+        }
+    }
+
     // Cartão branco centralizado com logo no topo e rodapé padrão — dá uma cara mais
     // profissional ao e-mail em vez de HTML solto direto no corpo da mensagem.
     private String wrapInLayout(String innerContent) {
@@ -202,6 +222,38 @@ public class EmailService {
             mailSender.send(message);
         } catch (Exception e) {
             log.error("Falha ao enviar e-mail pra {}: {}", to, e.getMessage());
+        }
+    }
+
+    // Igual a send(), só que multipart=true (o "true" no construtor do
+    // MimeMessageHelper) — é o que habilita helper.addAttachment(). Sem isso, chamar
+    // addAttachment() estoura exceção em runtime (MimeMessageHelper recusa anexo se não
+    // foi construído em modo multipart).
+    private void sendWithAttachment(String to, String subject, String htmlBody, String attachmentFilename, byte[] attachmentBytes) {
+        if (!mailEnabled) {
+            log.info("Envio de e-mail desabilitado (app.mail.enabled=false) — pulando envio pra {}", to);
+            return;
+        }
+        if (to == null || to.isBlank()) {
+            log.warn("Contato sem e-mail válido — não foi possível notificar.");
+            return;
+        }
+        String companyName = companySettingsService.getOrCreate().getName();
+        try {
+            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+            if (companyName != null && !companyName.isBlank()) {
+                helper.setFrom(fromAddress, companyName);
+            } else {
+                helper.setFrom(fromAddress);
+            }
+            helper.setTo(to);
+            helper.setSubject(prefixWithCompanyName(companyName, subject));
+            helper.setText(htmlBody, true);
+            helper.addAttachment(attachmentFilename, new ByteArrayResource(attachmentBytes));
+            mailSender.send(message);
+        } catch (Exception e) {
+            log.error("Falha ao enviar e-mail com anexo pra {}: {}", to, e.getMessage());
         }
     }
 

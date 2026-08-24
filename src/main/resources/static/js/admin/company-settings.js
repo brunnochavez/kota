@@ -21,6 +21,7 @@ async function loadCompanySettingsForm() {
   document.getElementById('company-state').value = company.state || '';
   document.getElementById('company-zip').value = company.zipCode ? maskCep(company.zipCode) : '';
   renderCompanyLogoPreview(company.logoUrl);
+  loadEmailContacts();
 }
 
 function renderCompanyLogoPreview(logoUrl) {
@@ -112,4 +113,50 @@ async function applyCompanyBranding() {
       ? `<img src="${company.logoUrl}?t=${Date.now()}" alt="">`
       : `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 11l9-8 9 8"/><path d="M5 10v10a1 1 0 001 1h4v-6h4v6h4a1 1 0 001-1V10"/></svg>`;
   }
+}
+
+// ---------- Contatos de E-mail (recebem o PDF de resultado quando uma cotação fecha) ----------
+
+async function loadEmailContacts() {
+  const contacts = await safeCall(() => api('GET', '/company-settings/email-contacts'));
+  const tbody = document.getElementById('email-contacts-tbody');
+  const empty = document.getElementById('email-contacts-empty');
+  tbody.innerHTML = '';
+  empty.style.display = contacts.length ? 'none' : 'block';
+
+  contacts.forEach(c => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${escapeHtml(c.name)}</td>
+      <td>${escapeHtml(c.email)}</td>
+      <td><button class="danger small" onclick="deleteEmailContact(${c.id}, this)">Remover</button></td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+async function createEmailContact() {
+  const nameInput = document.getElementById('email-contact-name');
+  const emailInput = document.getElementById('email-contact-email');
+  const fieldMap = { name: 'email-contact-name', email: 'email-contact-email' };
+  Object.values(fieldMap).forEach(clearFieldError);
+
+  try {
+    await api('POST', '/company-settings/email-contacts', { name: nameInput.value.trim(), email: emailInput.value.trim() });
+  } catch (e) {
+    distributeFieldErrors(e.message, fieldMap);
+    return;
+  }
+
+  toast('Contato adicionado.');
+  nameInput.value = '';
+  emailInput.value = '';
+  loadEmailContacts();
+}
+
+function deleteEmailContact(id, buttonEl) {
+  showConfirmPopover(buttonEl, 'Remover esse contato? Ele deixa de receber o PDF de resultado.', async () => {
+    await safeCall(() => api('DELETE', `/company-settings/email-contacts/${id}`));
+    toast('Contato removido.');
+    loadEmailContacts();
+  });
 }
