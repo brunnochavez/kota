@@ -133,13 +133,11 @@ async function refreshRepAccessModal(id) {
 // da sessão admin desta aba) e limpa a URL. Só funciona com acesso ativo — por isso o
 // botão nem aparece quando status.enabled é false.
 async function viewAsRepresentative(id, buttonEl) {
-  buttonEl.disabled = true;
   let result;
   try {
-    result = await api('POST', `/representatives/${id}/access/impersonate`);
+    result = await withButtonLoading(buttonEl, 'Abrindo...', () => api('POST', `/representatives/${id}/access/impersonate`));
   } catch (e) {
     toast(e.message, true);
-    buttonEl.disabled = false;
     return;
   }
   const params = new URLSearchParams({
@@ -148,7 +146,6 @@ async function viewAsRepresentative(id, buttonEl) {
     impersonate_rep_id: result.representativeId || ''
   });
   window.open(`/representante.html?${params.toString()}`, '_blank');
-  buttonEl.disabled = false;
 }
 
 async function createRepAccess(id) {

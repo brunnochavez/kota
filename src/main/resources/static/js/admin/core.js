@@ -74,17 +74,19 @@ async function safeCall(fn) {
 // Link/navegação direta (href, window.open) não manda cabeçalho Authorization — o
 // navegador não anexa header customizado numa navegação normal. Por isso todo PDF agora
 // baixa via fetch autenticado, vira blob, e só então dispara o download.
-async function downloadPdfWithAuth(url, filename) {
-  const token = sessionStorage.getItem('kota-token');
-  const res = await fetch(url, { headers: token ? { 'Authorization': 'Bearer ' + token } : {} });
-  if (!res.ok) { toast('Não foi possível baixar o PDF.', true); return; }
-  const blob = await res.blob();
-  const blobUrl = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = blobUrl;
-  a.download = filename;
-  a.click();
-  URL.revokeObjectURL(blobUrl);
+async function downloadPdfWithAuth(url, filename, buttonEl) {
+  await withButtonLoading(buttonEl, 'Gerando PDF...', async () => {
+    const token = sessionStorage.getItem('kota-token');
+    const res = await fetch(url, { headers: token ? { 'Authorization': 'Bearer ' + token } : {} });
+    if (!res.ok) { toast('Não foi possível baixar o PDF.', true); return; }
+    const blob = await res.blob();
+    const blobUrl = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = blobUrl;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(blobUrl);
+  });
 }
 
 function openModal(html, size) {

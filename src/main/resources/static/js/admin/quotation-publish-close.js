@@ -17,7 +17,20 @@ function showConfirmPopover(anchorEl, messageHtml, onConfirm) {
 
   const [noBtn, yesBtn] = pop.querySelectorAll('button');
   noBtn.onclick = closeConfirmPopover;
-  yesBtn.onclick = () => { closeConfirmPopover(); onConfirm(); };
+  // Antes fechava o popover ANTES de chamar onConfirm() — sem feedback nenhum
+  // enquanto a chamada real (fechar cotação, desativar, excluir etc.) estava em
+  // andamento; se a rede estivesse lenta, parecia que nada tinha acontecido. Agora o
+  // botão "Sim" mostra o spinner e só fecha depois que onConfirm() termina (sucesso ou
+  // erro) — como esse popover é reaproveitado por dezenas de ações no sistema inteiro,
+  // esse ajuste sozinho já cobre a maioria delas de uma vez.
+  yesBtn.onclick = () => withButtonLoading(yesBtn, 'Aguarde...', async () => {
+    noBtn.disabled = true;
+    try {
+      await onConfirm();
+    } finally {
+      closeConfirmPopover();
+    }
+  });
 
   // Tenta abrir logo abaixo do botão, alinhado pela direita; se estourar a borda da tela
   // (topo, base ou lateral), reposiciona pro lado que sobra espaço.
@@ -220,12 +233,10 @@ async function confirmExtendDeadline() {
     toast('Escolha a nova data do prazo.', true);
     return;
   }
-  btn.disabled = true;
   try {
-    await api('POST', `/quotations/${currentQuotationId}/extend`, { expirationDate });
+    await withButtonLoading(btn, 'Prorrogando...', () => api('POST', `/quotations/${currentQuotationId}/extend`, { expirationDate }));
   } catch (e) {
     toast(e.message, true);
-    btn.disabled = false;
     return;
   }
   toast('Prazo prorrogado — representantes avisados por e-mail.');
@@ -262,12 +273,10 @@ async function confirmRepublish() {
     toast('Escolha a nova data do prazo.', true);
     return;
   }
-  btn.disabled = true;
   try {
-    await api('POST', `/quotations/${currentQuotationId}/republish`, { expirationDate });
+    await withButtonLoading(btn, 'Republicando...', () => api('POST', `/quotations/${currentQuotationId}/republish`, { expirationDate }));
   } catch (e) {
     toast(e.message, true);
-    btn.disabled = false;
     return;
   }
   toast('Cotação republicada — representantes avisados por e-mail.');
@@ -276,11 +285,13 @@ async function confirmRepublish() {
   abrirDetalheCotacao(currentQuotationId);
 }
 
-async function publishQuotation() {
-  await safeCall(() => api('POST', `/quotations/${currentQuotationId}/publish`));
-  toast('Cotação publicada.');
-  loadQuotations();
-  abrirDetalheCotacao(currentQuotationId);
+async function publishQuotation(buttonEl) {
+  await withButtonLoading(buttonEl, 'Publicando...', async () => {
+    await safeCall(() => api('POST', `/quotations/${currentQuotationId}/publish`));
+    toast('Cotação publicada.');
+    loadQuotations();
+    abrirDetalheCotacao(currentQuotationId);
+  });
 }
 
 // Clona nome/grupo/projeção padrão/itens (produto + quantidade) de uma cotação expirada
@@ -325,7 +336,14 @@ function closeQuotation(buttonEl) {
     return;
   }
 
-  doCloseQuotation();
+  // Fora do prazo (o caminho mais comum) não passa pelo popover de confirmação, então
+  // precisa do próprio spinner aqui — calcular vencedores pode levar alguns segundos
+  // numa cotação com muitos itens/lances.
+  if (buttonEl) {
+    withButtonLoading(buttonEl, 'Calculando...', doCloseQuotation);
+  } else {
+    doCloseQuotation();
+  }
 }
 
 async function doCloseQuotation() {

@@ -52,8 +52,8 @@ function renderPurchaseOrdersList() {
     const tr = document.createElement('tr');
     const actions = po.status === 'PENDING'
       ? `<button class="secondary small" onclick="markPurchaseOrderReceived(${po.id}, this)">Marcar como recebida</button>
-         <button class="secondary small" onclick="downloadPdfWithAuth('/purchase-orders/${po.id}/pdf', 'ordem-compra-${po.id}.pdf')">Baixar PDF</button>`
-      : `<button class="secondary small" onclick="downloadPdfWithAuth('/purchase-orders/${po.id}/pdf', 'ordem-compra-${po.id}.pdf')">Baixar PDF</button>`;
+         <button class="secondary small" onclick="downloadPdfWithAuth('/purchase-orders/${po.id}/pdf', 'ordem-compra-${po.id}.pdf', this)">Baixar PDF</button>`
+      : `<button class="secondary small" onclick="downloadPdfWithAuth('/purchase-orders/${po.id}/pdf', 'ordem-compra-${po.id}.pdf', this)">Baixar PDF</button>`;
 
     tr.innerHTML = `
       <td class="mono">${formatOrderNumber(po.id)}</td>

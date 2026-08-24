@@ -1,6 +1,31 @@
 // ============================================================
 // PAGINAÇÃO, ERROS DE CAMPO, MÁSCARAS, DATAS
 // ============================================================
+
+// Feedback visual genérico pra qualquer botão que dispara um processo (calcular
+// vencedores, gerar/baixar PDF, salvar, criar acesso, etc.) — desabilita o botão, troca
+// o conteúdo por um spinner + texto, e SEMPRE restaura o conteúdo original no final
+// (sucesso ou erro, via finally), pra nunca deixar o botão travado "carregando" pra
+// sempre se a chamada falhar. fn pode ser síncrona ou assíncrona; await numa função
+// síncrona não quebra nada.
+async function withButtonLoading(buttonEl, loadingText, fn) {
+  if (!buttonEl) return fn();
+  const originalHtml = buttonEl.innerHTML;
+  // min-width trava a largura ANTES de trocar o conteúdo — sem isso, o botão encolhe/
+  // cresce (o texto de loading quase sempre tem tamanho diferente do original) e o
+  // layout ao redor pisca durante a operação.
+  buttonEl.style.minWidth = buttonEl.offsetWidth + 'px';
+  buttonEl.disabled = true;
+  buttonEl.innerHTML = `<span class="btn-spinner"></span>${escapeHtml(loadingText || 'Aguarde...')}`;
+  try {
+    return await fn();
+  } finally {
+    buttonEl.disabled = false;
+    buttonEl.innerHTML = originalHtml;
+    buttonEl.style.minWidth = '';
+  }
+}
+
 // ============================================================
 // PAGINAÇÃO — genérica, client-side, 10 por página. Reaproveitada em toda lista que já
 // carrega o array inteiro na memória (não busca de novo no servidor a cada página, só

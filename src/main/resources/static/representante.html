@@ -112,6 +112,9 @@
   button.small { padding: 5px 10px; font-size: 12px; }
   button.ghost { background: transparent; color: var(--text-dim); padding: 6px 8px; }
   button.ghost:hover { background: var(--surface-2); color: var(--text); }
+  button:disabled { opacity: 0.5; cursor: not-allowed; }
+  .btn-spinner { display: inline-block; width: 12px; height: 12px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: btn-spin 0.6s linear infinite; margin-right: 6px; vertical-align: -2px; }
+  @keyframes btn-spin { to { transform: rotate(360deg); } }
   .confirm-popover {
     position: fixed; z-index: 1150; background: var(--surface); border: 1px solid var(--border);
     border-radius: var(--radius); box-shadow: var(--shadow); padding: 12px 14px; min-width: 220px; max-width: 300px;
@@ -586,31 +589,33 @@ function buildPdfFilename(quotationName, quotationId) {
 // contexto seguro (HTTPS) e nem todo navegador suporta compartilhar ARQUIVO (a maioria
 // dos navegadores desktop não suporta, só o texto) — por isso sempre com fallback pra
 // baixar normal, nunca deixando sem nenhuma ação acontecer.
-async function sharePdfOrDownload(url, filename) {
-  const token = sessionStorage.getItem('kota-token');
-  const res = await fetch(url, { headers: token ? { 'Authorization': 'Bearer ' + token } : {} });
-  if (!res.ok) { toast('Não foi possível gerar o PDF.', true); return; }
-  const blob = await res.blob();
+async function sharePdfOrDownload(url, filename, buttonEl) {
+  await withButtonLoading(buttonEl, 'Gerando PDF...', async () => {
+    const token = sessionStorage.getItem('kota-token');
+    const res = await fetch(url, { headers: token ? { 'Authorization': 'Bearer ' + token } : {} });
+    if (!res.ok) { toast('Não foi possível gerar o PDF.', true); return; }
+    const blob = await res.blob();
 
-  if (window.isSecureContext && navigator.canShare) {
-    const file = new File([blob], filename, { type: 'application/pdf' });
-    if (navigator.canShare({ files: [file] })) {
-      try {
-        await navigator.share({ files: [file] });
-        return;
-      } catch (e) {
-        if (e.name === 'AbortError') return; // cancelou o compartilhamento de propósito
-        // qualquer outro erro de compartilhar cai pro download normal, abaixo
+    if (window.isSecureContext && navigator.canShare) {
+      const file = new File([blob], filename, { type: 'application/pdf' });
+      if (navigator.canShare({ files: [file] })) {
+        try {
+          await navigator.share({ files: [file] });
+          return;
+        } catch (e) {
+          if (e.name === 'AbortError') return; // cancelou o compartilhamento de propósito
+          // qualquer outro erro de compartilhar cai pro download normal, abaixo
+        }
       }
     }
-  }
 
-  const blobUrl = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = blobUrl;
-  a.download = filename;
-  a.click();
-  URL.revokeObjectURL(blobUrl);
+    const blobUrl = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = blobUrl;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(blobUrl);
+  });
 }
 
 function escapeHtml(str) {
@@ -618,6 +623,24 @@ function escapeHtml(str) {
   return String(str).replace(/[&<>"']/g, c => ({
     '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
   }[c]));
+}
+
+// Feedback visual genérico pra botão que dispara um processo (salvar cotação, não
+// cotar, finalizar pedido, baixar PDF) — mesmo helper do admin.html, duplicado aqui
+// porque representante.html não compartilha os arquivos js/admin/*.js.
+async function withButtonLoading(buttonEl, loadingText, fn) {
+  if (!buttonEl) return fn();
+  const originalHtml = buttonEl.innerHTML;
+  buttonEl.style.minWidth = buttonEl.offsetWidth + 'px';
+  buttonEl.disabled = true;
+  buttonEl.innerHTML = `<span class="btn-spinner"></span>${escapeHtml(loadingText || 'Aguarde...')}`;
+  try {
+    return await fn();
+  } finally {
+    buttonEl.disabled = false;
+    buttonEl.innerHTML = originalHtml;
+    buttonEl.style.minWidth = '';
+  }
 }
 
 function maskCurrencyInput(raw) {
@@ -873,7 +896,14 @@ function showConfirmPopover(anchorEl, messageHtml, onConfirm) {
 
   const [noBtn, yesBtn] = pop.querySelectorAll('button');
   noBtn.onclick = closeConfirmPopover;
-  yesBtn.onclick = () => { closeConfirmPopover(); onConfirm(); };
+  yesBtn.onclick = () => withButtonLoading(yesBtn, 'Aguarde...', async () => {
+    noBtn.disabled = true;
+    try {
+      await onConfirm();
+    } finally {
+      closeConfirmPopover();
+    }
+  });
 
   const anchor = anchorEl.getBoundingClientRect();
   const popRect = pop.getBoundingClientRect();
@@ -1033,9 +1063,9 @@ function finalizeCurrentFulfillment() {
     <div class="export-choice-card">
       <h3>Finalizar pedido</h3>
       <div class="subtitle" style="margin-bottom:16px">Depois disso não dá mais pra cortar itens. Quer levar uma cópia do pedido?</div>
-      <button class="won-action-btn" onclick="finalizeWithExport('pdf')">${PDF_ICON} Baixar PDF e finalizar</button>
-      <button class="won-action-btn" onclick="finalizeWithExport('whatsapp')">${WHATSAPP_ICON} Compartilhar no WhatsApp e finalizar</button>
-      <button class="secondary" style="width:100%; margin-bottom:8px" onclick="finalizeWithExport(null)">Só finalizar</button>
+      <button class="won-action-btn" onclick="finalizeWithExport('pdf', this)">${PDF_ICON} Baixar PDF e finalizar</button>
+      <button class="won-action-btn" onclick="finalizeWithExport('whatsapp', this)">${WHATSAPP_ICON} Compartilhar no WhatsApp e finalizar</button>
+      <button class="secondary" style="width:100%; margin-bottom:8px" onclick="finalizeWithExport(null, this)">Só finalizar</button>
       <button class="secondary" style="width:100%" onclick="closeExportChoiceOverlay()">Cancelar</button>
     </div>
   `;
@@ -1049,12 +1079,16 @@ function closeExportChoiceOverlay() {
 
 // Finaliza primeiro, exporta depois — assim o PDF/texto gerado já reflete um pedido de
 // verdade confirmado, não um rascunho que ainda podia ser cancelado no meio do caminho.
-async function finalizeWithExport(exportType) {
-  closeExportChoiceOverlay();
+// Não fecha a janelinha de escolha ANTES de finalizar (diferente de antes) — assim o
+// spinner tem um botão pra aparecer em cima; fecha só depois que a requisição volta.
+async function finalizeWithExport(exportType, buttonEl) {
   const quotationId = currentFulfillmentQuotationId;
   const supplierId = currentFulfillmentSupplierId;
 
-  await safeCall(() => api('POST', `/quotations/${quotationId}/finalize-fulfillment?supplierId=${supplierId}`));
+  await withButtonLoading(buttonEl, 'Finalizando...', () =>
+    safeCall(() => api('POST', `/quotations/${quotationId}/finalize-fulfillment?supplierId=${supplierId}`))
+  );
+  closeExportChoiceOverlay();
   toast('Pedido finalizado.');
 
   if (exportType === 'pdf') {
@@ -1387,7 +1421,7 @@ function renderWonListPage() {
           </div>
         `).join('')}
         <div class="won-card-actions">
-          <button class="won-action-btn" onclick="event.stopPropagation(); downloadWonPdf(${q.quotationId})">${PDF_ICON} PDF</button>
+          <button class="won-action-btn" onclick="event.stopPropagation(); downloadWonPdf(${q.quotationId}, this)">${PDF_ICON} PDF</button>
           <button class="won-action-btn" onclick="event.stopPropagation(); shareWonWhatsApp(${idx})">${WHATSAPP_ICON} WhatsApp</button>
         </div>
       </div>
@@ -1414,10 +1448,10 @@ function toggleWonCard(idx) {
 // PDF já filtrado pra essa empresa — o backend nem devolve o pedido dos outros
 // fornecedores (?supplierId= no result-pdf existente do admin). Compartilha o arquivo
 // de verdade via Web Share API quando o navegador suporta (ver sharePdfOrDownload).
-function downloadWonPdf(quotationId) {
+function downloadWonPdf(quotationId, buttonEl) {
   const q = wonQuotationsCache.find(w => w.quotationId === quotationId);
   const filename = buildPdfFilename(q ? q.quotationName : quotationId, quotationId);
-  sharePdfOrDownload(`/quotations/${quotationId}/result-pdf?supplierId=${currentSupplierId}`, filename);
+  sharePdfOrDownload(`/quotations/${quotationId}/result-pdf?supplierId=${currentSupplierId}`, filename, buttonEl);
 }
 
 function maskCnpj(raw) {
@@ -1813,15 +1847,23 @@ async function submitAllBids() {
 
   if (!toSubmit.length) { toast('Preencha o preço de pelo menos um item.', true); return; }
 
-  const requests = toSubmit.map(({ itemId, value }) => api('POST', '/bids', {
-    quotationItemId: parseInt(itemId),
-    supplierId,
-    submittedById: myRepresentativeId,
-    value,
-    notes: null
-  }));
+  // Busca o botão pelo id em vez de receber como parâmetro — esse mesmo botão fixo é
+  // reaproveitado pra várias telas (btn.onclick = submitAllBids em algumas, que dispara
+  // com o Event do clique como argumento, não o elemento), então ler pelo id é mais
+  // confiável do que depender de como a função foi chamada dessa vez.
+  const btn = document.getElementById('sticky-main-btn');
 
-  await safeCall(() => Promise.all(requests));
+  await withButtonLoading(btn, 'Salvando...', async () => {
+    const requests = toSubmit.map(({ itemId, value }) => api('POST', '/bids', {
+      quotationItemId: parseInt(itemId),
+      supplierId,
+      submittedById: myRepresentativeId,
+      value,
+      notes: null
+    }));
+    await safeCall(() => Promise.all(requests));
+  });
+
   // 1 evento só no histórico pra esse envio inteiro (não 1 por item) — ver
   // QuotationService.logBidSubmission(). Não usa safeCall aqui: se isso falhar por
   // qualquer motivo, os lances já foram salvos de verdade acima, então não faz sentido

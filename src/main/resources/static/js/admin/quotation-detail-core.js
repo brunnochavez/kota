@@ -59,7 +59,7 @@ async function abrirDetalheCotacao(id) {
     </div>
 
     <div class="btn-row" style="margin-top:16px">
-      <button id="qd-publish-btn" class="success" onclick="publishQuotation()">Publicar (Rascunho → Publicada)</button>
+      <button id="qd-publish-btn" class="success" onclick="publishQuotation(this)">Publicar (Rascunho → Publicada)</button>
       <button id="qd-close-btn" class="secondary" onclick="closeQuotation(this)">Fechar (calcular vencedores)</button>
       <button id="qd-extend-btn" class="secondary" style="display:none" onclick="openExtendDeadlineModal()">Prorrogar Prazo</button>
       <button id="qd-republish-btn" class="success" style="display:none" onclick="openRepublishModal()">Republicar (mesmo Nº)</button>
@@ -69,7 +69,7 @@ async function abrirDetalheCotacao(id) {
       <button id="qd-history-btn" class="secondary" onclick="openQuotationHistoryModal()" style="display:none">Ver Histórico</button>
       <button id="qd-review-bids-btn" class="secondary" onclick="openReviewBidsModal()" style="display:none">Revisar Cotações Enviadas</button>
       <button id="qd-confirm-close-btn" class="success" onclick="confirmCloseQuotation(this)" style="display:none">Confirmar Fechamento (gerar PDF)</button>
-      <button id="qd-pdf-link" class="secondary" style="display:${q.status === 'CLOSED' ? 'inline-block' : 'none'}" onclick="downloadPdfWithAuth('/quotations/' + currentQuotationId + '/result-pdf', 'cotacao-' + currentQuotationId + '.pdf')">Baixar PDF do resultado</button>
+      <button id="qd-pdf-link" class="secondary" style="display:${q.status === 'CLOSED' ? 'inline-block' : 'none'}" onclick="downloadPdfWithAuth('/quotations/' + currentQuotationId + '/result-pdf', 'cotacao-' + currentQuotationId + '.pdf', this)">Baixar PDF do resultado</button>
       <button id="qd-duplicate-btn" class="secondary" style="display:none" onclick="duplicateQuotation()">Gerar Outra Cotação</button>
       <button id="qd-delete-btn" class="danger" style="display:none" onclick="deleteQuotationFromModal(this)">Excluir Cotação</button>
     </div>
@@ -408,18 +408,19 @@ async function confirmAddUnquotedToExisting() {
   const targetId = document.getElementById('add-unquoted-target').value;
   const noWinnerItems = qdCurrentItems.filter(i => !i.winningBidId);
   const btn = document.getElementById('add-unquoted-confirm-btn');
-  btn.disabled = true;
 
   let added = 0;
   let failed = 0;
-  for (const item of noWinnerItems) {
-    try {
-      await api('POST', `/quotations/${targetId}/items`, { productId: item.productId, quantity: item.quantity });
-      added++;
-    } catch (e) {
-      failed++;
+  await withButtonLoading(btn, 'Adicionando...', async () => {
+    for (const item of noWinnerItems) {
+      try {
+        await api('POST', `/quotations/${targetId}/items`, { productId: item.productId, quantity: item.quantity });
+        added++;
+      } catch (e) {
+        failed++;
+      }
     }
-  }
+  });
 
   if (failed) {
     toast(`${added} adicionado${added !== 1 ? 's' : ''}, ${failed} falhou/falharam (já deve existir nesse rascunho).`, true);

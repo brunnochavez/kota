@@ -206,6 +206,13 @@
   }
   button:hover { background: var(--accent-hover); }
   button:disabled { opacity: 0.5; cursor: not-allowed; }
+  /* Spinner genérico pra feedback visual de "processo em andamento" (calcular
+     vencedores, gerar PDF, salvar, etc.) — usa currentColor pra herdar a cor do texto
+     do próprio botão (branco no botão principal, azul/vermelho/verde nos variantes),
+     sem precisar de uma versão por variante. Botão em loading já fica opacity:0.5 pelo
+     :disabled acima; o spinner soma "está processando" a isso. */
+  .btn-spinner { display: inline-block; width: 12px; height: 12px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: btn-spin 0.6s linear infinite; margin-right: 6px; vertical-align: -2px; }
+  @keyframes btn-spin { to { transform: rotate(360deg); } }
   button.secondary { background: var(--surface-2); color: var(--text); border: 1px solid var(--border); }
   button.secondary:hover { background: var(--surface-3); }
   button.danger { background: var(--danger-bg); color: var(--danger); border: 1px solid var(--danger-border); }

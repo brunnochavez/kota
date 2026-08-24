@@ -230,7 +230,7 @@ function openSupplierGroupModal(id) {
       <div><label>Grupo</label><select id="modal-group-select"></select></div>
     </div>
     <div class="btn-row" style="margin-top:16px">
-      <button onclick="submitSupplierGroupModal()">Incluir</button>
+      <button onclick="submitSupplierGroupModal(this)">Incluir</button>
       <button class="secondary" onclick="closeModal()">Fechar</button>
     </div>
   `);
@@ -244,22 +244,20 @@ async function populateModalGroupSelect() {
   sel.innerHTML = groups.map(g => `<option value="${g.id}">${escapeHtml(g.name)}</option>`).join('');
 }
 
-async function submitSupplierGroupModal() {
+async function submitSupplierGroupModal(buttonEl) {
   const supplierId = document.getElementById('modal-group-supplier-id').value;
   const groupId = document.getElementById('modal-group-select').value;
   if (!groupId) { toast('Escolha um grupo.', true); return; }
-  await safeCall(() => api('POST', `/suppliers/${supplierId}/groups/${groupId}`));
+  await withButtonLoading(buttonEl, 'Incluindo...', () => safeCall(() => api('POST', `/suppliers/${supplierId}/groups/${groupId}`)));
   toast('Fornecedor incluído no grupo.');
   await loadSuppliers();
   openSupplierGroupModal(Number(supplierId));
 }
 
 async function removeSupplierFromGroup(supplierId, groupId, buttonEl) {
-  buttonEl.disabled = true;
   try {
-    await safeCall(() => api('DELETE', `/suppliers/${supplierId}/groups/${groupId}`));
+    await withButtonLoading(buttonEl, '...', () => safeCall(() => api('DELETE', `/suppliers/${supplierId}/groups/${groupId}`)));
   } catch (e) {
-    buttonEl.disabled = false;
     return;
   }
   toast('Fornecedor removido do grupo.');
