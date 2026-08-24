@@ -27,6 +27,7 @@ import com.bruno.kota.entities.CompanyEmailContact;
 import com.bruno.kota.entities.OrderFulfillmentConfirmation;
 import com.bruno.kota.entities.Product;
 import com.bruno.kota.entities.Quotation;
+import com.bruno.kota.entities.QuotationEligibleSupplier;
 import com.bruno.kota.entities.QuotationDecline;
 import com.bruno.kota.entities.QuotationEvent;
 import com.bruno.kota.entities.QuotationEventType;
@@ -42,6 +43,7 @@ import com.bruno.kota.repositories.OrderFulfillmentConfirmationRepository;
 import com.bruno.kota.repositories.QuotationEventRepository;
 import com.bruno.kota.repositories.CompanyEmailContactRepository;
 import com.bruno.kota.repositories.QuotationDeclineRepository;
+import com.bruno.kota.repositories.QuotationEligibleSupplierRepository;
 import com.bruno.kota.repositories.ProductRepository;
 import com.bruno.kota.repositories.QuotationItemRepository;
 import com.bruno.kota.repositories.QuotationRepository;
@@ -71,6 +73,7 @@ public class QuotationService {
     private final PurchaseOrderService purchaseOrderService;
     private final CompanyEmailContactRepository companyEmailContactRepository;
     private final QuotationPdfService quotationPdfService;
+    private final QuotationEligibleSupplierRepository quotationEligibleSupplierRepository;
 
     @Transactional(readOnly = true)
     public List<QuotationResponse> findAll() {
@@ -469,6 +472,7 @@ public class QuotationService {
         quotation.setStatus(QuotationStatus.AVAILABLE);
         quotation.setPublishedAt(LocalDateTime.now());
         Quotation saved = quotationRepository.save(quotation);
+        snapshotEligibleSuppliers(saved);
         logEvent(saved, QuotationEventType.PUBLISHED,
                 "Cotação publicada — prazo até " + fmtEvent(saved.getExpirationDate()) + ".", performedBy);
 
@@ -504,6 +508,7 @@ public class QuotationService {
         quotation.setPublishedAt(LocalDateTime.now());
         quotation.setReminderSentAt(null);
         Quotation saved = quotationRepository.save(quotation);
+        snapshotEligibleSuppliers(saved);
         logEvent(saved, QuotationEventType.REPUBLISHED,
                 "Cotação republicada (mesmo Nº) — prazo até " + fmtEvent(saved.getExpirationDate()) + ".", performedBy);
 
@@ -516,6 +521,29 @@ public class QuotationService {
     // mesma lista de "quem deveria responder" usada em getRepresentativeFillRate e
     // getRepresentativeResponseStatus. EmailService já garante internamente que uma
     // falha de envio não propaga — a publicação em si nunca é derrubada por causa disso.
+    // Fotografa quem estava elegível a responder essa cotação NESSE momento (publicação
+    // ou republicação) — é o que permite calcular uma taxa de resposta histórica de
+    // verdade depois (ver StatisticsService), em vez de reconstruir com a composição
+    // ATUAL do grupo, que já pode ter mudado. Limpa fotografia anterior antes de gravar
+    // — importa só pra republicação: se o grupo mudou entre um ciclo e outro, a
+    // fotografia precisa refletir o ciclo novo, não acumular os dois.
+    private void snapshotEligibleSuppliers(Quotation quotation) {
+        quotationEligibleSupplierRepository.deleteByQuotationId(quotation.getId());
+        SupplierGroup group = safeGetSupplierGroup(quotation);
+        if (group == null) {
+            return;
+        }
+        List<Supplier> suppliers = supplierRepository.findByGroup(group);
+        List<QuotationEligibleSupplier> rows = suppliers.stream()
+                .map(s -> QuotationEligibleSupplier.builder()
+                        .quotation(quotation)
+                        .supplier(s)
+                        .representative(s.getRepresentative())
+                        .build())
+                .toList();
+        quotationEligibleSupplierRepository.saveAll(rows);
+    }
+
     private void notifyEligibleRepresentativesOfPublish(Quotation quotation) {
         SupplierGroup group = safeGetSupplierGroup(quotation);
         if (group == null) {

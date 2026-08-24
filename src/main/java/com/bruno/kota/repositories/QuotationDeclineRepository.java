@@ -26,4 +26,10 @@ public interface QuotationDeclineRepository extends JpaRepository<QuotationDecli
             + "JOIN FETCH d.declinedBy "
             + "WHERE d.quotation.id IN :quotationIds")
     List<QuotationDecline> findByQuotationIdInWithDetails(@Param("quotationIds") List<Long> quotationIds);
+
+    // Usado pela tela de Estatísticas — todas as recusas já registradas, com fornecedor
+    // e representante pré-carregados, sem filtro de período (mesmo raciocínio de
+    // BidRepository.findAllWithFullDetails).
+    @Query("SELECT d FROM QuotationDecline d JOIN FETCH d.supplier JOIN FETCH d.declinedBy")
+    List<QuotationDecline> findAllWithDetails();
 }

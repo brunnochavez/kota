@@ -93,11 +93,11 @@ async function loadRepStatusPage() {
   updatePaginationControls('rep-status', result.page, result.totalPages, result.totalElements, goToRepStatusPage);
 }
 
-// Reaproveita GET /bids?quotationItemId=X (já usado na Revisão de Lances) — cruza com
-// os itens da cotação e filtra pela dupla (representante + fornecedor), não só pelo
-// representante. Precisa ser assim porque um representante pode estar vinculado a mais
-// de um fornecedor do grupo — filtrar só por representante misturava lance de um
-// fornecedor com o outro (era exatamente o bug: cotar por UM aparecia duplicado nos
+// Reaproveita GET /bids/by-quotation/{id} (1 chamada só, pra cotação inteira — ver
+// BidService.findByQuotation) — cruza com os itens da cotação e filtra pela dupla
+// (representante + fornecedor), não só pelo representante. Precisa ser assim porque um
+// representante pode estar vinculado a mais de um fornecedor do grupo — filtrar só por
+// representante misturava lance de um fornecedor com o outro (era exatamente o bug: cotar por UM aparecia duplicado nos
 // dois). É só leitura (sem editar preço/quantidade nem marcar vencedor), diferente do
 // modal de Revisar Lances.
 let vrbEntries = [];
@@ -107,14 +107,15 @@ let vrbSupplierName = '';
 const VRB_PAGE_SIZE = 10;
 
 async function viewRepresentativeBids(representativeId, supplierId, representativeName, supplierName) {
-  const perItem = await Promise.all(qdCurrentItems.map(item =>
-    safeCall(() => api('GET', `/bids?quotationItemId=${item.id}`)).then(bids => ({ item, bids }))
-  ));
+  const bids = await safeCall(() => api('GET', `/bids/by-quotation/${currentQuotationId}`));
+  const itemsById = new Map(qdCurrentItems.map(item => [item.id, item]));
 
   vrbEntries = [];
-  perItem.forEach(({ item, bids }) => {
-    const bid = bids.find(b => b.submittedById === representativeId && b.supplierId === supplierId);
-    if (bid) vrbEntries.push({ item, bid });
+  bids.forEach(bid => {
+    if (bid.submittedById === representativeId && bid.supplierId === supplierId) {
+      const item = itemsById.get(bid.quotationItemId);
+      if (item) vrbEntries.push({ item, bid });
+    }
   });
   vrbPage = 0;
   vrbRepName = representativeName;
@@ -189,22 +190,21 @@ async function openReviewBidsModal() {
   openModal2('<div style="padding:60px 20px; text-align:center; color:var(--text-dim)">Carregando lances enviados…</div>', true);
   reviewBidsPage = 0;
 
-  const [perItem, suppliers] = await Promise.all([
-    Promise.all(qdCurrentItems.map(item =>
-      safeCall(() => api('GET', `/bids?quotationItemId=${item.id}`)).then(bids => ({ item, bids }))
-    )),
+  const [allBids, suppliers] = await Promise.all([
+    safeCall(() => api('GET', `/bids/by-quotation/${currentQuotationId}`)),
     safeCall(() => api('GET', '/suppliers'))
   ]);
   qdReviewSuppliersByRepId = new Map(suppliers.filter(s => s.representativeId).map(s => [s.representativeId, s]));
 
+  const itemsById = new Map(qdCurrentItems.map(item => [item.id, item]));
   qdReviewBidGroups = new Map();
-  perItem.forEach(({ item, bids }) => {
-    bids.forEach(bid => {
-      if (!qdReviewBidGroups.has(bid.submittedById)) {
-        qdReviewBidGroups.set(bid.submittedById, { name: bid.submittedByName, entries: [] });
-      }
-      qdReviewBidGroups.get(bid.submittedById).entries.push({ item, bid });
-    });
+  allBids.forEach(bid => {
+    const item = itemsById.get(bid.quotationItemId);
+    if (!item) return;
+    if (!qdReviewBidGroups.has(bid.submittedById)) {
+      qdReviewBidGroups.set(bid.submittedById, { name: bid.submittedByName, entries: [] });
+    }
+    qdReviewBidGroups.get(bid.submittedById).entries.push({ item, bid });
   });
 
   const winningReps = Array.from(qdReviewBidGroups.entries())
@@ -257,18 +257,17 @@ async function openReviewBidsModal() {
 }
 
 async function loadReviewBidsData() {
-  const perItem = await Promise.all(qdCurrentItems.map(item =>
-    safeCall(() => api('GET', `/bids?quotationItemId=${item.id}`)).then(bids => ({ item, bids }))
-  ));
+  const allBids = await safeCall(() => api('GET', `/bids/by-quotation/${currentQuotationId}`));
+  const itemsById = new Map(qdCurrentItems.map(item => [item.id, item]));
 
   qdReviewBidGroups = new Map();
-  perItem.forEach(({ item, bids }) => {
-    bids.forEach(bid => {
-      if (!qdReviewBidGroups.has(bid.submittedById)) {
-        qdReviewBidGroups.set(bid.submittedById, { name: bid.submittedByName, entries: [] });
-      }
-      qdReviewBidGroups.get(bid.submittedById).entries.push({ item, bid });
-    });
+  allBids.forEach(bid => {
+    const item = itemsById.get(bid.quotationItemId);
+    if (!item) return;
+    if (!qdReviewBidGroups.has(bid.submittedById)) {
+      qdReviewBidGroups.set(bid.submittedById, { name: bid.submittedByName, entries: [] });
+    }
+    qdReviewBidGroups.get(bid.submittedById).entries.push({ item, bid });
   });
 
   const winningReps = Array.from(qdReviewBidGroups.entries())

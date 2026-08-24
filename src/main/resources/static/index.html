@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>easyKota — Cotações B2B entre fornecedores, sem planilha</title>
+<meta name="description" content="O easyKota organiza cotações entre vários fornecedores, recebe os preços direto do celular do representante e calcula o vencedor de cada item automaticamente.">
+<link rel="icon" href="/favicon.ico">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --blue: #2f6fed;
+    --blue-dark: #1d4fc2;
+    --blue-soft: #eaf1ff;
+    --navy: #11162a;
+    --navy-2: #1a2140;
+    --red: #c0362c;
+    --bg: #fbfbfe;
+    --surface: #ffffff;
+    --border: #e7e9f4;
+    --text: #11162a;
+    --text-dim: #5b6178;
+    --success: #16814f;
+    --success-soft: #e4f7ee;
+    --radius: 14px;
+    --shadow: 0 1px 2px rgba(17,22,42,.04), 0 8px 24px -12px rgba(17,22,42,.12);
+    --shadow-lg: 0 24px 60px -20px rgba(17,22,42,.28);
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font-family: 'Inter', -apple-system, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    line-height: 1.5;
+  }
+  h1, h2, h3, .display { font-family: 'Sora', 'Inter', sans-serif; letter-spacing: -0.02em; }
+  img { max-width: 100%; display: block; }
+  a { color: inherit; }
+  .wrap { max-width: 1160px; margin: 0 auto; padding: 0 28px; }
+  @media (max-width: 640px) { .wrap { padding: 0 20px; } }
+
+  /* ---------- header ---------- */
+  header {
+    position: sticky; top: 0; z-index: 100;
+    background: rgba(251,251,254,.82); backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--border);
+  }
+  .header-row { display: flex; align-items: center; justify-content: space-between; height: 72px; }
+  .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 19px; text-decoration: none; }
+  .brand img { height: 30px; width: 30px; }
+  .brand .easy { color: var(--blue); }
+  .brand .kota { color: var(--navy); }
+  nav.main-nav { display: flex; align-items: center; gap: 34px; }
+  nav.main-nav a.nav-link { font-size: 14.5px; font-weight: 500; color: var(--text-dim); text-decoration: none; transition: color .15s; }
+  nav.main-nav a.nav-link:hover { color: var(--text); }
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    font-family: 'Inter', sans-serif; font-weight: 600; font-size: 14.5px;
+    padding: 11px 22px; border-radius: 10px; text-decoration: none; cursor: pointer;
+    border: 1px solid transparent; transition: transform .15s, box-shadow .15s, background .15s, border-color .15s;
+  }
+  .btn:active { transform: translateY(1px); }
+  .btn-primary { background: var(--blue); color: #fff; box-shadow: 0 1px 2px rgba(47,111,237,.15), 0 10px 24px -10px rgba(47,111,237,.55); }
+  .btn-primary:hover { background: var(--blue-dark); }
+  .btn-ghost { background: transparent; color: var(--text); border-color: var(--border); }
+  .btn-ghost:hover { border-color: var(--navy); }
+  .btn-lg { padding: 14px 26px; font-size: 15.5px; }
+  .mobile-nav-toggle { display: none; }
+  @media (max-width: 760px) {
+    nav.main-nav a.nav-link { display: none; }
+    .header-row { height: 64px; }
+  }
+
+  /* ---------- hero ---------- */
+  .hero { padding: 84px 0 60px; overflow: hidden; }
+  .hero-grid { display: grid; grid-template-columns: 1.05fr 0.95fr; gap: 56px; align-items: center; }
+  @media (max-width: 900px) { .hero-grid { grid-template-columns: 1fr; gap: 48px; } .hero { padding: 48px 0 40px; } }
+  .eyebrow {
+    display: inline-flex; align-items: center; gap: 8px;
+    font-size: 12.5px; font-weight: 600; color: var(--blue-dark);
+    background: var(--blue-soft); border: 1px solid #d5e3fd;
+    padding: 6px 13px; border-radius: 100px; margin-bottom: 22px;
+  }
+  .eyebrow .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--blue); }
+  .hero h1 {
+    font-size: 47px; font-weight: 700; line-height: 1.09; margin: 0 0 22px; color: var(--navy);
+  }
+  @media (max-width: 640px) { .hero h1 { font-size: 34px; } }
+  .hero h1 .accent { color: var(--blue); }
+  .hero-sub { font-size: 18px; color: var(--text-dim); max-width: 480px; margin: 0 0 34px; line-height: 1.6; }
+  .hero-ctas { display: flex; gap: 14px; flex-wrap: wrap; margin-bottom: 30px; }
+  .hero-note { display: flex; align-items: center; gap: 9px; font-size: 13.5px; color: var(--text-dim); }
+  .hero-note svg { flex-shrink: 0; color: var(--success); }
+
+  /* ---------- signature: mockup de cotação ao vivo ---------- */
+  .mockup-stage { position: relative; display: flex; justify-content: center; }
+  .mockup-card {
+    width: 100%; max-width: 420px; background: var(--surface); border: 1px solid var(--border);
+    border-radius: 18px; box-shadow: var(--shadow-lg); overflow: hidden;
+    transform: rotate(1.2deg);
+  }
+  .mockup-head {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 18px 20px 14px; border-bottom: 1px solid var(--border);
+  }
+  .mockup-head .title { font-weight: 700; font-size: 14.5px; }
+  .mockup-head .status {
+    font-size: 11px; font-weight: 700; color: var(--blue-dark); background: var(--blue-soft);
+    padding: 4px 10px; border-radius: 100px; letter-spacing: .02em;
+  }
+  .mockup-item-label { padding: 14px 20px 4px; font-size: 12px; color: var(--text-dim); font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
+  .mockup-rows { padding: 4px 12px 18px; display: flex; flex-direction: column; gap: 7px; }
+  .mockup-row {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 11px 12px; border-radius: 11px; background: #f7f8fc;
+    opacity: 0; transform: translateY(8px);
+    animation: rowIn .5s ease forwards;
+    transition: background .4s, box-shadow .4s;
+  }
+  .mockup-row:nth-child(1) { animation-delay: .3s; }
+  .mockup-row:nth-child(2) { animation-delay: .55s; }
+  .mockup-row:nth-child(3) { animation-delay: .8s; }
+  .mockup-row .supplier { display: flex; align-items: center; gap: 10px; font-size: 13.5px; font-weight: 600; }
+  .mockup-row .avatar { width: 26px; height: 26px; border-radius: 50%; background: var(--navy-2); color: #fff; font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .mockup-row .price { font-size: 14.5px; font-weight: 700; color: var(--text-dim); font-variant-numeric: tabular-nums; }
+  .mockup-row.is-winner {
+    background: var(--success-soft);
+    box-shadow: inset 0 0 0 1.5px var(--success-border, #a7e3c6);
+    animation: rowIn .5s ease forwards, winnerPulse 1.6s ease .3s;
+  }
+  .mockup-row.is-winner .price { color: var(--success); }
+  .mockup-row.is-winner .avatar { background: var(--success); }
+  .mockup-check {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 20px; height: 20px; border-radius: 50%; background: var(--success); flex-shrink: 0;
+    opacity: 0; transform: scale(.4); animation: checkIn .4s ease 1.35s forwards;
+  }
+  .mockup-check svg { width: 12px; height: 12px; }
+  .mockup-foot {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 20px; background: var(--navy); color: #fff;
+    opacity: 0; animation: rowIn .5s ease 1.6s forwards;
+  }
+  .mockup-foot .label { font-size: 11.5px; color: #a9b0cc; }
+  .mockup-foot .value { font-size: 16px; font-weight: 700; color: #6fe3a8; }
+  @keyframes rowIn { to { opacity: 1; transform: translateY(0); } }
+  @keyframes checkIn { to { opacity: 1; transform: scale(1); } }
+  @keyframes winnerPulse { 0%,100% { box-shadow: inset 0 0 0 1.5px #a7e3c6; } 50% { box-shadow: inset 0 0 0 1.5px #a7e3c6, 0 0 0 6px rgba(22,129,79,.08); } }
+  .mockup-badge-float {
+    position: absolute; top: -14px; right: 6px; background: var(--red); color: #fff;
+    font-size: 11.5px; font-weight: 700; padding: 7px 13px; border-radius: 100px;
+    box-shadow: 0 8px 20px -6px rgba(192,54,44,.55);
+    opacity: 0; animation: floatIn .5s ease 1.7s forwards;
+  }
+  @keyframes floatIn { from { opacity: 0; transform: translateY(6px) scale(.9); } to { opacity: 1; transform: translateY(0) scale(1); } }
+  @media (prefers-reduced-motion: reduce) {
+    .mockup-row, .mockup-check, .mockup-foot, .mockup-badge-float { animation: none !important; opacity: 1 !important; transform: none !important; }
+  }
+
+  /* ---------- seções genéricas ---------- */
+  section { padding: 88px 0; }
+  @media (max-width: 640px) { section { padding: 56px 0; } }
+  .section-head { max-width: 620px; margin: 0 0 52px; }
+  .section-head.center { margin-left: auto; margin-right: auto; text-align: center; }
+  .section-eyebrow { font-size: 12.5px; font-weight: 700; color: var(--blue); text-transform: uppercase; letter-spacing: .06em; margin: 0 0 12px; }
+  .section-head h2 { font-size: 32px; font-weight: 700; color: var(--navy); margin: 0 0 14px; line-height: 1.2; }
+  .section-head p { font-size: 16.5px; color: var(--text-dim); margin: 0; line-height: 1.6; }
+
+  /* ---------- features ---------- */
+  .features-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+  @media (max-width: 900px) { .features-grid { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 620px) { .features-grid { grid-template-columns: 1fr; } }
+  .feature-card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 26px 24px; box-shadow: var(--shadow); transition: transform .18s, box-shadow .18s, border-color .18s;
+  }
+  .feature-card:hover { transform: translateY(-3px); box-shadow: var(--shadow-lg); border-color: #d5e3fd; }
+  .feature-icon {
+    width: 42px; height: 42px; border-radius: 11px; background: var(--blue-soft); color: var(--blue-dark);
+    display: flex; align-items: center; justify-content: center; margin-bottom: 16px;
+  }
+  .feature-card h3 { font-size: 16.5px; font-weight: 700; margin: 0 0 8px; color: var(--navy); }
+  .feature-card p { font-size: 14.5px; color: var(--text-dim); margin: 0; line-height: 1.55; }
+
+  /* ---------- como funciona ---------- */
+  .how { background: var(--surface); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+  .how-steps { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0; counter-reset: step; }
+  @media (max-width: 900px) { .how-steps { grid-template-columns: repeat(2, 1fr); gap: 32px 20px; } }
+  @media (max-width: 560px) { .how-steps { grid-template-columns: 1fr; } }
+  .how-step { position: relative; padding: 0 22px 0 0; }
+  .how-step:not(:last-child)::after {
+    content: ''; position: absolute; top: 21px; left: 62px; right: 0; height: 1.5px;
+    background: repeating-linear-gradient(to right, var(--border) 0 6px, transparent 6px 11px);
+  }
+  @media (max-width: 900px) { .how-step:not(:last-child)::after { display: none; } }
+  .how-num {
+    width: 42px; height: 42px; border-radius: 50%; background: var(--navy); color: #fff;
+    display: flex; align-items: center; justify-content: center; font-family: 'Sora', sans-serif;
+    font-weight: 700; font-size: 16px; margin-bottom: 18px; position: relative; z-index: 1;
+  }
+  .how-step h3 { font-size: 15.5px; font-weight: 700; margin: 0 0 8px; color: var(--navy); }
+  .how-step p { font-size: 13.8px; color: var(--text-dim); margin: 0; line-height: 1.55; max-width: 240px; }
+
+  /* ---------- perfis ---------- */
+  .roles-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+  @media (max-width: 760px) { .roles-grid { grid-template-columns: 1fr; } }
+  .role-card { border-radius: 18px; padding: 32px; position: relative; overflow: hidden; }
+  .role-card.admin { background: var(--navy); color: #fff; }
+  .role-card.supplier { background: var(--blue-soft); color: var(--navy); border: 1px solid #d5e3fd; }
+  .role-tag { display: inline-block; font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; margin-bottom: 14px; opacity: .7; }
+  .role-card h3 { font-size: 21px; font-weight: 700; margin: 0 0 12px; }
+  .role-card ul { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 11px; }
+  .role-card li { display: flex; align-items: flex-start; gap: 10px; font-size: 14.5px; line-height: 1.5; }
+  .role-card.admin li { color: #cfd5ec; }
+  .role-card.supplier li { color: #3a4166; }
+  .role-card svg.check { flex-shrink: 0; margin-top: 3px; }
+  .role-card.admin svg.check { color: #6fe3a8; }
+  .role-card.supplier svg.check { color: var(--blue); }
+
+  /* ---------- cta band ---------- */
+  .cta-band {
+    background: var(--navy); color: #fff; border-radius: 24px; padding: 60px 48px;
+    display: flex; align-items: center; justify-content: space-between; gap: 32px; flex-wrap: wrap;
+    position: relative; overflow: hidden;
+  }
+  .cta-band::before {
+    content: ''; position: absolute; width: 420px; height: 420px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(47,111,237,.35), transparent 70%);
+    top: -180px; right: -120px;
+  }
+  .cta-band-text { position: relative; max-width: 520px; }
+  .cta-band-text h2 { font-size: 28px; font-weight: 700; margin: 0 0 10px; }
+  .cta-band-text p { font-size: 15.5px; color: #b7bcda; margin: 0; }
+  .cta-band-actions { position: relative; display: flex; gap: 14px; flex-wrap: wrap; }
+  @media (max-width: 640px) { .cta-band { padding: 40px 26px; border-radius: 18px; } .cta-band-text h2 { font-size: 23px; } }
+
+  /* ---------- footer ---------- */
+  footer { padding: 48px 0 40px; }
+  .footer-row { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 20px; padding-top: 32px; border-top: 1px solid var(--border); }
+  .footer-brand { display: flex; align-items: center; gap: 9px; font-weight: 700; font-size: 15.5px; }
+  .footer-brand img { height: 22px; width: 22px; }
+  .footer-note { font-size: 13px; color: var(--text-dim); }
+  .footer-links { display: flex; gap: 24px; font-size: 13.5px; }
+  .footer-links a { color: var(--text-dim); text-decoration: none; }
+  .footer-links a:hover { color: var(--text); }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap header-row">
+    <a href="#" class="brand"><img src="/img/kota-logo.png" alt=""><span class="easy">easy</span><span class="kota">Kota</span></a>
+    <nav class="main-nav">
+      <a href="#funcionalidades" class="nav-link">Funcionalidades</a>
+      <a href="#como-funciona" class="nav-link">Como funciona</a>
+      <a href="#quem-usa" class="nav-link">Quem usa</a>
+      <a href="/login.html" class="btn btn-primary">Entrar no sistema</a>
+    </nav>
+  </div>
+</header>
+
+<section class="hero">
+  <div class="wrap hero-grid">
+    <div>
+      <span class="eyebrow"><span class="dot"></span>Cotações B2B entre fornecedores</span>
+      <h1>Peça preço a vários fornecedores.<br>Feche com o <span class="accent">menor</span>, sozinho.</h1>
+      <p class="hero-sub">O easyKota monta a cotação, cada fornecedor responde pelo próprio celular, e o sistema calcula o vencedor de cada produto — com PDF, ordem de compra e histórico prontos no final.</p>
+      <div class="hero-ctas">
+        <a href="/login.html" class="btn btn-primary btn-lg">Entrar no sistema</a>
+        <a href="#funcionalidades" class="btn btn-ghost btn-lg">Ver funcionalidades</a>
+      </div>
+      <div class="hero-note">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><circle cx="12" cy="12" r="10"/><path d="M8 12.5l2.5 2.5L16 9"/></svg>
+        Fornecedor responde pelo celular — sem instalar nada
+      </div>
+    </div>
+
+    <div class="mockup-stage">
+      <div class="mockup-card">
+        <div class="mockup-badge-float">−16% nesse lote</div>
+        <div class="mockup-head">
+          <span class="title">Cotação · Bebidas</span>
+          <span class="status">Em revisão</span>
+        </div>
+        <div class="mockup-item-label">Cachaça Seleta 1L</div>
+        <div class="mockup-rows">
+          <div class="mockup-row">
+            <span class="supplier"><span class="avatar">DP</span>Distribuidora Pontes</span>
+            <span class="price">R$ 46,90</span>
+          </div>
+          <div class="mockup-row is-winner">
+            <span class="supplier"><span class="avatar">AZ</span>Atacadão Zani</span>
+            <span class="price">R$ 39,40 <span class="mockup-check"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3"><path d="M5 12.5l4.5 4.5L19 7"/></svg></span></span>
+          </div>
+          <div class="mockup-row">
+            <span class="supplier"><span class="avatar">RB</span>RB Distribuidora</span>
+            <span class="price">R$ 44,10</span>
+          </div>
+        </div>
+        <div class="mockup-foot">
+          <span class="label">Economia nesse item</span>
+          <span class="value">R$ 7,50</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="funcionalidades">
+  <div class="wrap">
+    <div class="section-head center">
+      <p class="section-eyebrow">Funcionalidades</p>
+      <h2>Tudo que uma cotação precisa, num lugar só</h2>
+      <p>Da montagem do lote ao pedido de compra pronto — sem planilha, sem WhatsApp perdido, sem calcular vencedor na mão.</p>
+    </div>
+
+    <div class="features-grid">
+      <div class="feature-card">
+        <div class="feature-icon"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M8 4v5"/></svg></div>
+        <h3>Cotações por grupo de fornecedores</h3>
+        <p>Monte o lote de produtos e envie só para o grupo certo — nunca mistura concorrentes que não deveriam ver o preço um do outro.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="6" y="2" width="12" height="20" rx="2"/><path d="M11 18h2"/></svg></div>
+        <h3>Fornecedor responde pelo celular</h3>
+        <p>Cada representante recebe um link, vê os itens pedidos e manda o preço direto do celular — sem instalar aplicativo.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg></div>
+        <h3>Vencedor calculado automaticamente</h3>
+        <p>O sistema compara os lances item a item e já aponta quem ganhou cada produto — sem planilha de comparação manual.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 2h6l1 4H8l1-4z"/><path d="M4 6h16l-1.5 13a2 2 0 01-2 2H7.5a2 2 0 01-2-2L4 6z"/></svg></div>
+        <h3>Ordem de compra automática</h3>
+        <p>Assim que a cotação fecha, a Ordem de Compra sai pronta pra cada fornecedor, com número próprio e previsão de entrega.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg></div>
+        <h3>Economia mês a mês</h3>
+        <p>Veja quanto foi economizado comparando o menor lance com a média recebida — por grupo de fornecedor, com tendência mensal.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 8v5l3 3"/><circle cx="12" cy="13" r="8"/><path d="M12 2v3M5 5l1.5 1.5M19 5l-1.5 1.5"/></svg></div>
+        <h3>Histórico completo</h3>
+        <p>Publicação, prorrogação, lance e fechamento — tudo com data, hora e quem fez, pra nunca perder o fio de uma cotação.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c0-3.6 2.9-6.5 6.5-6.5s6.5 2.9 6.5 6.5"/><path d="M17 8.5a3 3 0 100 6M20.5 20c0-2.8-1.8-5.1-4.3-6"/></svg></div>
+        <h3>Vários administradores</h3>
+        <p>Divida a gestão das cotações com o time — cada pessoa com seu próprio login e um registro de quem fez o quê.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 3v18h18"/><path d="M7 15l4-6 3 4 5-7"/></svg></div>
+        <h3>Ponto de compra</h3>
+        <p>Saiba quando reabastecer com base na projeção de venda de cada produto — antes de faltar na prateleira.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg></div>
+        <h3>Avisos automáticos</h3>
+        <p>E-mail de nova cotação, lembrete de prazo e resultado final — o fornecedor fica sabendo sem você precisar avisar um por um.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="how" id="como-funciona">
+  <div class="wrap">
+    <div class="section-head center">
+      <p class="section-eyebrow">Como funciona</p>
+      <h2>Da cotação ao pedido, em 4 passos</h2>
+    </div>
+    <div class="how-steps">
+      <div class="how-step">
+        <div class="how-num">1</div>
+        <h3>Monte a cotação</h3>
+        <p>Escolha os produtos, a quantidade e o grupo de fornecedores que vai receber.</p>
+      </div>
+      <div class="how-step">
+        <div class="how-num">2</div>
+        <h3>Fornecedores respondem</h3>
+        <p>Cada um recebe o link, vê os itens e envia o preço pelo próprio celular.</p>
+      </div>
+      <div class="how-step">
+        <div class="how-num">3</div>
+        <h3>Feche com um clique</h3>
+        <p>O sistema calcula o vencedor de cada item e monta o resultado sozinho.</p>
+      </div>
+      <div class="how-step">
+        <div class="how-num">4</div>
+        <h3>Receba tudo pronto</h3>
+        <p>PDF do resultado, ordem de compra por fornecedor e histórico completo.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="quem-usa">
+  <div class="wrap">
+    <div class="section-head center">
+      <p class="section-eyebrow">Pensado pros dois lados</p>
+      <h2>Feito pra quem compra e pra quem vende</h2>
+    </div>
+    <div class="roles-grid">
+      <div class="role-card admin">
+        <span class="role-tag">Time de compras</span>
+        <h3>Você organiza, o sistema calcula</h3>
+        <ul>
+          <li><svg class="check" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12.5l4.5 4.5L19 7"/></svg>Monte cotações por grupo de fornecedores em minutos</li>
+          <li><svg class="check" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12.5l4.5 4.5L19 7"/></svg>Acompanhe quem já respondeu, em tempo real</li>
+          <li><svg class="check" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12.5l4.5 4.5L19 7"/></svg>Feche com o vencedor certo, sem contar preço na mão</li>
+          <li><svg class="check" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12.5l4.5 4.5L19 7"/></svg>Divida a gestão com o time, cada um com seu acesso</li>
+        </ul>
+      </div>
+      <div class="role-card supplier">
+        <span class="role-tag">Fornecedor / representante</span>
+        <h3>Cota do celular, sem enrolação</h3>
+        <ul>
+          <li><svg class="check" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12.5l4.5 4.5L19 7"/></svg>Recebe o link direto no WhatsApp ou e-mail</li>
+          <li><svg class="check" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12.5l4.5 4.5L19 7"/></svg>Envia o preço item por item, do próprio celular</li>
+          <li><svg class="check" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12.5l4.5 4.5L19 7"/></svg>Vê o que ganhou e confirma o pedido na hora</li>
+          <li><svg class="check" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12.5l4.5 4.5L19 7"/></svg>Acompanha o próprio desempenho ao longo do tempo</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <div class="cta-band">
+      <div class="cta-band-text">
+        <h2>Pronto pra parar de comparar preço no WhatsApp?</h2>
+        <p>Se você já tem acesso, é só entrar. Se ainda não usa o easyKota, fale com quem cuida das cotações na sua empresa.</p>
+      </div>
+      <div class="cta-band-actions">
+        <a href="/login.html" class="btn btn-primary btn-lg">Entrar no sistema</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <div class="footer-row">
+      <a href="#" class="footer-brand"><img src="/img/kota-logo.png" alt=""><span class="easy" style="color:var(--blue)">easy</span><span class="kota" style="color:var(--navy)">Kota</span></a>
+      <div class="footer-links">
+        <a href="#funcionalidades">Funcionalidades</a>
+        <a href="#como-funciona">Como funciona</a>
+        <a href="/login.html">Entrar</a>
+      </div>
+      <span class="footer-note">© 2026 easyKota. Todos os direitos reservados.</span>
+    </div>
+  </div>
+</footer>
+
+</body>
+</html>

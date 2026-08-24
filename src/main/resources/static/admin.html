@@ -213,6 +213,19 @@
      :disabled acima; o spinner soma "está processando" a isso. */
   .btn-spinner { display: inline-block; width: 12px; height: 12px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: btn-spin 0.6s linear infinite; margin-right: 6px; vertical-align: -2px; }
   @keyframes btn-spin { to { transform: rotate(360deg); } }
+  /* Gráfico de barras simples, sem biblioteca externa — cada mês é uma coluna com 1 ou
+     2 barrinhas dentro (ex: criadas/fechadas), altura proporcional ao maior valor do
+     conjunto inteiro (não só daquele mês), senão a comparação visual entre meses fica
+     enganosa. */
+  .stats-chart { display: flex; flex-direction: column; min-height: 200px; }
+  .stats-chart-cols { display: flex; align-items: flex-end; gap: 14px; flex: 1; padding: 20px 4px 0; overflow-x: auto; }
+  .stats-chart-col { display: flex; flex-direction: column; align-items: center; min-width: 46px; flex: 1; height: 100%; }
+  .stats-chart-bars { display: flex; align-items: flex-end; gap: 3px; flex: 1; width: 100%; justify-content: center; }
+  .stats-chart-bar { width: 14px; border-radius: 3px 3px 0 0; min-height: 2px; position: relative; }
+  .stats-chart-bar .stats-chart-value { position: absolute; top: -18px; left: 50%; transform: translateX(-50%); font-size: 10px; color: var(--text-dim); white-space: nowrap; }
+  .stats-chart-label { font-size: 10.5px; color: var(--text-dim); margin-top: 6px; white-space: nowrap; }
+  .stats-chart-legend { display: flex; gap: 16px; margin-bottom: 6px; font-size: 11.5px; color: var(--text-dim); }
+  .stats-chart-legend-dot { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 5px; vertical-align: -1px; }
   button.secondary { background: var(--surface-2); color: var(--text); border: 1px solid var(--border); }
   button.secondary:hover { background: var(--surface-3); }
   button.danger { background: var(--danger-bg); color: var(--danger); border: 1px solid var(--danger-border); }
@@ -544,6 +557,10 @@
   <div class="nav-item" data-section="reports">
     <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 3v18h18"/><path d="M7 15l4-6 3 4 5-7"/></svg></span>
     Relatórios
+  </div>
+  <div class="nav-item" data-section="statistics">
+    <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 19h16"/><rect x="6" y="10" width="3" height="9"/><rect x="11" y="6" width="3" height="13"/><rect x="16" y="13" width="3" height="6"/></svg></span>
+    Estatísticas
   </div>
   <div class="nav-item" data-section="spend-savings">
     <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg></span>
@@ -1142,6 +1159,54 @@
     </div>
   </section>
 
+  <!-- ESTATÍSTICAS -->
+  <section class="section" id="section-statistics">
+    <h1>Estatísticas</h1>
+    <div class="subtitle">Visão histórica dos últimos 6 meses — volume de cotações, ranking de fornecedores e representantes, tendência de economia e variação de preço por produto. A "Taxa de resposta" só existe pra cotações publicadas a partir de hoje — cotações antigas aparecem com "—" nessa coluna (o sistema não tinha como saber quem estava elegível numa cotação de antes dessa funcionalidade existir).</div>
+
+    <div class="card">
+      <h2>Volume de Cotações por Mês</h2>
+      <div id="stats-volume-chart" class="stats-chart"></div>
+    </div>
+
+    <div class="card">
+      <h2>Economia por Mês</h2>
+      <div id="stats-savings-chart" class="stats-chart"></div>
+    </div>
+
+    <div class="card">
+      <h2>Ranking de Fornecedores</h2>
+      <div class="subtitle" style="margin-bottom:10px">Ordenado por valor total ganho.</div>
+      <table><thead><tr>
+        <th>Fornecedor</th><th style="text-align:center">Itens ganhos</th><th style="text-align:right">Valor ganho (R$)</th>
+        <th style="text-align:center">Lances enviados</th><th style="text-align:center">Não Cotar</th><th style="text-align:center">Taxa de resposta</th>
+      </tr></thead>
+        <tbody id="stats-supplier-ranking-tbody"></tbody></table>
+      <div class="empty" id="stats-supplier-ranking-empty" style="display:none">Sem dados suficientes ainda.</div>
+    </div>
+
+    <div class="card">
+      <h2>Ranking de Representantes</h2>
+      <div class="subtitle" style="margin-bottom:10px">Ordenado por lances enviados.</div>
+      <table><thead><tr>
+        <th>Representante</th><th style="text-align:center">Lances enviados</th><th style="text-align:center">Não Cotar</th>
+        <th style="text-align:center">Tempo médio de resposta</th><th style="text-align:center">Taxa de resposta</th>
+      </tr></thead>
+        <tbody id="stats-rep-ranking-tbody"></tbody></table>
+      <div class="empty" id="stats-rep-ranking-empty" style="display:none">Sem dados suficientes ainda.</div>
+    </div>
+
+    <div class="card">
+      <h2>Produtos com Maior Variação de Preço</h2>
+      <div class="subtitle" style="margin-bottom:10px">Diferença entre o menor e o maior lance já recebido para o produto (mínimo 2 lances).</div>
+      <table><thead><tr>
+        <th>Produto</th><th style="text-align:right">Menor preço (R$)</th><th style="text-align:right">Maior preço (R$)</th><th style="text-align:right">Variação</th>
+      </tr></thead>
+        <tbody id="stats-price-variation-tbody"></tbody></table>
+      <div class="empty" id="stats-price-variation-empty" style="display:none">Sem dados suficientes ainda.</div>
+    </div>
+  </section>
+
   <!-- PURCHASE ORDERS -->
   <section class="section" id="section-purchase-orders">
     <h1>Ordens de Compra</h1>
@@ -1213,6 +1278,7 @@
   <script src="js/admin/reorder-points.js"></script>
   <script src="js/admin/purchase-orders.js"></script>
   <script src="js/admin/pending-deliveries.js"></script>
+  <script src="js/admin/statistics.js"></script>
   <script src="js/admin/reports.js"></script>
   <script src="js/admin/spend-savings.js"></script>
   <script src="js/admin/quotation-detail-core.js"></script>

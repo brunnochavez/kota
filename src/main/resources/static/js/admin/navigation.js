@@ -107,6 +107,7 @@ function loadSectionData(section) {
   if (section === 'reorder-points') loadReorderPointReport();
   if (section === 'purchase-orders') loadPurchaseOrders();
   if (section === 'pending-deliveries') loadPendingDeliveries();
+  if (section === 'statistics') loadStatistics();
   if (section === 'company-settings') loadCompanySettingsForm();
   if (section === 'admin-users') loadAdminUsers();
 }

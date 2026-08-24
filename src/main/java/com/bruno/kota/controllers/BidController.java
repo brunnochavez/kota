@@ -44,6 +44,15 @@ public class BidController {
         return bidService.findByQuotationItem(quotationItemId);
     }
 
+    // Mesma restrição e mesma sensibilidade do endpoint acima, só que devolvendo TODOS
+    // os lances de uma cotação inteira numa chamada só — usado pelas telas que antes
+    // faziam 1 chamada por item (ver BidService.findByQuotation).
+    @GetMapping("/by-quotation/{quotationId}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public List<BidResponse> findByQuotation(@PathVariable Long quotationId) {
+        return bidService.findByQuotation(quotationId);
+    }
+
     @PostMapping
     public ResponseEntity<BidResponse> submit(@AuthenticationPrincipal AuthPrincipal principal, @Valid @RequestBody BidRequest request) {
         Long authenticatedRepresentativeId = (principal != null && !principal.isAdmin()) ? principal.representativeId() : null;

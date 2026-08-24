@@ -87,4 +87,19 @@ public interface BidRepository extends JpaRepository<Bid, Long> {
             + "LEFT JOIN FETCH qi.winningBid "
             + "WHERE qi.quotation.id IN :quotationIds")
     List<Bid> findByQuotationItem_QuotationIdInWithGroupAndWinner(@Param("quotationIds") List<Long> quotationIds);
+
+    // Usado pela tela de Estatísticas — TODOS os lances já registrados no sistema,
+    // numa query só, com fornecedor/representante/produto/cotação/vencedor
+    // pré-carregados. É histórico completo (sem filtro de período aqui dentro; quem
+    // decide a janela de tempo é o StatisticsService, em memória, sobre esse mesmo
+    // resultado) — dataset pequeno o bastante hoje pra isso ser tranquilo; se um dia
+    // isso pesar, é candidato a virar uma agregação no banco em vez de em Java.
+    @Query("SELECT b FROM Bid b "
+            + "JOIN FETCH b.supplier "
+            + "JOIN FETCH b.submittedBy "
+            + "JOIN FETCH b.quotationItem qi "
+            + "JOIN FETCH qi.product "
+            + "JOIN FETCH qi.quotation "
+            + "LEFT JOIN FETCH qi.winningBid")
+    List<Bid> findAllWithFullDetails();
 }

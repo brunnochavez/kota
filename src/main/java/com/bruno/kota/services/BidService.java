@@ -46,6 +46,20 @@ public class BidService {
                 .toList();
     }
 
+    // Todos os lances de uma cotação inteira, numa query só — substitui o padrão que o
+    // front usava antes (1 GET /bids?quotationItemId=X por item da cotação, em
+    // paralelo) nas telas "Quem já respondeu" → "Ver" e "Revisar Lances Enviados". Numa
+    // cotação com muitos itens (ex: 90), isso eram 90 requisições HTTP de uma vez só só
+    // pra abrir um modal — reaproveita a mesma query já usada pelo Relatório de
+    // Cotações (findByQuotationItem_QuotationIdInWithReportDetails), só que pra 1
+    // cotação em vez de um lote.
+    @Transactional(readOnly = true)
+    public List<BidResponse> findByQuotation(Long quotationId) {
+        return bidRepository.findByQuotationItem_QuotationIdInWithReportDetails(List.of(quotationId)).stream()
+                .map(this::toResponse)
+                .toList();
+    }
+
     @Transactional
     // authenticatedRepresentativeId vem do token, não do corpo da requisição — é o que
     // fecha a brecha de um representante conseguir enviar lance em nome de outro só
