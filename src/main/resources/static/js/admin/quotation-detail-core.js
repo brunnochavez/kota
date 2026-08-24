@@ -441,7 +441,8 @@ const QD_EVENT_LABELS = {
   CLOSED: 'Concluída',
   REPUBLISHED: 'Republicada',
   DECLINED: 'Recusada (Não Cotar)',
-  FULFILLMENT_CONFIRMED: 'Atendimento confirmado'
+  FULFILLMENT_CONFIRMED: 'Atendimento confirmado',
+  EMAIL_SENT: 'E-mail disparado'
 };
 const QD_EVENT_COLORS = {
   CREATED: 'var(--text-dim)',
@@ -452,7 +453,8 @@ const QD_EVENT_COLORS = {
   CLOSED: 'var(--accent)',
   REPUBLISHED: 'var(--accent)',
   DECLINED: 'var(--danger)',
-  FULFILLMENT_CONFIRMED: 'var(--success)'
+  FULFILLMENT_CONFIRMED: 'var(--success)',
+  EMAIL_SENT: 'var(--text-dim)'
 };
 
 let qdHistoryEvents = [];

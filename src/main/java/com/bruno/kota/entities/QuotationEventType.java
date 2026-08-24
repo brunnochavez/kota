@@ -9,5 +9,6 @@ public enum QuotationEventType {
     CLOSED,
     REPUBLISHED,
     DECLINED,
-    FULFILLMENT_CONFIRMED
+    FULFILLMENT_CONFIRMED,
+    EMAIL_SENT
 }

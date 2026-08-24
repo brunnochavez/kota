@@ -1,5 +1,7 @@
 package com.bruno.kota.services;
+import java.text.Collator;
 import java.util.List;
+import java.util.Locale;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import com.bruno.kota.dtos.SupplierRequest;
@@ -31,10 +33,17 @@ public class SupplierService {
     private final QuotationDeclineRepository quotationDeclineRepository;
     private final OrderFulfillmentConfirmationRepository orderFulfillmentConfirmationRepository;
 
+    // Collator em vez de String.CASE_INSENSITIVE_ORDER ou Comparator.naturalOrder() —
+    // esses dois comparam por valor numérico de caractere, então acento vem DEPOIS de Z
+    // ("Álvaro" cairia no fim da lista, não perto de "Alvaro"). Collator pt-BR ordena do
+    // jeito que uma lista telefônica de verdade ordena.
+    private static final Collator PT_BR_COLLATOR = Collator.getInstance(new Locale("pt", "BR"));
+
     @Transactional(readOnly = true)
     public List<SupplierResponse> findAll() {
         return supplierRepository.findAll().stream()
                 .map(this::toResponse)
+                .sorted((a, b) -> PT_BR_COLLATOR.compare(a.name(), b.name()))
                 .toList();
     }
 
@@ -45,6 +54,7 @@ public class SupplierService {
         return supplierRepository.findAll().stream()
                 .filter(s -> s.getRepresentative() != null && s.getRepresentative().getId().equals(representativeId))
                 .map(this::toResponse)
+                .sorted((a, b) -> PT_BR_COLLATOR.compare(a.name(), b.name()))
                 .toList();
     }
 
@@ -57,6 +67,7 @@ public class SupplierService {
     public List<SupplierResponse> findAllInactive() {
         return supplierRepository.findAllInactive().stream()
                 .map(this::toResponse)
+                .sorted((a, b) -> PT_BR_COLLATOR.compare(a.name(), b.name()))
                 .toList();
     }
 

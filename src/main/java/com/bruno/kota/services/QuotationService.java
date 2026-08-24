@@ -527,6 +527,10 @@ public class QuotationService {
                 .map(r -> new EmailService.RepContact(r.getName(), r.getEmail()))
                 .toList();
         emailService.notifyQuotationPublished(quotation.getId(), quotation.getName(), quotation.getExpirationDate(), eligibleReps);
+        if (!eligibleReps.isEmpty()) {
+            logEvent(quotation, QuotationEventType.EMAIL_SENT,
+                    "E-mail de publicação disparado para " + eligibleReps.size() + " representante" + (eligibleReps.size() == 1 ? "" : "s") + ".");
+        }
     }
 
     // Chamado pelo QuotationReminderScheduler — 1 vez por cotação (o scheduler já filtra
@@ -614,6 +618,10 @@ public class QuotationService {
                 .map(r -> new EmailService.RepContact(r.getName(), r.getEmail()))
                 .toList();
         emailService.notifyDeadlineExtended(quotation.getId(), quotation.getName(), quotation.getExpirationDate(), eligibleReps);
+        if (!eligibleReps.isEmpty()) {
+            logEvent(quotation, QuotationEventType.EMAIL_SENT,
+                    "E-mail de prorrogação de prazo disparado para " + eligibleReps.size() + " representante" + (eligibleReps.size() == 1 ? "" : "s") + ".");
+        }
     }
 
     @Transactional
@@ -855,6 +863,10 @@ public class QuotationService {
                             item.getProduct().getName(), item.getQuantity(), item.getWinningBid().getValue()))
                     .toList();
             emailService.notifyQuotationClosed(quotation.getName(), new EmailService.RepContact(rep.getName(), rep.getEmail()), wonLines);
+        }
+        if (!eligibleReps.isEmpty()) {
+            logEvent(quotation, QuotationEventType.EMAIL_SENT,
+                    "E-mail de resultado disparado para " + eligibleReps.size() + " representante" + (eligibleReps.size() == 1 ? "" : "s") + ".");
         }
     }
 

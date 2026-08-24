@@ -1,8 +1,10 @@
 package com.bruno.kota.services;
 import java.math.BigDecimal;
+import java.text.Collator;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -34,10 +36,13 @@ public class ProductService {
     private final QuotationItemRepository quotationItemRepository;
     private final ProductGroupRepository productGroupRepository;
 
+    private static final Collator PT_BR_COLLATOR = Collator.getInstance(new Locale("pt", "BR"));
+
     @Transactional(readOnly = true)
     public List<ProductResponse> findAll() {
         return productRepository.findAll().stream()
                 .map(this::toResponseWithoutPricing)
+                .sorted((a, b) -> PT_BR_COLLATOR.compare(a.name(), b.name()))
                 .toList();
     }
 
@@ -65,6 +70,7 @@ public class ProductService {
         Map<Long, QuotationItem> lastWonByProduct = loadLastWonBatch(inactive);
         return inactive.stream()
                 .map(p -> toResponse(p, lastWonByProduct.get(p.getId())))
+                .sorted((a, b) -> PT_BR_COLLATOR.compare(a.name(), b.name()))
                 .toList();
     }
 

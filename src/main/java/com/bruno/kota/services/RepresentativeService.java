@@ -1,6 +1,8 @@
 package com.bruno.kota.services;
 
+import java.text.Collator;
 import java.util.List;
+import java.util.Locale;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -31,10 +33,13 @@ public class RepresentativeService {
     private final SupplierRepository supplierRepository;
     private final UserRepository userRepository;
 
+    private static final Collator PT_BR_COLLATOR = Collator.getInstance(new Locale("pt", "BR"));
+
     @Transactional(readOnly = true)
     public List<RepresentativeResponse> findAll() {
         return representativeRepository.findAll().stream()
                 .map(this::toResponse)
+                .sorted((a, b) -> PT_BR_COLLATOR.compare(a.name(), b.name()))
                 .toList();
     }
 
@@ -127,6 +132,7 @@ public class RepresentativeService {
     public List<RepresentativeResponse> findAllInactive() {
         return representativeRepository.findAllInactive().stream()
                 .map(this::toResponse)
+                .sorted((a, b) -> PT_BR_COLLATOR.compare(a.name(), b.name()))
                 .toList();
     }
 

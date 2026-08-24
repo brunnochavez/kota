@@ -64,6 +64,7 @@ function renderSuppliersList() {
       <td class="num">${s.minimumOrderValue != null ? 'R$ ' + s.minimumOrderValue : '—'}</td>
       <td>${s.defaultDeliveryDeadlineDays != null ? s.defaultDeliveryDeadlineDays + ' dias' : '—'}</td>
       <td class="truncate-cell" title="${escapeHtml(s.representativeName || '')}">${s.representativeName || '—'}</td>
+      <td class="truncate-cell" title="${escapeHtml((s.groupNames || []).join(', '))}">${(s.groupNames || []).length ? escapeHtml(s.groupNames.join(', ')) : '—'}</td>
       <td><div class="row-actions">${actions}</div></td>`;
     tbody.appendChild(tr);
   });
@@ -210,15 +211,27 @@ async function refreshCurrentSuppliersView() {
 function openSupplierGroupModal(id) {
   const s = findSupplierById(id);
   if (!s) return;
+  const currentGroupsHtml = (s.groupIds || []).length
+    ? s.groupIds.map((gid, i) => `
+        <span class="chip">${escapeHtml(s.groupNames[i])}
+          <button type="button" class="chip-remove" title="Remover do grupo" onclick="removeSupplierFromGroup(${s.id}, ${gid}, this)">×</button>
+        </span>`).join('')
+    : '<span class="subtitle">Esse fornecedor ainda não está em nenhum grupo.</span>';
+
   openModal(`
-    <h2>Incluir ${escapeHtml(s.name)} em um grupo</h2>
+    <h2>Grupos de ${escapeHtml(s.name)}</h2>
+    <label style="margin-bottom:6px">Grupos atuais</label>
+    <div id="modal-current-groups" style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:16px">${currentGroupsHtml}</div>
+
+    <hr class="divider">
+    <h3 style="margin:14px 0 6px">Incluir em outro grupo</h3>
     <input type="hidden" id="modal-group-supplier-id" value="${s.id}">
     <div class="field-grid">
       <div><label>Grupo</label><select id="modal-group-select"></select></div>
     </div>
     <div class="btn-row" style="margin-top:16px">
       <button onclick="submitSupplierGroupModal()">Incluir</button>
-      <button class="secondary" onclick="closeModal()">Cancelar</button>
+      <button class="secondary" onclick="closeModal()">Fechar</button>
     </div>
   `);
   populateModalGroupSelect();
@@ -237,6 +250,20 @@ async function submitSupplierGroupModal() {
   if (!groupId) { toast('Escolha um grupo.', true); return; }
   await safeCall(() => api('POST', `/suppliers/${supplierId}/groups/${groupId}`));
   toast('Fornecedor incluído no grupo.');
-  closeModal();
+  await loadSuppliers();
+  openSupplierGroupModal(Number(supplierId));
+}
+
+async function removeSupplierFromGroup(supplierId, groupId, buttonEl) {
+  buttonEl.disabled = true;
+  try {
+    await safeCall(() => api('DELETE', `/suppliers/${supplierId}/groups/${groupId}`));
+  } catch (e) {
+    buttonEl.disabled = false;
+    return;
+  }
+  toast('Fornecedor removido do grupo.');
+  await loadSuppliers();
+  openSupplierGroupModal(supplierId);
 }
 
