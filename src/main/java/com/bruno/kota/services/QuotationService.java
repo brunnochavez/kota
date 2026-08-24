@@ -1244,6 +1244,24 @@ public class QuotationService {
         }
     }
 
+    // 1 evento por ENVIO no histórico, não 1 por item — antes, BidService.submit()
+    // gravava um "LANCE RECEBIDO" pra cada item, o que enchia o "Ver Histórico" de
+    // dezenas de linhas idênticas quando o representante mandava uma cotação com muitos
+    // produtos de uma vez (o representante.html manda um POST /bids por item, tudo em
+    // paralelo). Chamado pelo front UMA VEZ, depois que todos os itens da leva já
+    // terminaram de salvar com sucesso.
+    @Transactional
+    public void logBidSubmission(Long quotationId, Long supplierId, Long authenticatedRepresentativeId, int itemCount, String impersonatedBy) {
+        validateSupplierOwnership(supplierId, authenticatedRepresentativeId);
+        Quotation quotation = findEntityById(quotationId);
+        Supplier supplier = supplierRepository.findById(supplierId)
+                .orElseThrow(() -> new ResourceNotFoundException("Fornecedor não encontrado: id " + supplierId));
+
+        logEvent(quotation, QuotationEventType.BID_RECEIVED,
+                "Cotação enviada por " + supplier.getName() + " — " + itemCount + " item" + (itemCount == 1 ? "" : "s") + ".",
+                impersonatedBy != null ? impersonatedBy + " (via \"Ver como\" o representante)" : null);
+    }
+
     // Cotações fechadas onde esse fornecedor ganhou pelo menos um item — usado na tela do
     // representante ("O que eu ganhei"). Só entra cotação CLOSED (Em Revisão ainda pode
     // mudar, não faz sentido mostrar como resultado definitivo ainda). Cada representante

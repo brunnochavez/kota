@@ -1822,6 +1822,11 @@ async function submitAllBids() {
   }));
 
   await safeCall(() => Promise.all(requests));
+  // 1 evento só no histórico pra esse envio inteiro (não 1 por item) — ver
+  // QuotationService.logBidSubmission(). Não usa safeCall aqui: se isso falhar por
+  // qualquer motivo, os lances já foram salvos de verdade acima, então não faz sentido
+  // travar o fluxo do representante por causa só do registro no histórico.
+  api('POST', `/quotations/${currentQuotationId}/bids-submitted?supplierId=${supplierId}&itemCount=${toSubmit.length}`).catch(() => {});
   toast('Cotação salva com sucesso.');
   closeItemsView();
 }

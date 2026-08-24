@@ -192,6 +192,20 @@ public class QuotationController {
         return quotationService.findForSupplier(supplierId, repIdOrNull(principal));
     }
 
+    // Chamado pelo front logo depois que TODOS os POST /bids de uma leva (a tela de
+    // "Salvar Cotação" manda um por item) terminam com sucesso — registra 1 evento só
+    // no histórico, em vez de 1 por item.
+    @PostMapping("/{id}/bids-submitted")
+    public ResponseEntity<Void> logBidSubmission(
+            @AuthenticationPrincipal AuthPrincipal principal,
+            @PathVariable Long id,
+            @RequestParam Long supplierId,
+            @RequestParam int itemCount) {
+        quotationService.logBidSubmission(id, supplierId, repIdOrNull(principal), itemCount,
+                principal != null ? principal.impersonatedBy() : null);
+        return ResponseEntity.noContent().build();
+    }
+
     // Antes não checava nada aqui: representante autenticado podia ver detalhe de
     // QUALQUER cotação por id, inclusive Rascunho e de outro grupo. Admin continua sem
     // restrição (repId vem null pra ele).

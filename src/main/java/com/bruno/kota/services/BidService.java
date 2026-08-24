@@ -11,8 +11,6 @@ import com.bruno.kota.dtos.BidRequest;
 import com.bruno.kota.dtos.BidResponse;
 import com.bruno.kota.entities.Bid;
 import com.bruno.kota.entities.Quotation;
-import com.bruno.kota.entities.QuotationEvent;
-import com.bruno.kota.entities.QuotationEventType;
 import com.bruno.kota.entities.QuotationItem;
 import com.bruno.kota.entities.QuotationStatus;
 import com.bruno.kota.entities.Representative;
@@ -21,7 +19,6 @@ import com.bruno.kota.entities.SupplierGroup;
 import com.bruno.kota.exceptions.BusinessRuleException;
 import com.bruno.kota.exceptions.ResourceNotFoundException;
 import com.bruno.kota.repositories.BidRepository;
-import com.bruno.kota.repositories.QuotationEventRepository;
 import com.bruno.kota.repositories.QuotationItemRepository;
 import com.bruno.kota.repositories.QuotationRepository;
 import com.bruno.kota.repositories.RepresentativeRepository;
@@ -38,7 +35,6 @@ public class BidService {
     private final QuotationRepository quotationRepository;
     private final SupplierRepository supplierRepository;
     private final RepresentativeRepository representativeRepository;
-    private final QuotationEventRepository quotationEventRepository;
 
     @Transactional(readOnly = true)
     public List<BidResponse> findByQuotationItem(Long quotationItemId) {
@@ -55,10 +51,10 @@ public class BidService {
     // fecha a brecha de um representante conseguir enviar lance em nome de outro só
     // mudando um número no JSON. null significa "quem chamou é admin", caso em que o
     // submittedById declarado no corpo ainda é respeitado (admin já tem acesso total).
-    // impersonatedBy vem do AuthPrincipal quando a sessão foi aberta via "Ver como este
-    // representante" (RepresentativeAccessController.impersonate) — não afeta a regra de
-    // negócio em nada, só marca o evento gravado abaixo pra deixar rastro de que foi um
-    // admin agindo em nome do representante, não o representante de verdade.
+    // impersonatedBy não é usado aqui dentro — o registro de auditoria da impersonação
+    // agora acontece uma vez só, em QuotationService.logBidSubmission(), depois que
+    // todos os itens da leva terminam de salvar. Mantido no parâmetro só pra não mudar a
+    // assinatura que o controller já chama.
     public BidResponse submit(BidRequest request, Long authenticatedRepresentativeId, String impersonatedBy) {
         QuotationItem quotationItem = quotationItemRepository.findById(request.quotationItemId())
                 .orElseThrow(() -> new ResourceNotFoundException("Item de cotação não encontrado: id " + request.quotationItemId()));
@@ -86,16 +82,11 @@ public class BidService {
         bid.setNotes(request.notes());
 
         Bid saved = bidRepository.save(bid);
-        // "Recebido" no histórico independe de ser lance novo ou atualização de um já
-        // existente — pro admin, o que importa é "esse fornecedor mexeu na cotação
-        // agora", não a distinção técnica de insert vs update.
-        quotationEventRepository.save(QuotationEvent.builder()
-                .quotation(quotationItem.getQuotation())
-                .type(QuotationEventType.BID_RECEIVED)
-                .description("Lance recebido de " + supplier.getName() + " (" + submittedBy.getName() + ") no item "
-                        + quotationItem.getProduct().getName() + ": R$ " + saved.getValue() + ".")
-                .performedBy(impersonatedBy != null ? impersonatedBy + " (via \"Ver como\" o representante)" : null)
-                .build());
+        // Não loga evento aqui — antes gravava 1 "LANCE RECEBIDO" por item, o que
+        // enchia o histórico de dezenas de linhas idênticas quando um representante
+        // enviava uma cotação com muitos produtos de uma vez. O registro agora é 1 só
+        // por envio, feito pelo QuotationService.logBidSubmission() depois que TODOS os
+        // itens da leva terminam de salvar (ver submitAllBids() no representante.html).
 
         return toResponse(saved);
     }
