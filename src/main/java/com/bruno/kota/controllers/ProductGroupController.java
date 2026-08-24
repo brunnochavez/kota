@@ -33,11 +33,13 @@ public class ProductGroupController {
     private final ProductService productService;
 
     @GetMapping
+    @PreAuthorize("hasRole('ADMIN')")
     public List<ProductGroupResponse> findAll() {
         return productGroupService.findAll();
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ProductGroupResponse findById(@PathVariable Long id) {
         return productGroupService.findById(id);
     }

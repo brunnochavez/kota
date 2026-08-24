@@ -29,6 +29,7 @@ public class SupplierGroupController {
     private final SupplierGroupService supplierGroupService;
 
     @GetMapping
+    @PreAuthorize("hasRole('ADMIN')")
     public List<SupplierGroupResponse> findAll() {
         return supplierGroupService.findAll();
     }
@@ -40,6 +41,7 @@ public class SupplierGroupController {
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     public SupplierGroupResponse findById(@PathVariable Long id) {
         return supplierGroupService.findById(id);
     }

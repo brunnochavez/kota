@@ -22,14 +22,16 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import org.hibernate.annotations.UpdateTimestamp;
 
-// Índice em "status": ao contrário das colunas de FK (que o MySQL já indexa sozinho
-// junto com a constraint), "status" não é FK — e é filtrada o tempo todo (findByStatus
-// no dashboard, nos relatórios, na checagem de expiração). Sem índice, cada uma dessas
-// consultas faz table scan completo em "quotations"; hoje com poucas linhas isso não
-// dói, mas cresce proporcional ao histórico. hibernate.ddl-auto=update cria esse índice
-// automaticamente no próximo deploy, sem exigir migração manual.
+// Índice composto em (status, expiration_date): ao contrário das colunas de FK (que o
+// MySQL já indexa sozinho junto com a constraint), essas duas não são FK — e são
+// filtradas JUNTAS o tempo todo (findByStatusAndExpirationDateBefore e
+// findDueForReminder, chamadas pelo scheduler a cada execução, além do dashboard e da
+// paginação por aba). Sem índice, cada uma dessas consultas faz table scan completo em
+// "quotations"; hoje com poucas linhas isso não dói, mas cresce proporcional ao
+// histórico. hibernate.ddl-auto=update cria esse índice automaticamente no próximo
+// deploy, sem exigir migração manual.
 @Entity
-@Table(name = "quotations", indexes = @Index(name = "idx_quotations_status", columnList = "status"))
+@Table(name = "quotations", indexes = @Index(name = "idx_quotations_status_expiration", columnList = "status, expiration_date"))
 @Getter
 @Setter
 @NoArgsConstructor

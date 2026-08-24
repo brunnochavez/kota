@@ -85,6 +85,16 @@ public class CompanySettingsService {
             if (originalName != null && originalName.contains(".")) {
                 extension = originalName.substring(originalName.lastIndexOf('.'));
             }
+            // Lista fechada de extensões aceitas, em vez de aceitar qualquer sufixo que
+            // vier no nome do arquivo enviado pelo cliente. Antes disso, um nome de
+            // arquivo malicioso (ex: contendo "../../" na parte tratada como extensão)
+            // ia direto pro Path.resolve() sem filtro — teoricamente dava pra escrever
+            // fora da pasta de uploads. contentType já é checado acima, mas o
+            // Content-Type também é enviado pelo próprio cliente (spoofável); a extensão
+            // final do arquivo salvo no disco não pode depender só disso.
+            if (!extension.toLowerCase().matches("\\.(png|jpe?g|gif|webp|svg)")) {
+                extension = ".png";
+            }
             // Nome único a cada upload (não sobrescreve o arquivo antigo com o mesmo
             // nome) — evita o navegador continuar mostrando a logo antiga em cache
             // depois de trocada.

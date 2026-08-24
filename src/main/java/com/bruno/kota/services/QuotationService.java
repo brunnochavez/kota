@@ -130,6 +130,38 @@ public class QuotationService {
         return toResponse(findEntityById(id));
     }
 
+    // Checagem de acesso pra representante ver detalhe/itens/PDF de uma cotação —
+    // ANTES não existia nenhuma (qualquer representante logado podia ver QUALQUER
+    // cotação por id, inclusive Rascunho e de grupo que não é o dele). Devolve
+    // ResourceNotFoundException (404) em vez de "sem permissão" (403) de propósito: não
+    // queremos confirmar pra quem não tem acesso que aquele id de cotação existe.
+    @Transactional(readOnly = true)
+    public void validateRepresentativeCanViewQuotation(Long quotationId, Long representativeId) {
+        Quotation quotation = quotationRepository.findById(quotationId)
+                .orElseThrow(() -> new ResourceNotFoundException("Cotação não encontrada: id " + quotationId));
+        if (quotation.getStatus() == QuotationStatus.DRAFT) {
+            throw new ResourceNotFoundException("Cotação não encontrada: id " + quotationId);
+        }
+        SupplierGroup group = safeGetSupplierGroup(quotation);
+        boolean hasAccess = group != null && supplierRepository.findByGroup(group).stream()
+                .anyMatch(s -> s.getRepresentative() != null && s.getRepresentative().getId().equals(representativeId));
+        if (!hasAccess) {
+            throw new ResourceNotFoundException("Cotação não encontrada: id " + quotationId);
+        }
+    }
+
+    // Mesma checagem acima + confirma que o supplierId informado é mesmo do
+    // representante — usado antes de gerar PDF de resultado (nunca pode baixar o PDF
+    // "geral" da empresa nem o de outro fornecedor do mesmo grupo).
+    @Transactional(readOnly = true)
+    public void validateRepresentativeCanViewQuotationResult(Long quotationId, Long supplierId, Long representativeId) {
+        validateRepresentativeCanViewQuotation(quotationId, representativeId);
+        if (supplierId == null) {
+            throw new BusinessRuleException("Informe o fornecedor.");
+        }
+        validateSupplierOwnership(supplierId, representativeId);
+    }
+
     @Transactional(readOnly = true)
     public List<QuotationItemResponse> findItems(Long quotationId) {
         return findItems(quotationId, null);

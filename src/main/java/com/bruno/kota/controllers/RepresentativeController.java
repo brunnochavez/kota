@@ -28,12 +28,17 @@ public class RepresentativeController {
 
     private final RepresentativeService representativeService;
 
+    // ADMIN só — devolve nome/telefone/e-mail de TODOS os representantes (concorrentes
+    // entre si). A tela de representante nunca chama isso (ela já sabe quem é o próprio
+    // usuário pelo token) — antes, qualquer autenticado conseguia listar todo mundo.
     @GetMapping
+    @PreAuthorize("hasRole('ADMIN')")
     public List<RepresentativeResponse> findAll() {
         return representativeService.findAll();
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     public RepresentativeResponse findById(@PathVariable Long id) {
         return representativeService.findById(id);
     }

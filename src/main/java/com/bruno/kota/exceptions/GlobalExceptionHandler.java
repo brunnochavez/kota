@@ -10,8 +10,10 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 import jakarta.validation.ConstraintViolationException;
+import lombok.extern.slf4j.Slf4j;
 
 @RestControllerAdvice
+@Slf4j
 public class GlobalExceptionHandler {
 
     @ExceptionHandler(ResourceNotFoundException.class)
@@ -70,12 +72,27 @@ public class GlobalExceptionHandler {
                     .collect(Collectors.joining("; "));
             return buildResponse(HttpStatus.BAD_REQUEST, message);
         }
-        return buildResponse(HttpStatus.INTERNAL_SERVER_ERROR, "Erro inesperado: " + ex.getMessage());
+        // Aqui embaixo (causa desconhecida) é justamente o tipo de erro que a gente NÃO
+        // quer mostrar pro usuário — pode ser mensagem de driver JDBC, nome de tabela,
+        // caminho de arquivo, etc. Loga completo (com stack trace) pro log do servidor,
+        // que é onde a gente de fato investiga; devolve só uma mensagem genérica pro
+        // cliente. Mesma lógica do handleGeneric logo abaixo.
+        log.error("Erro inesperado (TransactionSystemException sem causa mapeada)", ex);
+        return buildResponse(HttpStatus.INTERNAL_SERVER_ERROR, "Erro inesperado. Tente novamente ou entre em contato com o suporte.");
     }
 
+    // Pega QUALQUER exceção não tratada pelos handlers específicos acima — sem esse
+    // catch-all, um erro inesperado (NullPointerException, erro de conexão com o banco,
+    // etc.) voltaria pro cliente como HTML de erro padrão do Spring/Tomcat, com stack
+    // trace completo exposto. Antes esse handler devolvia ex.getMessage() direto pro
+    // cliente, o que também vaza detalhes internos (mensagem de driver JDBC, nome de
+    // classe, caminho de arquivo) — não é informação que um usuário, muito menos um
+    // possível atacante, deveria ver. Loga o erro completo no servidor (é ali que dá pra
+    // investigar de verdade) e devolve só uma mensagem genérica pro cliente.
     @ExceptionHandler(Exception.class)
     public ResponseEntity<Map<String, Object>> handleGeneric(Exception ex) {
-        return buildResponse(HttpStatus.INTERNAL_SERVER_ERROR, "Erro inesperado: " + ex.getMessage());
+        log.error("Erro inesperado não tratado", ex);
+        return buildResponse(HttpStatus.INTERNAL_SERVER_ERROR, "Erro inesperado. Tente novamente ou entre em contato com o suporte.");
     }
 
     private ResponseEntity<Map<String, Object>> buildResponse(HttpStatus status, String message) {

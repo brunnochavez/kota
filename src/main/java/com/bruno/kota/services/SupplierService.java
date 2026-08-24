@@ -38,6 +38,16 @@ public class SupplierService {
                 .toList();
     }
 
+    // Representante só vê os PRÓPRIOS fornecedores — nunca a lista inteira, que revela
+    // concorrente (nome, pedido mínimo, contato) de empresas que ele nem trabalha.
+    @Transactional(readOnly = true)
+    public List<SupplierResponse> findAllForRepresentative(Long representativeId) {
+        return supplierRepository.findAll().stream()
+                .filter(s -> s.getRepresentative() != null && s.getRepresentative().getId().equals(representativeId))
+                .map(this::toResponse)
+                .toList();
+    }
+
     @Transactional(readOnly = true)
     public SupplierResponse findById(Long id) {
         return toResponse(findEntityById(id));

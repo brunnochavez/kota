@@ -31,7 +31,15 @@ public class BidController {
 
     private final BidService bidService;
 
+    // ADMIN só — esse endpoint devolve TODOS os lances de um item, incluindo fornecedor,
+    // representante e valor de cada um (ou seja, o preço de cada concorrente). Antes não
+    // tinha restrição nenhuma: qualquer usuário autenticado, inclusive um representante
+    // comum, podia chamar isso direto pela API (mesmo sem o front dele nunca usar essa
+    // rota) e ver o preço de TODOS os concorrentes em qualquer item de qualquer cotação,
+    // só variando o quotationItemId. É dado comercialmente sensível — só admin pode ver
+    // lance de todo mundo de uma vez; representante só vê o próprio, via POST /bids.
     @GetMapping
+    @PreAuthorize("hasRole('ADMIN')")
     public List<BidResponse> findByQuotationItem(@RequestParam Long quotationItemId) {
         return bidService.findByQuotationItem(quotationItemId);
     }

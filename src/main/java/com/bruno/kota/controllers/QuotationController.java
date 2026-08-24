@@ -63,7 +63,13 @@ public class QuotationController {
     private final QuotationPdfService quotationPdfService;
     private final QuotationImportService quotationImportService;
 
+    // ADMIN só — antes não tinha restrição nenhuma, e essa rota devolve TODAS as
+    // cotações do sistema (inclusive Rascunho, de qualquer grupo). Usada só pelo
+    // Dashboard e dropdowns do admin; a tela do representante nunca chama essa rota
+    // (ela usa /quotations/{id} pontual, /quotations/won, /pending-fulfillment etc,
+    // todas com escopo próprio).
     @GetMapping
+    @PreAuthorize("hasRole('ADMIN')")
     public List<QuotationResponse> findAll() {
         return quotationService.findAll();
     }
@@ -179,13 +185,32 @@ public class QuotationController {
         return quotationService.getEvents(id);
     }
 
+    // Antes não checava nada aqui: representante autenticado podia ver detalhe de
+    // QUALQUER cotação por id, inclusive Rascunho e de outro grupo. Admin continua sem
+    // restrição (repId vem null pra ele).
     @GetMapping("/{id}")
-    public QuotationResponse findById(@PathVariable Long id) {
+    public QuotationResponse findById(@AuthenticationPrincipal AuthPrincipal principal, @PathVariable Long id) {
+        Long repId = repIdOrNull(principal);
+        if (repId != null) {
+            quotationService.validateRepresentativeCanViewQuotation(id, repId);
+        }
         return quotationService.findById(id);
     }
 
+    // Mesmo raciocínio do findById acima. Quando vem supplierId, valida também que é o
+    // fornecedor do próprio representante (não só o grupo) — sem isso, um representante
+    // conseguia ver o myBidValue de outro fornecedor do mesmo grupo só passando o
+    // supplierId dele na query string.
     @GetMapping("/{id}/items")
-    public List<QuotationItemResponse> findItems(@PathVariable Long id, @RequestParam(required = false) Long supplierId) {
+    public List<QuotationItemResponse> findItems(@AuthenticationPrincipal AuthPrincipal principal, @PathVariable Long id, @RequestParam(required = false) Long supplierId) {
+        Long repId = repIdOrNull(principal);
+        if (repId != null) {
+            if (supplierId != null) {
+                quotationService.validateRepresentativeCanViewQuotationResult(id, supplierId, repId);
+            } else {
+                quotationService.validateRepresentativeCanViewQuotation(id, repId);
+            }
+        }
         return quotationService.findItems(id, supplierId);
     }
 
@@ -254,8 +279,16 @@ public class QuotationController {
         return quotationService.confirmClose(id, request, principal.displayName());
     }
 
+    // Representante precisa informar o próprio supplierId (validado abaixo) — não pode
+    // baixar o PDF "geral" (sem supplierId, que é o consolidado de todos os
+    // fornecedores) nem o de outro fornecedor. Antes disso não tinha restrição nenhuma:
+    // qualquer id de cotação, com ou sem supplierId, gerava o PDF pra quem pedisse.
     @GetMapping("/{id}/result-pdf")
-    public ResponseEntity<byte[]> exportResultPdf(@PathVariable Long id, @RequestParam(required = false) Long supplierId) {
+    public ResponseEntity<byte[]> exportResultPdf(@AuthenticationPrincipal AuthPrincipal principal, @PathVariable Long id, @RequestParam(required = false) Long supplierId) {
+        Long repId = repIdOrNull(principal);
+        if (repId != null) {
+            quotationService.validateRepresentativeCanViewQuotationResult(id, supplierId, repId);
+        }
         byte[] pdf = supplierId != null
                 ? quotationPdfService.generateSupplierResultPdf(id, supplierId)
                 : quotationPdfService.generateResultPdf(id);

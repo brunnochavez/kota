@@ -18,12 +18,18 @@ public class ProductController {
 
     private final ProductService productService;
 
+    // ADMIN só — catálogo interno de produtos, sem uso nenhum do lado do representante
+    // (ele só vê os produtos já dentro dos itens da cotação que participa, via
+    // /quotations/{id}/items). Antes, qualquer autenticado conseguia listar/buscar o
+    // catálogo inteiro.
     @GetMapping
+    @PreAuthorize("hasRole('ADMIN')")
     public List<ProductResponse> findAll() {
         return productService.findAll();
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ProductResponse findById(@PathVariable Long id) {
         return productService.findById(id);
     }
@@ -54,6 +60,7 @@ public class ProductController {
     }
 
     @GetMapping("/search")
+    @PreAuthorize("hasRole('ADMIN')")
     public PagedResponse<ProductResponse> search(
             @RequestParam(required = false) String term,
             @RequestParam(defaultValue = "0") int page,
@@ -68,6 +75,7 @@ public class ProductController {
     }
 
     @GetMapping("/by-group/{groupId}")
+    @PreAuthorize("hasRole('ADMIN')")
     public List<ProductResponse> findByGroup(@PathVariable Long groupId) {
         return productService.findByGroupId(groupId);
     }

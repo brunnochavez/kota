@@ -1,5 +1,6 @@
 package com.bruno.kota.controllers;
 
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -17,6 +18,7 @@ public class ImportProfileController {
     private final ImportProfileService importProfileService;
 
     @GetMapping("/current")
+    @PreAuthorize("hasRole('ADMIN')")
     public ImportProfileResponse findCurrent() {
         return importProfileService.findCurrent();
     }
