@@ -136,10 +136,11 @@ public class EmailService {
         content.append("<p style=\"margin:0 0 12px\">Olá, ").append(escapeHtml(firstName(rep.name()))).append("!</p>");
         if (won) {
             content.append("<p style=\"margin:0 0 20px\">A cotação <strong>").append(escapeHtml(quotationName))
-                    .append("</strong> foi fechada e você venceu pelo menos um item. Acesse o sistema pra conferir o resultado.</p>");
+                    .append("</strong> foi fechada — parabéns, você ganhou! Acesse o sistema pra conferir o resultado "
+                            + "e seu desempenho em \"Meu Desempenho\".</p>");
         } else {
             content.append("<p style=\"margin:0 0 20px\">A cotação <strong>").append(escapeHtml(quotationName))
-                    .append("</strong> foi fechada e, dessa vez, nenhum item ficou com você. Obrigado por participar — fique de olho nas próximas cotações.</p>");
+                    .append("</strong> foi fechada. Obrigado por participar — fique de olho nas próximas cotações.</p>");
         }
         content.append(buttonHtml(link, "Acessar o sistema"));
 

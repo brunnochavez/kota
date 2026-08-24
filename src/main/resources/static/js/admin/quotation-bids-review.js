@@ -180,13 +180,22 @@ function changeVrbPage(delta) {
 // loadReviewBidsData() no arquivo (excludeSupplier, acceptViolation, addProductToRep)
 // continuam usando a função original — ali o modal já está aberto e cheio de conteúdo
 // de verdade, é só uma atualização depois de uma ação, não a abertura inicial.
+// Cache de fornecedores carregado uma vez por abertura do modal (openReviewBidsModal) e
+// reaproveitado nas atualizações parciais (loadReviewBidsData) — usado só pra achar o
+// pedido mínimo do fornecedor de cada representante, exibido ao lado do total.
+let qdReviewSuppliersByRepId = new Map();
+
 async function openReviewBidsModal() {
   openModal2('<div style="padding:60px 20px; text-align:center; color:var(--text-dim)">Carregando lances enviados…</div>', true);
   reviewBidsPage = 0;
 
-  const perItem = await Promise.all(qdCurrentItems.map(item =>
-    safeCall(() => api('GET', `/bids?quotationItemId=${item.id}`)).then(bids => ({ item, bids }))
-  ));
+  const [perItem, suppliers] = await Promise.all([
+    Promise.all(qdCurrentItems.map(item =>
+      safeCall(() => api('GET', `/bids?quotationItemId=${item.id}`)).then(bids => ({ item, bids }))
+    )),
+    safeCall(() => api('GET', '/suppliers'))
+  ]);
+  qdReviewSuppliersByRepId = new Map(suppliers.filter(s => s.representativeId).map(s => [s.representativeId, s]));
 
   qdReviewBidGroups = new Map();
   perItem.forEach(({ item, bids }) => {
@@ -214,6 +223,7 @@ async function openReviewBidsModal() {
       </div>
       <div style="display:flex; gap:18px; text-align:right">
         <div><div style="font-size:10.5px; color:var(--text-dim); text-transform:uppercase; letter-spacing:0.03em">Qtd. de itens</div><div id="review-rep-count" style="font-weight:700; font-size:14px">—</div></div>
+        <div><div style="font-size:10.5px; color:var(--text-dim); text-transform:uppercase; letter-spacing:0.03em">Pedido Mínimo</div><div id="review-rep-minorder" style="font-weight:700; font-size:14px">—</div></div>
         <div><div style="font-size:10.5px; color:var(--text-dim); text-transform:uppercase; letter-spacing:0.03em">Total da Cotação</div><div id="review-total-geral" style="font-weight:700; font-size:14px; color:var(--success)">—</div></div>
       </div>
     </div>
@@ -307,10 +317,17 @@ function renderSelectedRepBids() {
   // receber pelo que ele ganhou, não a soma de todos juntos. Recalcula a cada troca no dropdown.
   const countEl = document.getElementById('review-rep-count');
   const totalEl = document.getElementById('review-total-geral');
+  const minOrderEl = document.getElementById('review-rep-minorder');
   if (countEl) countEl.textContent = wonEntries.length;
   if (totalEl) {
     const repTotal = wonEntries.reduce((sum, { item, bid }) => sum + bid.value * item.quantity, 0);
     totalEl.textContent = 'R$ ' + formatCurrencyFromNumber(repTotal);
+  }
+  if (minOrderEl) {
+    const supplier = qdReviewSuppliersByRepId.get(repId);
+    minOrderEl.textContent = (supplier && supplier.minimumOrderValue != null)
+      ? 'R$ ' + formatCurrencyFromNumber(supplier.minimumOrderValue)
+      : '—';
   }
 
   if (!wonEntries.length) {

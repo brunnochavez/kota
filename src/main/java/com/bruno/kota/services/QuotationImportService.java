@@ -118,6 +118,13 @@ public class QuotationImportService {
         validateColumnIndex(barcodeColumn, headers.size(), "código de barras");
         validateColumnIndex(quantityColumn, headers.size(), "quantidade");
 
+        // As três colunas mapeadas precisam ser fisicamente diferentes entre si — mapear
+        // a mesma coluna duas vezes (ex: código de barras e descrição apontando pra
+        // coluna 2) é sempre erro de mapeamento, nunca uma escolha válida.
+        if (descriptionColumn.equals(barcodeColumn) || descriptionColumn.equals(quantityColumn) || barcodeColumn.equals(quantityColumn)) {
+            throw new BusinessRuleException("As colunas de Descrição, Código de Barras e Quantidade precisam ser diferentes entre si — confira o mapeamento.");
+        }
+
         SupplierGroup supplierGroup = resolveSupplierGroup(supplierGroupId);
         LocalDateTime parsedExpirationDate = parseExpirationDate(expirationDate);
 
@@ -142,6 +149,26 @@ public class QuotationImportService {
 
             if (barcode.isEmpty()) {
                 throw new BusinessRuleException("Linha " + row.getRecordNumber() + ": código de barras vazio.");
+            }
+            // Código de barras real sempre tem alguns dígitos (o padrão EAN mais comum
+            // no Brasil tem 13) — um valor com 1 ou 2 caracteres quase sempre é sinal de
+            // mapeamento errado (coluna de índice/sequência sendo lida como se fosse
+            // código de barras), não um código de barras de verdade.
+            if (barcode.length() < 3) {
+                throw new BusinessRuleException("Linha " + row.getRecordNumber() + ": código de barras muito curto (\"" + barcode
+                        + "\") — confira se a coluna mapeada como \"Código de Barras\" é mesmo essa.");
+            }
+
+            if (description.isEmpty()) {
+                throw new BusinessRuleException("Linha " + row.getRecordNumber() + ": descrição vazia.");
+            }
+            // O motivo direto desta checagem: uma planilha malformada (ou mapeamento
+            // errado, apontando a coluna de código/índice como se fosse a de descrição)
+            // já criou produtos com nome "1", "2", "3"... nesse sistema antes — descrição
+            // de produto de verdade sempre tem pelo menos uma letra.
+            if (!description.matches(".*[a-zA-ZÀ-ÿ].*")) {
+                throw new BusinessRuleException("Linha " + row.getRecordNumber() + ": descrição parece ser só números (\"" + description
+                        + "\") — confira se a coluna mapeada como \"Descrição\" não é na verdade a de código de barras ou outra coluna numérica.");
             }
 
             BigDecimal quantity;
