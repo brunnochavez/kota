@@ -88,13 +88,12 @@ async function refreshRepAccessModal(id) {
 
   if (!status.hasAccess) {
     body.innerHTML = `
-      <div class="subtitle" style="margin-bottom:16px">Esse representante ainda não tem login criado — ele não consegue entrar no sistema até isso ser feito.</div>
+      <div class="subtitle" style="margin-bottom:16px">Esse representante ainda não tem login criado — ele não consegue entrar no sistema até isso ser feito. Um e-mail com um link pra ele mesmo escolher a senha será enviado.</div>
       <div class="field-grid">
-        <div><label>E-mail</label><input type="email" id="rep-access-email" placeholder="representante@empresa.com"></div>
-        <div><label>Senha</label><input type="password" id="rep-access-password" placeholder="Mínimo 6 caracteres"></div>
+        <div><label>E-mail</label><input type="email" id="rep-access-email" placeholder="representante@empresa.com" value="${escapeHtml(rep.email || '')}"></div>
       </div>
       <div class="btn-row" style="margin-top:16px">
-        <button onclick="createRepAccess(${id})">Criar acesso</button>
+        <button onclick="createRepAccess(${id})">Enviar convite de acesso</button>
         <button class="secondary" onclick="closeModal2()">Fechar</button>
       </div>`;
     return;
@@ -150,13 +149,32 @@ async function viewAsRepresentative(id, buttonEl) {
 
 async function createRepAccess(id) {
   const email = document.getElementById('rep-access-email').value.trim();
-  const password = document.getElementById('rep-access-password').value;
-  if (!email || !password) { toast('Preencha e-mail e senha.', true); return; }
-  if (password.length < 6) { toast('Senha deve ter pelo menos 6 caracteres.', true); return; }
+  if (!email) { toast('Preencha o e-mail.', true); return; }
 
-  await safeCall(() => api('POST', `/representatives/${id}/access`, { email, password }));
-  toast('Acesso criado — já pode passar o e-mail e a senha pro representante.');
+  await safeCall(() => api('POST', `/representatives/${id}/access`, { email }));
+  toast('Convite enviado — o representante vai receber um e-mail pra escolher a própria senha.');
   await refreshRepAccessModal(id);
+}
+
+// "Enviar convite pra quem não tem acesso" — pensado pra representante cadastrado
+// ANTES do convite automático existir (o cadastro novo já cria acesso sozinho; quem
+// já estava na base não teve isso). Confirma antes por ser uma ação em massa — pode
+// disparar e-mail pra bastante gente de uma vez.
+function inviteAllMissingAccess(buttonEl) {
+  showConfirmPopover(
+    buttonEl,
+    'Isso envia um e-mail de convite pra TODO representante ativo que ainda não tem acesso criado. Continuar?',
+    async () => {
+      const result = await withButtonLoading(buttonEl, 'Enviando...', () => api('POST', '/representatives/access/invite-all-missing'));
+      if (result.invited === 0 && result.failedNames.length === 0) {
+        toast('Todo mundo já tinha acesso — nenhum convite novo foi necessário.');
+      } else if (result.failedNames.length > 0) {
+        toast(`${result.invited} convite(s) enviado(s). Falhou pra: ${result.failedNames.join(', ')}.`, true);
+      } else {
+        toast(`${result.invited} convite(s) enviado(s) com sucesso.`);
+      }
+    }
+  );
 }
 
 async function resetRepAccessPassword(id) {

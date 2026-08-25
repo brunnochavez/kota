@@ -7,6 +7,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.bruno.kota.dtos.AdminUserResponse;
+import com.bruno.kota.dtos.BulkInviteResult;
 import com.bruno.kota.dtos.CreateAccessRequest;
 import com.bruno.kota.dtos.CreateAdminUserRequest;
 import com.bruno.kota.dtos.LoginResponse;
@@ -22,19 +23,25 @@ import com.bruno.kota.repositories.UserRepository;
 import com.bruno.kota.security.JwtService;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 // Cadastro de Representative (dado de negócio: nome, telefone, e-mail) e criação de acesso
 // de login (email + senha) são intencionalmente duas ações separadas — o admin cadastra
 // o representante primeiro, e só cria o acesso quando fizer sentido (pode nunca precisar,
-// se o representante nunca for logar direto no sistema).
+// se o representante nunca for logar direto no sistema). Na prática, hoje o acesso já é
+// criado automaticamente no cadastro (RepresentativeService.create()) — esse fluxo aqui
+// (createAccess) só é usado como reforço/reenvio, pra representante cadastrado antes
+// dessa automação existir, ou algum caso de borda em que o automático foi pulado.
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class UserService {
 
     private final UserRepository userRepository;
     private final RepresentativeRepository representativeRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
+    private final PasswordResetService passwordResetService;
 
     @Transactional(readOnly = true)
     public RepresentativeAccessResponse getAccessStatus(Long representativeId) {
@@ -51,14 +58,50 @@ public class UserService {
             throw new BusinessRuleException("Esse representante já tem acesso criado — use redefinir senha em vez de criar de novo.");
         }
 
-        String email = request.email().trim().toLowerCase();
+        User user = provisionAccessAndInvite(representative, request.email());
+        return toResponse(representativeId, user);
+    }
+
+    // "Convidar todos sem acesso" — pensado pra representante cadastrado ANTES do
+    // convite automático existir (RepresentativeService.create() só passou a criar
+    // acesso sozinho a partir de um certo ponto; quem já estava cadastrado antes disso
+    // nunca teve acesso criado, e não teria como saber). Usa o e-mail que já está
+    // cadastrado no próprio representante — sem campo de e-mail separado igual no
+    // convite individual, já que aqui é em lote e não dá pra revisar um por um.
+    @Transactional
+    public BulkInviteResult inviteAllMissingAccess() {
+        List<Representative> missing = representativeRepository.findAll().stream()
+                .filter(r -> r.getUser() == null)
+                .toList();
+
+        int invited = 0;
+        List<String> failedNames = new java.util.ArrayList<>();
+        for (Representative representative : missing) {
+            try {
+                provisionAccessAndInvite(representative, representative.getEmail());
+                invited++;
+            } catch (Exception e) {
+                log.error("Falha ao convidar representante {} no envio em lote: {}", representative.getId(), e.getMessage());
+                failedNames.add(representative.getName());
+            }
+        }
+        return new BulkInviteResult(invited, failedNames);
+    }
+
+    // Núcleo compartilhado entre o convite individual (createAccess) e o em lote
+    // (inviteAllMissingAccess) — cria o User com senha aleatória (ninguém chega a
+    // saber) e dispara o e-mail de convite. Falha no e-mail em si não derruba a criação
+    // do acesso (fica só registrado no log) — o representante já pode pedir "esqueci
+    // minha senha" depois, mesmo que esse envio específico não tenha saído.
+    private User provisionAccessAndInvite(Representative representative, String rawEmail) {
+        String email = rawEmail.trim().toLowerCase();
         if (userRepository.findByEmail(email).isPresent()) {
             throw new DuplicateResourceException("Já existe um usuário cadastrado com esse e-mail.");
         }
 
         User user = User.builder()
                 .email(email)
-                .passwordHash(passwordEncoder.encode(request.password()))
+                .passwordHash(passwordEncoder.encode(java.util.UUID.randomUUID().toString()))
                 .role(UserRole.REPRESENTATIVE)
                 .enabled(true)
                 .build();
@@ -67,7 +110,13 @@ public class UserService {
         representative.setUser(user);
         representativeRepository.save(representative);
 
-        return toResponse(representativeId, user);
+        try {
+            passwordResetService.sendAccessInvite(user, representative.getName());
+        } catch (Exception e) {
+            log.error("Falha ao enviar convite de acesso pro representante {}: {}", representative.getId(), e.getMessage());
+        }
+
+        return user;
     }
 
     @Transactional

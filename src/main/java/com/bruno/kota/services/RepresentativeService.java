@@ -3,7 +3,9 @@ package com.bruno.kota.services;
 import java.text.Collator;
 import java.util.List;
 import java.util.Locale;
+import java.util.UUID;
 
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -11,6 +13,7 @@ import com.bruno.kota.dtos.RepresentativeRequest;
 import com.bruno.kota.dtos.RepresentativeResponse;
 import com.bruno.kota.entities.Representative;
 import com.bruno.kota.entities.User;
+import com.bruno.kota.entities.UserRole;
 import com.bruno.kota.exceptions.BusinessRuleException;
 import com.bruno.kota.exceptions.DuplicateResourceException;
 import com.bruno.kota.exceptions.InactiveResourceException;
@@ -22,9 +25,11 @@ import com.bruno.kota.repositories.SupplierRepository;
 import com.bruno.kota.repositories.UserRepository;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class RepresentativeService {
 
     private final RepresentativeRepository representativeRepository;
@@ -32,6 +37,8 @@ public class RepresentativeService {
     private final QuotationDeclineRepository quotationDeclineRepository;
     private final SupplierRepository supplierRepository;
     private final UserRepository userRepository;
+    private final PasswordEncoder passwordEncoder;
+    private final PasswordResetService passwordResetService;
 
     private static final Collator PT_BR_COLLATOR = Collator.getInstance(new Locale("pt", "BR"));
 
@@ -67,8 +74,43 @@ public class RepresentativeService {
                 .phone(request.phone())
                 .email(request.email())
                 .build();
+        representative = representativeRepository.save(representative);
 
-        return toResponse(representativeRepository.save(representative));
+        provisionAccessAndSendInvite(representative);
+
+        return toResponse(representative);
+    }
+
+    // Cria o acesso (User) automaticamente e dispara o e-mail de "crie sua senha" —
+    // antes disso dependia de um segundo passo manual (botão "Acesso" na tela de
+    // representantes), com o admin tendo que digitar e comunicar uma senha provisória
+    // ele mesmo. A senha aqui é só um placeholder aleatório que ninguém vai usar de
+    // verdade (nem o admin sabe qual é) — a senha real só passa a existir quando o
+    // representante clica no link do e-mail e define a dele em set-password.html.
+    // "Melhor esforço" pro e-mail em si: se o SMTP falhar, o cadastro do representante
+    // continua valendo — o admin sempre pode reenviar o convite depois.
+    private void provisionAccessAndSendInvite(Representative representative) {
+        if (userRepository.findByEmail(representative.getEmail()).isPresent()) {
+            log.info("E-mail do representante {} já tem um usuário associado (provavelmente também é admin) — acesso automático pulado.", representative.getId());
+            return;
+        }
+
+        User user = User.builder()
+                .email(representative.getEmail())
+                .passwordHash(passwordEncoder.encode(UUID.randomUUID().toString()))
+                .role(UserRole.REPRESENTATIVE)
+                .enabled(true)
+                .build();
+        user = userRepository.save(user);
+
+        representative.setUser(user);
+        representativeRepository.save(representative);
+
+        try {
+            passwordResetService.sendAccessInvite(user, representative.getName());
+        } catch (Exception e) {
+            log.error("Falha ao enviar convite de acesso pro representante {}: {}", representative.getId(), e.getMessage());
+        }
     }
 
     @Transactional

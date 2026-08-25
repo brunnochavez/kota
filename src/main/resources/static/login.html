@@ -70,6 +70,10 @@
     background: var(--danger-bg); border: 1px solid var(--danger-border); color: var(--danger);
     border-radius: 10px; padding: 10px 12px; font-size: 13px; margin-bottom: 16px; display: none;
   }
+  .success-box {
+    background: var(--success-bg, #e4f7ee); border: 1px solid var(--success-border, #a7e3c6); color: var(--success, #16814f);
+    border-radius: 10px; padding: 10px 12px; font-size: 13px; margin-bottom: 16px; display: none;
+  }
 </style>
 </head>
 <body>
@@ -101,6 +105,30 @@
 
     <button type="submit" id="submit-btn">Entrar</button>
   </form>
+  <div style="text-align:center; margin-top:16px">
+    <a href="#" id="forgot-password-link" onclick="showForgotPasswordCard(); return false;" style="color:var(--text-dim); font-size:13px; text-decoration:underline">Esqueci minha senha</a>
+  </div>
+</div>
+
+<div class="card" id="forgot-password-card" style="display:none">
+  <div class="brand">
+    <span class="brand-logo-slot"><img src="/img/kota-logo.png" alt="kota"></span>
+    <span class="brand-name">kota</span>
+  </div>
+  <div class="subtitle">Digite o e-mail da sua conta — se ele estiver cadastrado, mandamos um link pra você escolher uma senha nova.</div>
+
+  <div class="error-box" id="forgot-error-box"></div>
+  <div class="success-box" id="forgot-success-box"></div>
+
+  <form id="forgot-password-form">
+    <label for="forgot-email">E-mail</label>
+    <input type="email" id="forgot-email" autocomplete="username" required>
+
+    <button type="submit" id="forgot-submit-btn">Enviar link</button>
+  </form>
+  <div style="text-align:center; margin-top:16px">
+    <a href="#" onclick="hideForgotPasswordCard(); return false;" style="color:var(--text-dim); font-size:13px; text-decoration:underline">Voltar pro login</a>
+  </div>
 </div>
 
 <div class="card" id="change-password-card" style="display:none">
@@ -253,6 +281,53 @@ document.getElementById('login-form').addEventListener('submit', async (e) => {
     errorBox.style.display = 'block';
     submitBtn.disabled = false;
     submitBtn.textContent = 'Entrar';
+  }
+});
+
+function showForgotPasswordCard() {
+  document.getElementById('login-card').style.display = 'none';
+  document.getElementById('forgot-password-card').style.display = 'block';
+}
+
+function hideForgotPasswordCard() {
+  document.getElementById('forgot-password-card').style.display = 'none';
+  document.getElementById('login-card').style.display = 'block';
+  document.getElementById('forgot-success-box').style.display = 'none';
+  document.getElementById('forgot-error-box').style.display = 'none';
+}
+
+document.getElementById('forgot-password-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const errorBox = document.getElementById('forgot-error-box');
+  const successBox = document.getElementById('forgot-success-box');
+  const submitBtn = document.getElementById('forgot-submit-btn');
+  errorBox.style.display = 'none';
+  successBox.style.display = 'none';
+  submitBtn.disabled = true;
+  submitBtn.textContent = 'Enviando...';
+
+  try {
+    const res = await fetch('/password-reset/request', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: document.getElementById('forgot-email').value.trim() })
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data.message || 'Não foi possível enviar o link agora.');
+    }
+    // Resposta sempre a mesma, exista ou não conta com esse e-mail — o backend já
+    // decide isso em silêncio (ver PasswordResetService.requestReset). Mostrar
+    // "enviamos, se existir" em vez de confirmar/negar a existência da conta.
+    successBox.textContent = 'Se esse e-mail tiver uma conta, um link pra redefinir a senha foi enviado. Confira sua caixa de entrada.';
+    successBox.style.display = 'block';
+    document.getElementById('forgot-password-form').reset();
+  } catch (err) {
+    errorBox.textContent = err.message;
+    errorBox.style.display = 'block';
+  } finally {
+    submitBtn.disabled = false;
+    submitBtn.textContent = 'Enviar link';
   }
 });
 

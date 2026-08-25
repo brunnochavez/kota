@@ -148,6 +148,29 @@ public class EmailService {
         send(rep.email(), subject, wrapInLayout(content.toString()));
     }
 
+    // Usado nos dois momentos em que alguém precisa DEFINIR uma senha nova (não trocar
+    // uma que já sabe): convite de acesso recém-criado, e "esqueci minha senha". O link
+    // aponta pra uma tela pública (sem precisar estar logado) que só existe pra isso —
+    // ver PasswordResetService/set-password.html. isNewAccount só muda o texto, o
+    // mecanismo por trás (token de uso único, expira em algumas horas) é idêntico.
+    @Async
+    public void sendPasswordSetupEmail(RepContact contact, String token, boolean isNewAccount) {
+        String subject = isNewAccount ? "Crie sua senha de acesso" : "Redefinir sua senha";
+        String link = APP_URL + "/set-password.html?token=" + token;
+
+        StringBuilder content = new StringBuilder();
+        content.append("<p style=\"margin:0 0 12px\">Olá, ").append(escapeHtml(firstName(contact.name()))).append("!</p>");
+        if (isNewAccount) {
+            content.append("<p style=\"margin:0 0 20px\">Seu acesso ao sistema foi criado. Clique no botão abaixo pra escolher sua senha e começar a usar.</p>");
+        } else {
+            content.append("<p style=\"margin:0 0 20px\">Recebemos um pedido pra redefinir sua senha. Se foi você, clique no botão abaixo pra escolher uma nova.</p>");
+        }
+        content.append(buttonHtml(link, isNewAccount ? "Criar minha senha" : "Redefinir senha"));
+        content.append("<p style=\"margin:22px 0 0; font-size:12.5px; color:#8b93ab\">Esse link expira em 48 horas e só pode ser usado uma vez. Se você não pediu isso, é só ignorar este e-mail — nada muda.</p>");
+
+        send(contact.email(), subject, wrapInLayout(content.toString()));
+    }
+
     // Manda o PDF de resultado (o mesmo que "Baixar PDF do Resultado" gera) em anexo
     // pra quem estiver cadastrado em "Dados da Empresa → Contatos de E-mail" — pensado
     // pro CPD/financeiro conferir pedidos sem precisar logar no sistema. pdfBytes já vem

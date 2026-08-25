@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.bruno.kota.dtos.BulkInviteResult;
 import com.bruno.kota.dtos.CreateAccessRequest;
 import com.bruno.kota.dtos.LoginResponse;
 import com.bruno.kota.dtos.RepresentativeAccessResponse;
@@ -21,32 +22,40 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 
 // Tudo aqui é coisa de administrador gerenciando o acesso de outra pessoa — nenhum
-// representante mexe na própria senha por essa rota (não existe fluxo de "esqueci minha
-// senha" ainda; é o admin que reseta manualmente se precisar).
+// representante mexe na própria senha por essa rota ("esqueci minha senha" é público,
+// em PasswordResetController).
 @RestController
-@RequestMapping("/representatives/{representativeId}/access")
+@RequestMapping("/representatives")
 @RequiredArgsConstructor
 @PreAuthorize("hasRole('ADMIN')")
 public class RepresentativeAccessController {
 
     private final UserService userService;
 
-    @GetMapping
+    // Fora do path com {representativeId} de propósito — não é sobre UM representante,
+    // é sobre todos que ainda não têm acesso. "Convidar todos sem acesso", pensado pra
+    // representante cadastrado antes do convite automático existir.
+    @PostMapping("/access/invite-all-missing")
+    public BulkInviteResult inviteAllMissingAccess() {
+        return userService.inviteAllMissingAccess();
+    }
+
+    @GetMapping("/{representativeId}/access")
     public RepresentativeAccessResponse getStatus(@PathVariable Long representativeId) {
         return userService.getAccessStatus(representativeId);
     }
 
-    @PostMapping
+    @PostMapping("/{representativeId}/access")
     public RepresentativeAccessResponse create(@PathVariable Long representativeId, @Valid @RequestBody CreateAccessRequest request) {
         return userService.createAccess(representativeId, request);
     }
 
-    @PutMapping("/password")
+    @PutMapping("/{representativeId}/access/password")
     public RepresentativeAccessResponse resetPassword(@PathVariable Long representativeId, @RequestParam String newPassword) {
         return userService.resetPassword(representativeId, newPassword);
     }
 
-    @PutMapping("/enabled")
+    @PutMapping("/{representativeId}/access/enabled")
     public RepresentativeAccessResponse setEnabled(@PathVariable Long representativeId, @RequestParam boolean enabled) {
         return userService.setEnabled(representativeId, enabled);
     }
@@ -54,7 +63,7 @@ public class RepresentativeAccessController {
     // "Ver como esse representante" — devolve um token de sessão REPRESENTATIVE pra o
     // admin abrir representante.html enxergando exatamente o que aquele representante
     // vê, sem precisar saber (ou redefinir) a senha dele.
-    @PostMapping("/impersonate")
+    @PostMapping("/{representativeId}/access/impersonate")
     public LoginResponse impersonate(@AuthenticationPrincipal AuthPrincipal principal, @PathVariable Long representativeId) {
         return userService.impersonateRepresentative(representativeId, principal.displayName());
     }
