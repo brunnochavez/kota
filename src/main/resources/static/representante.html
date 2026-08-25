@@ -211,7 +211,8 @@
   .copy-barcode-btn.copied { color: var(--success); }
   .copy-barcode-btn svg { width: 13px; height: 13px; }
   .item-row-qty { font-size: 11.5px; color: var(--text-dim); white-space: nowrap; flex-shrink: 0; }
-  .item-row-price { width: 100px; flex-shrink: 0; padding: 7px 9px; font-size: 13px; margin: 0; margin-left: auto; }
+  .item-row-price-label { font-size: 11.5px; color: var(--text-dim); white-space: nowrap; flex-shrink: 0; margin-left: auto; }
+  .item-row-price { width: 100px; flex-shrink: 0; padding: 7px 9px; font-size: 13px; margin: 0; }
   .mono { font-family: var(--mono); }
   .export-choice-overlay {
     position: fixed; inset: 0; background: rgba(15,23,42,0.5); z-index: 998;
@@ -1763,6 +1764,7 @@ function renderEntryItemsPage() {
         <button class="copy-barcode-btn" type="button" title="Copiar código de barras" aria-label="Copiar código de barras" onclick="copyBarcode(this, '${item.productBarcode}')">${COPY_ICON}</button>
         <span class="item-row-qty">Qtd: ${item.quantity}</span>
         ${existingBid ? '<span class="item-row-sent">✓ Enviado</span>' : ''}
+        <span class="item-row-price-label">Vlr. Unit.</span>
         <input type="text" inputmode="decimal" class="item-row-price" id="bid-price-${item.id}" placeholder="0,00" value="${prefill}" oninput="onEntryPriceInput('${item.id}', this)">
       </div>
     `;

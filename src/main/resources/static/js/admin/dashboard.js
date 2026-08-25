@@ -127,9 +127,11 @@ function renderRecentQuotations(quotations) {
 function countdownLabel(iso) {
   const diffMs = new Date(iso) - new Date();
   if (diffMs <= 0) return 'expirando agora';
-  const hours = Math.floor(diffMs / (1000 * 60 * 60));
-  if (hours < 1) return 'menos de 1h restante';
-  if (hours < 24) return `${hours}h restantes`;
+  const totalMinutes = Math.floor(diffMs / (1000 * 60));
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  if (hours < 1) return `${minutes}min restantes`;
+  if (hours < 24) return `${hours}h ${minutes}min restantes`;
   const days = Math.floor(hours / 24);
   return `${days}d restantes`;
 }

@@ -21,12 +21,6 @@ function onPendingDeliveriesSearchInput() {
   renderPendingDeliveriesList();
 }
 
-function pendingDeliveryStatusBadge(status) {
-  return status === 'RECEIVED'
-    ? '<span class="badge badge-available">Recebida</span>'
-    : '<span class="badge badge-reviewing">Pendente</span>';
-}
-
 function renderPendingDeliveriesList() {
   const list = pendingDeliveriesSearchTerm
     ? pendingDeliveriesCache.filter(i =>
@@ -50,8 +44,7 @@ function renderPendingDeliveriesList() {
       <td style="text-align:right">${formatCurrencyFromNumber(i.unitPrice)}</td>
       <td class="truncate-cell" title="${escapeHtml(i.supplierName)}">${escapeHtml(i.supplierName)}</td>
       <td class="truncate-cell" title="${escapeHtml(i.quotationName)}"><a href="#" onclick="abrirDetalheCotacao(${i.quotationId}); return false;">${escapeHtml(i.quotationName)}</a></td>
-      <td>${fmtDateOnly(i.estimatedDeliveryDate)}</td>
-      <td>${pendingDeliveryStatusBadge(i.status)}</td>`;
+      <td>${fmtDateOnly(i.estimatedDeliveryDate)}</td>`;
     tbody.appendChild(tr);
   });
 

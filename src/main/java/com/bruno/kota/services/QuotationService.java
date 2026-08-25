@@ -487,7 +487,7 @@ public class QuotationService {
     // Se já tiver lance registrado é a aba "Aguardando Fechamento" — ali o certo é Fechar
     // pra calcular vencedores, não republicar (senão o lance que já chegou fica órfão de
     // um prazo que nunca mais bate com ele). reminderSentAt volta pra null pra o lembrete
-    // de 3h poder disparar de novo nesse novo ciclo.
+    // de prazo poder disparar de novo nesse novo ciclo.
     @Transactional
     public QuotationResponse republish(Long id, QuotationExtendRequest request, String performedBy) {
         Quotation quotation = findEntityById(id);
@@ -624,7 +624,7 @@ public class QuotationService {
             throw new BusinessRuleException("O novo prazo precisa ser posterior ao prazo atual.");
         }
 
-        // Mesmo motivo do update(): se o lembrete de 3h-antes já saiu pro prazo antigo,
+        // Mesmo motivo do update(): se o lembrete de prazo já saiu pro prazo antigo,
         // libera de novo pro prazo novo — senão o scheduler nunca mais notificaria essa
         // cotação, mesmo com um prazo bem mais longe do que gerou o lembrete original.
         LocalDateTime previousExpiration = quotation.getExpirationDate();

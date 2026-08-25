@@ -132,8 +132,12 @@ public class PurchaseOrderService {
     @Transactional(readOnly = true)
     public List<PendingDeliveryItemResponse> findPendingDeliveryItems() {
         LocalDateTime now = LocalDateTime.now();
+        // Antes, OC sem previsão de entrega definida (estimatedDeliveryDate == null)
+        // ficava na lista pra sempre, por padrão — mudou: agora só entra quem tem prazo
+        // definido E esse prazo ainda não passou. Sem previsão nenhuma pra comparar,
+        // não tem como saber se "ainda está dentro do prazo", então nem entra.
         List<PurchaseOrder> orders = purchaseOrderRepository.findAllWithDetails().stream()
-                .filter(po -> po.getEstimatedDeliveryDate() == null || !po.getEstimatedDeliveryDate().isBefore(now))
+                .filter(po -> po.getEstimatedDeliveryDate() != null && po.getEstimatedDeliveryDate().isAfter(now))
                 .toList();
         if (orders.isEmpty()) {
             return List.of();

@@ -27,7 +27,7 @@ public class QuotationReminderScheduler {
     // Janela de aviso: cotações que vencem entre agora e daqui a REMINDER_WINDOW_HOURS
     // horas entram na lista. Fixo por enquanto — é um comportamento do sistema como um
     // todo, não um dado configurável por cotação.
-    private static final int REMINDER_WINDOW_HOURS = 3;
+    private static final int REMINDER_WINDOW_HOURS = 5;
 
     private final QuotationRepository quotationRepository;
     private final QuotationService quotationService;
