@@ -104,11 +104,24 @@ let vrbEntries = [];
 let vrbPage = 0;
 let vrbRepName = '';
 let vrbSupplierName = '';
+let vrbMinValueByItem = new Map();
 const VRB_PAGE_SIZE = 10;
 
 async function viewRepresentativeBids(representativeId, supplierId, representativeName, supplierName) {
   const bids = await safeCall(() => api('GET', `/bids/by-quotation/${currentQuotationId}`));
   const itemsById = new Map(qdCurrentItems.map(item => [item.id, item]));
+
+  // Menor valor JÁ RECEBIDO por item, entre TODOS os fornecedores que já responderam —
+  // não é o vencedor oficial (que só existe depois de "Fechar"), é "quem está na frente
+  // agora, se a cotação fechasse nesse instante". Por isso calculado aqui, em cima de
+  // TODOS os lances da cotação, antes de filtrar pra só os desse representante/fornecedor.
+  vrbMinValueByItem = new Map();
+  bids.forEach(bid => {
+    const current = vrbMinValueByItem.get(bid.quotationItemId);
+    if (current === undefined || bid.value < current) {
+      vrbMinValueByItem.set(bid.quotationItemId, bid.value);
+    }
+  });
 
   vrbEntries = [];
   bids.forEach(bid => {
@@ -152,15 +165,21 @@ function renderVrbPage() {
   const pageEntries = vrbEntries.slice(pageStart, pageStart + VRB_PAGE_SIZE);
 
   document.getElementById('vrb-summary').textContent =
-    `Como ${vrbSupplierName} — ${vrbEntries.length} ${vrbEntries.length === 1 ? 'item cotado' : 'itens cotados'} nessa cotação.`;
+    `Como ${vrbSupplierName} — ${vrbEntries.length} ${vrbEntries.length === 1 ? 'item cotado' : 'itens cotados'} nessa cotação. "Menor preço" indica quem está na frente agora, entre quem já respondeu — não é o vencedor oficial (isso só é calculado ao Fechar a cotação).`;
 
-  const rowsHtml = pageEntries.map(({ item, bid }) => `
+  const rowsHtml = pageEntries.map(({ item, bid }) => {
+    const isCurrentLowest = vrbMinValueByItem.get(item.id) === bid.value;
+    const tag = isCurrentLowest
+      ? '<span style="color:var(--success); font-weight:600; font-size:11.5px; margin-left:8px">menor preço</span>'
+      : '';
+    return `
     <tr>
       <td class="mono">${item.productBarcode}</td>
-      <td>${escapeHtml(item.productName)}</td>
+      <td>${escapeHtml(item.productName)}${tag}</td>
       <td style="text-align:center">${item.quantity}</td>
       <td style="text-align:right">R$ ${formatCurrencyFromNumber(bid.value)}</td>
-    </tr>`).join('');
+    </tr>`;
+  }).join('');
   document.getElementById('vrb-tbody').innerHTML = rowsHtml || '<tr><td colspan="4" class="empty">Nenhum item encontrado.</td></tr>';
 
   const paginationEl = document.getElementById('vrb-pagination');
@@ -202,7 +221,7 @@ async function openReviewBidsModal() {
     const item = itemsById.get(bid.quotationItemId);
     if (!item) return;
     if (!qdReviewBidGroups.has(bid.submittedById)) {
-      qdReviewBidGroups.set(bid.submittedById, { name: bid.submittedByName, entries: [] });
+      qdReviewBidGroups.set(bid.submittedById, { name: bid.submittedByName, supplierName: bid.supplierName, entries: [] });
     }
     qdReviewBidGroups.get(bid.submittedById).entries.push({ item, bid });
   });
@@ -212,13 +231,13 @@ async function openReviewBidsModal() {
 
   openModal2(`
     <h2 style="margin-bottom:4px">Revisar Lances Enviados</h2>
-    <div class="subtitle" style="margin-bottom:10px">Escolha um representante vencedor pra ver os produtos que ele ganhou.</div>
+    <div class="subtitle" style="margin-bottom:10px">Escolha um fornecedor vencedor pra ver os produtos que ele ganhou.</div>
 
     <div style="display:flex; justify-content:space-between; align-items:end; flex-wrap:wrap; gap:16px; margin-bottom:10px">
       <div style="max-width:320px; flex:1; min-width:200px">
-        <label style="margin-bottom:3px">Representante</label>
+        <label style="margin-bottom:3px">Fornecedor</label>
         <select id="review-bids-rep-select" onchange="onReviewRepChange()">${winningReps.length
-          ? winningReps.map(([repId, group]) => `<option value="${repId}">${escapeHtml(group.name)}</option>`).join('')
+          ? winningReps.map(([repId, group]) => `<option value="${repId}">${escapeHtml(group.supplierName || group.name)}</option>`).join('')
           : '<option value="">Nenhum representante venceu itens</option>'}</select>
       </div>
       <div style="display:flex; gap:18px; text-align:right">
@@ -265,7 +284,7 @@ async function loadReviewBidsData() {
     const item = itemsById.get(bid.quotationItemId);
     if (!item) return;
     if (!qdReviewBidGroups.has(bid.submittedById)) {
-      qdReviewBidGroups.set(bid.submittedById, { name: bid.submittedByName, entries: [] });
+      qdReviewBidGroups.set(bid.submittedById, { name: bid.submittedByName, supplierName: bid.supplierName, entries: [] });
     }
     qdReviewBidGroups.get(bid.submittedById).entries.push({ item, bid });
   });
@@ -284,7 +303,7 @@ async function loadReviewBidsData() {
     return;
   }
 
-  select.innerHTML = winningReps.map(([repId, group]) => `<option value="${repId}">${escapeHtml(group.name)}</option>`).join('');
+  select.innerHTML = winningReps.map(([repId, group]) => `<option value="${repId}">${escapeHtml(group.supplierName || group.name)}</option>`).join('');
   renderSelectedRepBids();
 }
 

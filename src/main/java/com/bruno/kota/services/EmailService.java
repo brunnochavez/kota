@@ -123,8 +123,8 @@ public class EmailService {
     // cotação que já não existe mais pra responder. NÃO detalha o que foi ganho (nem
     // tabela, nem valores) — só avisa que fechou e manda pro login; o representante vê
     // os itens/valores de verdade dentro do sistema, não no e-mail. Quem não venceu nada
-    // recebe um texto diferente (agradecendo a participação, sem soar como "você
-    // perdeu") em vez do texto genérico de "acesse pra conferir".
+    // recebe um texto diferente, mas dizendo isso de forma direta (não venceu nenhum
+    // item) — só com um tom amigável em vez de seco, sem soar como uma reprimenda.
     @Async
     public void notifyQuotationClosed(String quotationName, RepContact rep, List<WonItemLine> wonItems) {
         boolean won = !wonItems.isEmpty();
@@ -141,7 +141,7 @@ public class EmailService {
                             + "e seu desempenho em \"Meu Desempenho\".</p>");
         } else {
             content.append("<p style=\"margin:0 0 20px\">A cotação <strong>").append(escapeHtml(quotationName))
-                    .append("</strong> foi fechada. Obrigado por participar — fique de olho nas próximas cotações.</p>");
+                    .append("</strong> foi fechada, e dessa vez nenhum item ficou com você. Sem problema — obrigado por participar, e fique de olho na próxima cotação!</p>");
         }
         content.append(buttonHtml(link, "Acessar o sistema"));
 

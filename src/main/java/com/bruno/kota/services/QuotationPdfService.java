@@ -215,19 +215,63 @@ public class QuotationPdfService {
     // esquerda, em vez de só um texto em negrito. Ajuda a separar visualmente um
     // fornecedor do outro quando o PDF tem vários (rola bastante quando um pedido é
     // dividido entre fornecedores diferentes).
-    private void addSupplierHeading(Document document, String supplierName) throws DocumentException {
+    // label é só o texto fixo antes do nome ("Fornecedor: " no PDF de pedido/OC, vazio
+    // no resultado geral, que já deixa claro pelo título da página) — o resto
+    // (CNPJ/telefone) vem sempre do cadastro do fornecedor, quando tiver.
+    private void addSupplierHeading(Document document, String label, Supplier supplier) throws DocumentException {
         PdfPTable heading = new PdfPTable(1);
         heading.setWidthPercentage(100);
-        PdfPCell cell = new PdfPCell(new Phrase(supplierName, new Font(Font.HELVETICA, 12.5f, Font.BOLD, ACCENT_DARK)));
+
+        PdfPCell cell = new PdfPCell();
         cell.setBackgroundColor(ACCENT_SOFT);
         cell.setBorder(Rectangle.LEFT);
         cell.setBorderColor(ACCENT);
         cell.setBorderWidthLeft(3.5f);
         cell.setPadding(9);
+
+        Paragraph p = new Paragraph();
+        p.add(new Phrase(label + supplier.getName(), new Font(Font.HELVETICA, 12.5f, Font.BOLD, ACCENT_DARK)));
+
+        List<String> details = new ArrayList<>();
+        if (supplier.getCnpj() != null && !supplier.getCnpj().isBlank()) {
+            details.add("CNPJ: " + formatCnpj(supplier.getCnpj()));
+        }
+        if (supplier.getPhone() != null && !supplier.getPhone().isBlank()) {
+            details.add("Tel: " + formatPhone(supplier.getPhone()));
+        }
+        if (!details.isEmpty()) {
+            Paragraph detailLine = new Paragraph(String.join("   ·   ", details),
+                    new Font(Font.HELVETICA, 9f, Font.NORMAL, new Color(90, 100, 120)));
+            detailLine.setSpacingBefore(2f);
+            p.add(detailLine);
+        }
+
+        cell.addElement(p);
         heading.addCell(cell);
         heading.setSpacingBefore(6);
         heading.setSpacingAfter(8);
         document.add(heading);
+    }
+
+    // Formatação só visual (o dado cru continua guardado sem máscara no banco, mesma
+    // convenção do resto do sistema) — se não vier com a quantidade certa de dígitos
+    // (cadastro antigo, incompleto etc.), devolve o valor original sem tentar forçar.
+    private String formatCnpj(String raw) {
+        String digits = raw.replaceAll("\\D", "");
+        if (digits.length() != 14) return raw;
+        return digits.substring(0, 2) + "." + digits.substring(2, 5) + "." + digits.substring(5, 8)
+                + "/" + digits.substring(8, 12) + "-" + digits.substring(12, 14);
+    }
+
+    private String formatPhone(String raw) {
+        String digits = raw.replaceAll("\\D", "");
+        if (digits.length() == 11) {
+            return "(" + digits.substring(0, 2) + ") " + digits.substring(2, 7) + "-" + digits.substring(7, 11);
+        }
+        if (digits.length() == 10) {
+            return "(" + digits.substring(0, 2) + ") " + digits.substring(2, 6) + "-" + digits.substring(6, 10);
+        }
+        return raw;
     }
 
     private PdfPTable buildItemsTable(List<QuotationItem> items, DecimalFormat moneyFormat, DecimalFormat qtyFormat) {
@@ -340,7 +384,7 @@ public class QuotationPdfService {
                 Supplier supplier = suppliersById.get(entry.getKey());
                 List<QuotationItem> supplierItems = entry.getValue();
 
-                addSupplierHeading(document, supplier.getName());
+                addSupplierHeading(document, "", supplier);
                 document.add(buildItemsTable(supplierItems, moneyFormat, qtyFormat));
 
                 BigDecimal supplierTotal = supplierItems.stream()
@@ -405,7 +449,7 @@ public class QuotationPdfService {
             addTitleBand(document, "Pedido — Cotação #" + quotation.getId() + " — " + quotation.getName(),
                     "Gerado em " + LocalDateTime.now().format(DATE_FORMAT));
 
-            addSupplierHeading(document, "Fornecedor: " + supplier.getName());
+            addSupplierHeading(document, "Fornecedor: ", supplier);
             document.add(buildItemsTable(supplierItems, moneyFormat, qtyFormat));
 
             BigDecimal supplierTotal = supplierItems.stream()
@@ -471,7 +515,7 @@ public class QuotationPdfService {
                             : "Pendente de recebimento",
                     labelFont, valueFont);
 
-            addSupplierHeading(document, "Fornecedor: " + supplier.getName());
+            addSupplierHeading(document, "Fornecedor: ", supplier);
             document.add(buildItemsTable(supplierItems, moneyFormat, qtyFormat));
 
             BigDecimal total = supplierItems.stream()

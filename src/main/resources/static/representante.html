@@ -50,6 +50,7 @@
     color: var(--text-dim); font-weight: 500; font-size: 13px;
     white-space: normal; word-break: break-word; line-height: 1.25;
   }
+  .brand-company-cnpj { color: var(--text-dim); font-weight: 400; font-size: 10.5px; white-space: nowrap; opacity: .75; }
   .whoami { display: flex; align-items: center; gap: 8px; flex: 1 1 auto; min-width: 0; justify-content: flex-end; }
   .my-identity-label { font-size: 13px; font-weight: 600; color: var(--text); white-space: normal; word-break: break-word; text-align: right; line-height: 1.25; }
   .logout-btn { background: none; border: none; padding: 6px; cursor: pointer; color: var(--text-dim); display: flex; border-radius: 8px; }
@@ -341,7 +342,10 @@
   <div class="row">
     <button class="brand" onclick="goHome()" title="Página inicial">
       <span id="brand-logo-slot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 11l9-8 9 8"/><path d="M5 10v10a1 1 0 001 1h4v-6h4v6h4a1 1 0 001-1V10"/></svg></span>
-      <span id="brand-company-name" class="brand-company-name"></span>
+      <span>
+        <span id="brand-company-name" class="brand-company-name" style="display:block"></span>
+        <span id="brand-company-cnpj" class="brand-company-cnpj" style="display:block"></span>
+      </span>
     </button>
     <div class="whoami">
       <span id="my-identity" class="my-identity-label"></span>
@@ -1144,6 +1148,9 @@ function applyCompanyBrandingToHeader() {
     const companyEl = document.getElementById('brand-company-name');
     companyEl.textContent = companySettingsCache.name;
     companyEl.title = companySettingsCache.name;
+  }
+  if (companySettingsCache.cnpj) {
+    document.getElementById('brand-company-cnpj').textContent = 'CNPJ: ' + maskCnpj(companySettingsCache.cnpj);
   }
   if (companySettingsCache.logoUrl) {
     document.getElementById('brand-logo-slot').innerHTML =
