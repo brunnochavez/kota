@@ -45,6 +45,8 @@ import com.bruno.kota.dtos.RepresentativeResponseStatus;
 import com.bruno.kota.dtos.ReviewBatchUpdateRequest;
 import com.bruno.kota.dtos.SalesProjectionUpdateRequest;
 import com.bruno.kota.dtos.SpendSavingsSummary;
+import com.bruno.kota.dtos.WonQuotationCardResponse;
+import com.bruno.kota.dtos.WonQuotationItem;
 import com.bruno.kota.dtos.WonQuotationSummary;
 import com.bruno.kota.security.AuthPrincipal;
 import com.bruno.kota.services.QuotationImportService;
@@ -105,8 +107,21 @@ public class QuotationController {
     }
 
     @GetMapping("/won")
-    public List<WonQuotationSummary> findWonQuotations(@AuthenticationPrincipal AuthPrincipal principal, @RequestParam Long supplierId) {
-        return quotationService.findWonQuotations(supplierId, repIdOrNull(principal));
+    public List<WonQuotationCardResponse> findWonQuotations(@AuthenticationPrincipal AuthPrincipal principal, @RequestParam Long supplierId) {
+        return quotationService.findWonQuotationCards(supplierId, repIdOrNull(principal));
+    }
+
+    // Itens de UMA cotação ganha, paginados — chamado quando o representante expande um
+    // card em "O que eu ganhei" (e com size grande de propósito na hora de montar a
+    // mensagem do WhatsApp, que precisa de todos os itens de uma vez).
+    @GetMapping("/{id}/won-items")
+    public PagedResponse<WonQuotationItem> getWonItems(
+            @AuthenticationPrincipal AuthPrincipal principal,
+            @PathVariable Long id,
+            @RequestParam Long supplierId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+        return quotationService.getWonItemsPage(id, supplierId, repIdOrNull(principal), page, size);
     }
 
     @GetMapping("/pending-fulfillment")
@@ -156,9 +171,16 @@ public class QuotationController {
         return quotationService.getReorderPointReport();
     }
 
+    // Paginado de verdade — antes mandava todos os lances desse fornecedor pra essa
+    // cotação numa chamada só. Chamado ao expandir um card em "Cotações anteriores".
     @GetMapping("/{id}/my-bids")
-    public List<QuotationReportRow> getMyBidsForQuotation(@AuthenticationPrincipal AuthPrincipal principal, @PathVariable Long id, @RequestParam Long supplierId) {
-        return quotationService.getMyBidsForQuotation(id, supplierId, repIdOrNull(principal));
+    public PagedResponse<QuotationReportRow> getMyBidsForQuotation(
+            @AuthenticationPrincipal AuthPrincipal principal,
+            @PathVariable Long id,
+            @RequestParam Long supplierId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+        return quotationService.getMyBidsForQuotation(id, supplierId, repIdOrNull(principal), page, size);
     }
 
     @PostMapping("/{id}/items/{itemId}/cut")

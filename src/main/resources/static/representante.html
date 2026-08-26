@@ -1276,6 +1276,10 @@ function renderQuoteListPage() {
 // ---------- aba: anteriores ----------
 let historyCache = [];
 let historyPage = 0;
+// Página atual de cada card expandido (por índice de cotação) — cada mudança de página
+// dispara uma nova busca no backend (ver renderHistoryCardItemsPage), não corta uma
+// lista já carregada.
+let historyItemsPage = {};
 
 async function loadHistory() {
   const all = await safeCall(() => api('GET', `/quotations/for-supplier?supplierId=${currentSupplierId}`));
@@ -1324,8 +1328,9 @@ function renderHistoryPage() {
 }
 
 // Busca sob demanda, só quando expande — cotação antiga que nunca é aberta não gasta
-// requisição à toa. Guarda "já carregou" no próprio elemento pra não buscar de novo ao
-// fechar e reabrir o mesmo card.
+// requisição à toa. Cada página dentro do card faz uma chamada nova ao backend
+// (GET /quotations/{id}/my-bids?page=&size=), paginação de verdade — não busca tudo de
+// uma vez pra depois cortar em pedaços aqui no front.
 async function toggleHistoryCard(idx) {
   const itemsEl = document.getElementById('history-items-' + idx);
   const chevronEl = document.getElementById('history-chevron-' + idx);
@@ -1340,14 +1345,24 @@ async function toggleHistoryCard(idx) {
   itemsEl.style.display = 'block';
   chevronEl.classList.add('open');
   if (itemsEl.dataset.loaded) return;
-
-  const q = historyCache[idx];
-  itemsEl.innerHTML = '<div class="empty">Carregando...</div>';
-  const rows = await safeCall(() => api('GET', `/quotations/${q.id}/my-bids?supplierId=${currentSupplierId}`));
   itemsEl.dataset.loaded = '1';
 
-  itemsEl.innerHTML = rows.length
-    ? rows.map(r => `
+  itemsEl.innerHTML = `<div class="empty">Carregando...</div><div id="history-items-rows-${idx}"></div>${paginationControlsHtml('history-items-' + idx)}`;
+  historyItemsPage[idx] = 0;
+  await renderHistoryCardItemsPage(idx);
+}
+
+// Renderiza (ou re-renderiza, ao trocar de página) os itens de UM card — busca essa
+// página específica no backend a cada chamada, real ida e volta ao servidor.
+async function renderHistoryCardItemsPage(idx) {
+  const q = historyCache[idx];
+  const page = historyItemsPage[idx] || 0;
+  const result = await safeCall(() => api('GET', `/quotations/${q.id}/my-bids?supplierId=${currentSupplierId}&page=${page}&size=${REP_PAGE_SIZE}`));
+  historyItemsPage[idx] = result.page;
+
+  const rowsEl = document.getElementById('history-items-rows-' + idx);
+  rowsEl.innerHTML = result.content.length
+    ? result.content.map(r => `
         <div class="won-item-row">
           <div class="won-item-name">${escapeHtml(r.productName)}</div>
           <div class="won-item-nums">
@@ -1357,10 +1372,19 @@ async function toggleHistoryCard(idx) {
         </div>
       `).join('')
     : '<div class="empty">Você não enviou nenhum lance nesta cotação.</div>';
+
+  updatePaginationControls('history-items-' + idx, result.page, result.totalPages, result.totalElements, (newPage) => {
+    historyItemsPage[idx] = newPage;
+    renderHistoryCardItemsPage(idx);
+  });
 }
 
 let wonQuotationsCache = [];
 let wonPage = 0;
+// Paginação dos itens DENTRO de cada card expandido — por índice de cotação, porque
+// mais de um card pode ficar aberto ao mesmo tempo (não fecha um card só porque abriu
+// outro), então cada um precisa lembrar sua própria página.
+let wonItemsPage = {};
 
 // ---------- aba: o que eu ganhei ----------
 async function loadWonQuotations() {
@@ -1405,7 +1429,7 @@ function renderWonListPage() {
   const list = document.getElementById('won-list');
   list.innerHTML = items.map((q, localIdx) => {
     const idx = page * REP_PAGE_SIZE + localIdx;
-    const itemCount = q.items.length;
+    const itemCount = q.itemCount;
     return `
     <div class="card won-card">
       <div class="won-card-header" onclick="toggleWonCard(${idx})">
@@ -1422,12 +1446,8 @@ function renderWonListPage() {
         </div>
       </div>
       <div class="won-card-items" id="won-items-${idx}" style="display:none">
-        ${q.items.map(i => `
-          <div class="won-item-row">
-            <div class="won-item-name">${escapeHtml(i.productName)}<span class="barcode">${i.productBarcode}</span></div>
-            <div class="won-item-nums">${i.quantity} × R$ ${formatCurrencyFromNumber(i.value)} = R$ ${formatCurrencyFromNumber(i.subtotal)}</div>
-          </div>
-        `).join('')}
+        <div id="won-items-rows-${idx}"></div>
+        ${paginationControlsHtml('won-items-' + idx)}
         <div class="won-card-actions">
           <button class="won-action-btn" onclick="event.stopPropagation(); downloadWonPdf(${q.quotationId}, this)">${PDF_ICON} PDF</button>
           <button class="won-action-btn" onclick="event.stopPropagation(); shareWonWhatsApp(${idx})">${WHATSAPP_ICON} WhatsApp</button>
@@ -1443,14 +1463,41 @@ function renderWonListPage() {
   });
 }
 
+// Renderiza (ou re-renderiza, ao trocar de página) os itens de UM card — busca essa
+// página no backend a cada chamada (GET /quotations/{id}/won-items), real ida e volta
+// ao servidor, não corta uma lista já carregada por inteiro.
+async function renderWonCardItemsPage(idx) {
+  const q = wonQuotationsCache[idx];
+  const page = wonItemsPage[idx] || 0;
+  const result = await safeCall(() => api('GET', `/quotations/${q.quotationId}/won-items?supplierId=${currentSupplierId}&page=${page}&size=${REP_PAGE_SIZE}`));
+  wonItemsPage[idx] = result.page;
+
+  document.getElementById('won-items-rows-' + idx).innerHTML = result.content.map(i => `
+    <div class="won-item-row">
+      <div class="won-item-name">${escapeHtml(i.productName)}<span class="barcode">${i.productBarcode}</span></div>
+      <div class="won-item-nums">${i.quantity} × R$ ${formatCurrencyFromNumber(i.value)} = R$ ${formatCurrencyFromNumber(i.subtotal)}</div>
+    </div>
+  `).join('');
+
+  updatePaginationControls('won-items-' + idx, result.page, result.totalPages, result.totalElements, (newPage) => {
+    wonItemsPage[idx] = newPage;
+    renderWonCardItemsPage(idx);
+  });
+}
+
 // Fechado por padrão — com várias cotações ganhas, uma lista toda expandida vira uma
-// rolagem enorme antes mesmo de bater o olho em qual cotação é qual.
+// rolagem enorme antes mesmo de bater o olho em qual cotação é qual. Itens só são
+// buscados na primeira vez que o card abre (dataset.rendered), não a cada clique.
 function toggleWonCard(idx) {
   const itemsEl = document.getElementById('won-items-' + idx);
   const chevronEl = document.getElementById('won-chevron-' + idx);
   const isOpen = itemsEl.style.display !== 'none';
   itemsEl.style.display = isOpen ? 'none' : 'block';
   chevronEl.classList.toggle('open', !isOpen);
+  if (!isOpen && !itemsEl.dataset.rendered) {
+    itemsEl.dataset.rendered = '1';
+    renderWonCardItemsPage(idx);
+  }
 }
 
 // PDF já filtrado pra essa empresa — o backend nem devolve o pedido dos outros
@@ -1478,7 +1525,7 @@ function formatQuotationNumber(id) {
   return String(id).padStart(6, '0');
 }
 
-function buildWonWhatsAppText(q) {
+function buildWonWhatsAppText(q, items) {
   const lines = [];
 
   if (companySettingsCache && companySettingsCache.name) {
@@ -1492,7 +1539,7 @@ function buildWonWhatsAppText(q) {
   lines.push(`Concluída em ${fmtDateTime(q.closedAt)}`);
   lines.push('');
 
-  q.items.forEach(i => {
+  items.forEach(i => {
     lines.push(`- ${i.productName} -`);
     lines.push(`Cód. barras: ${i.productBarcode} - ${i.quantity} × R$ ${formatCurrencyFromNumber(i.value)} = R$ ${formatCurrencyFromNumber(i.subtotal)}`);
     lines.push('');
@@ -1506,9 +1553,14 @@ function buildWonWhatsAppText(q) {
 // nem integração nenhuma. No celular, se o app estiver instalado, o sistema operacional
 // abre ele direto; no navegador, abre o WhatsApp Web (ou avisa que precisa logar, se for
 // a primeira vez). O texto já vem preenchido, só falta escolher o contato e mandar.
-function shareWonWhatsApp(idx) {
+// Mensagem do WhatsApp precisa de TODOS os itens de uma vez (não faz sentido mandar só
+// a página visível no momento) — busca à parte, com size bem maior que qualquer cotação
+// real, só pra esse propósito pontual. Diferente de renderWonCardItemsPage, que busca
+// 10 por vez pra navegação normal na tela.
+async function shareWonWhatsApp(idx) {
   const q = wonQuotationsCache[idx];
-  window.open(`https://wa.me/?text=${encodeURIComponent(buildWonWhatsAppText(q))}`, '_blank');
+  const result = await safeCall(() => api('GET', `/quotations/${q.quotationId}/won-items?supplierId=${currentSupplierId}&page=0&size=9999`));
+  window.open(`https://wa.me/?text=${encodeURIComponent(buildWonWhatsAppText(q, result.content))}`, '_blank');
 }
 
 // ---------- aba: meu desempenho ----------

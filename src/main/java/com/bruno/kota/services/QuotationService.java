@@ -1347,6 +1347,51 @@ public class QuotationService {
         return findFulfillmentSummaries(supplierId, true);
     }
 
+    // Versão "card" de findWonQuotations — mesmo cálculo, mas descarta a lista de itens
+    // antes de devolver pro controller, ficando só com a contagem e o total. É o que
+    // "O que eu ganhei" usa pra montar os cards fechados; os itens de verdade são
+    // buscados à parte, paginados, só quando o representante expande um card
+    // (getWonItemsPage) — evita mandar a cotação inteira (as vezes dezenas de itens)
+    // pra tela antes mesmo do representante decidir se vai olhar aquele card.
+    @Transactional(readOnly = true)
+    public List<WonQuotationCardResponse> findWonQuotationCards(Long supplierId, Long authenticatedRepresentativeId) {
+        return findWonQuotations(supplierId, authenticatedRepresentativeId).stream()
+                .map(q -> new WonQuotationCardResponse(q.quotationId(), q.quotationName(), q.closedAt(), q.items().size(), q.total()))
+                .toList();
+    }
+
+    // Itens de UMA cotação ganha, paginados — chamado sob demanda quando o card expande
+    // em "O que eu ganhei" (e de novo, com size grande, na hora de montar a mensagem do
+    // WhatsApp, que precisa da lista inteira). Mesmo filtro de sempre (vencedor é esse
+    // fornecedor E o item não foi cortado por falta de estoque depois) só que restrito a
+    // uma cotação, em vez de percorrer todas as fechadas do sistema.
+    @Transactional(readOnly = true)
+    public PagedResponse<WonQuotationItem> getWonItemsPage(Long quotationId, Long supplierId, Long authenticatedRepresentativeId, int page, int size) {
+        validateSupplierOwnership(supplierId, authenticatedRepresentativeId);
+        findEntityById(quotationId);
+
+        List<WonQuotationItem> wonItems = new ArrayList<>();
+        for (QuotationItem item : quotationItemRepository.findByQuotationId(quotationId)) {
+            Bid winner = item.getWinningBid();
+            if (winner == null || !winner.getSupplier().getId().equals(supplierId) || item.isFulfillmentCut()) {
+                continue;
+            }
+            BigDecimal subtotal = winner.getValue().multiply(item.getQuantity());
+            wonItems.add(new WonQuotationItem(
+                    item.getId(), item.getProduct().getName(), item.getProduct().getBarcode(),
+                    item.getQuantity(), winner.getValue(), subtotal
+            ));
+        }
+
+        int totalElements = wonItems.size();
+        int totalPages = size > 0 ? (int) Math.ceil((double) totalElements / size) : 1;
+        int fromIndex = Math.min(page * size, totalElements);
+        int toIndex = Math.min(fromIndex + size, totalElements);
+        List<WonQuotationItem> content = wonItems.subList(fromIndex, toIndex);
+
+        return new PagedResponse<>(content, page, size, totalElements, totalPages);
+    }
+
     // Espelho de findWonQuotations, mas pro que ainda NÃO foi finalizado — é o que
     // alimenta "Resultados de Cotações" na tela do representante, onde ele confirma ou
     // corta cada item antes de finalizar o pedido.
@@ -1710,7 +1755,14 @@ public class QuotationService {
     // cotação em "Anteriores". Funciona pra CLOSED (mostra won) e EXPIRED (nunca teve
     // vencedor, então won sempre falso — mas ainda mostra o que foi digitado).
     @Transactional(readOnly = true)
-    public List<QuotationReportRow> getMyBidsForQuotation(Long quotationId, Long supplierId, Long authenticatedRepresentativeId) {
+    // Paginado de verdade — antes mandava TODOS os lances desse fornecedor pra essa
+    // cotação de uma vez (podendo ser dezenas, numa cotação grande). Mesmo padrão de
+    // paginação em memória do resto do arquivo (ver getRepresentativeResponseStatus):
+    // a query em si já é pequena (só os lances DESSE fornecedor NESSA cotação), então
+    // paginar em memória depois de já ter filtrado é suficiente, sem precisar de
+    // LIMIT/OFFSET no banco.
+    @Transactional(readOnly = true)
+    public PagedResponse<QuotationReportRow> getMyBidsForQuotation(Long quotationId, Long supplierId, Long authenticatedRepresentativeId, int page, int size) {
         validateSupplierOwnership(supplierId, authenticatedRepresentativeId);
         Quotation quotation = quotationRepository.findById(quotationId)
                 .orElseThrow(() -> new ResourceNotFoundException("Cotação não encontrada: id " + quotationId));
@@ -1737,7 +1789,14 @@ public class QuotationService {
                     orderFulfillmentConfirmationRepository.existsByQuotationIdAndSupplierId(quotationId, supplierId)
             ));
         }
-        return rows;
+
+        int totalElements = rows.size();
+        int totalPages = size > 0 ? (int) Math.ceil((double) totalElements / size) : 1;
+        int fromIndex = Math.min(page * size, totalElements);
+        int toIndex = Math.min(fromIndex + size, totalElements);
+        List<QuotationReportRow> content = rows.subList(fromIndex, toIndex);
+
+        return new PagedResponse<>(content, page, size, totalElements, totalPages);
     }
 
     // "Não Cotar" — pra quando o representante abre uma cotação e não tem nenhum produto
