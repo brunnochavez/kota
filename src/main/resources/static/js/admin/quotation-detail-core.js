@@ -77,9 +77,9 @@ function renderQdExtraSuppliersList() {
   if (listEl) {
     listEl.innerHTML = items.length
       ? items.map(s => `
-          <label class="expiring-item" style="cursor:pointer; justify-content:flex-start">
-            <input type="checkbox" value="${s.id}" ${qdExtraSupplierIds.includes(s.id) ? 'checked' : ''} onchange="toggleQdExtraSupplier(${s.id}, this.checked)">
-            <span>${escapeHtml(s.representativeName)} <span style="color:var(--text-dim); font-size:11px">(${escapeHtml(s.name)})</span></span>
+          <label class="expiring-item" style="cursor:pointer; justify-content:flex-start; gap:8px">
+            <input type="checkbox" value="${s.id}" style="width:auto; flex-shrink:0" ${qdExtraSupplierIds.includes(s.id) ? 'checked' : ''} onchange="toggleQdExtraSupplier(${s.id}, this.checked)">
+            <span>${escapeHtml(s.name)}</span>
           </label>`).join('')
       : '<div class="empty">Nenhum representante encontrado.</div>';
   }
