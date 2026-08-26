@@ -146,9 +146,9 @@ async function abrirDetalheCotacao(id) {
 
     <div class="inline-form">
       <div><label>Nome</label><input id="qd-name" placeholder="Ex: Cotação de Bebidas" value="${escapeHtml(q.name)}"></div>
-      <div style="width:100%">
+      <div style="min-width:230px">
         <label>Destinatários da cotação</label>
-        <div class="tabs" id="qd-recipient-mode-tabs" style="margin-bottom:8px">
+        <div class="tabs" id="qd-recipient-mode-tabs" style="margin-bottom:6px">
           <div class="tab ${qdInitialRecipientMode === 'representantes' ? 'active' : ''}" data-mode="representantes" onclick="setQdRecipientMode('representantes')">Representantes</div>
           <div class="tab ${qdInitialRecipientMode === 'grupos' ? 'active' : ''}" data-mode="grupos" onclick="setQdRecipientMode('grupos')">Grupos</div>
         </div>
@@ -356,7 +356,11 @@ function applyQdEditLock(status, hasBids) {
     document.getElementById(id).disabled = !isDraft;
   });
   document.getElementById('qd-save-btn').disabled = !isDraft;
-  document.getElementById('qd-group-suppliers-btn').disabled = !isDraft;
+  document.getElementById('qd-extra-suppliers-btn').disabled = !isDraft;
+  document.querySelectorAll('#qd-recipient-mode-tabs .tab').forEach(t => {
+    t.style.pointerEvents = isDraft ? 'auto' : 'none';
+    t.style.opacity = isDraft ? '1' : '0.55';
+  });
   document.getElementById('qd-publish-btn').disabled = !isDraft;
   document.getElementById('qd-close-btn').style.display = canClose ? 'inline-block' : 'none';
   document.getElementById('qd-extend-btn').style.display = status === 'AVAILABLE' ? 'inline-block' : 'none';
