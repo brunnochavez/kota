@@ -3,6 +3,12 @@
 // ============================================================
 let qdReviewBidGroups = new Map();
 
+// Todos os lances da cotação, sem agrupar por representante — guardado à parte só pra
+// achar o "2º menor preço" na hora de excluir um lance (ver deleteBidAsAdmin), que
+// precisa olhar os OUTROS lances do mesmo item, não só os do representante selecionado
+// na tela.
+let qdReviewAllBids = [];
+
 // Selo de status por representante — mesma paleta usada no resto do sistema pra cada
 // situação (verde=feito, âmbar=atenção/pendente, cinza=neutro/declinado).
 function repResponseStatusBadge(status) {
@@ -213,6 +219,7 @@ async function openReviewBidsModal() {
     safeCall(() => api('GET', `/bids/by-quotation/${currentQuotationId}`)),
     safeCall(() => api('GET', '/suppliers'))
   ]);
+  qdReviewAllBids = allBids;
   qdReviewSuppliersByRepId = new Map(suppliers.filter(s => s.representativeId).map(s => [s.representativeId, s]));
 
   const itemsById = new Map(qdCurrentItems.map(item => [item.id, item]));
@@ -277,6 +284,7 @@ async function openReviewBidsModal() {
 
 async function loadReviewBidsData() {
   const allBids = await safeCall(() => api('GET', `/bids/by-quotation/${currentQuotationId}`));
+  qdReviewAllBids = allBids;
   const itemsById = new Map(qdCurrentItems.map(item => [item.id, item]));
 
   qdReviewBidGroups = new Map();
@@ -586,9 +594,20 @@ async function saveAllRepBidChanges() {
 }
 
 function deleteBidAsAdmin(bidId, buttonEl, productName) {
+  // "2º menor preço" é o menor valor entre os OUTROS lances do mesmo item (excluindo o
+  // que vai ser apagado) — se não sobrar nenhum, não tem pra quem reatribuir, e o
+  // popover nem oferece essa opção (ver showBidDeleteChoicePopover).
+  const currentBid = qdReviewAllBids.find(b => b.id === bidId);
+  const runnerUp = currentBid
+    ? qdReviewAllBids
+        .filter(b => b.quotationItemId === currentBid.quotationItemId && b.id !== bidId)
+        .sort((a, b) => a.value - b.value)[0]
+    : null;
+
   showBidDeleteChoicePopover(
     buttonEl,
     `Excluir o lance de <strong>${escapeHtml(productName)}</strong>?`,
+    runnerUp,
     () => confirmDeleteBidAsAdmin(bidId, false),
     () => confirmDeleteBidAsAdmin(bidId, true)
   );
@@ -598,9 +617,14 @@ function deleteBidAsAdmin(bidId, buttonEl, productName) {
 // 2 — só usada aqui, na exclusão de lance em "Revisar Lances Enviados". Reaproveita a
 // mesma classe/posicionamento/clique-fora do popover genérico (closeConfirmPopover e
 // handleOutsideConfirmPopoverClick funcionam sem alteração, já que ambos procuram pelo
-// id "confirm-popover"), só o corpo com os botões muda.
-function showBidDeleteChoicePopover(anchorEl, messageHtml, onDeleteOnly, onReassign) {
+// id "confirm-popover"), só o corpo com os botões muda. runnerUp (BidResponse ou null)
+// decide se o botão de reatribuir aparece, e com o nome/preço de quem ganharia.
+function showBidDeleteChoicePopover(anchorEl, messageHtml, runnerUp, onDeleteOnly, onReassign) {
   closeConfirmPopover();
+
+  const reassignLabel = runnerUp
+    ? `Excluir e atribuir a ${escapeHtml(runnerUp.supplierName)} — R$ ${formatCurrencyFromNumber(runnerUp.value)}`
+    : null;
 
   const pop = document.createElement('div');
   pop.className = 'confirm-popover';
@@ -608,7 +632,7 @@ function showBidDeleteChoicePopover(anchorEl, messageHtml, onDeleteOnly, onReass
   pop.innerHTML = `
     <div class="confirm-popover-msg">${messageHtml}</div>
     <div class="btn-row" style="flex-direction:column; align-items:stretch; margin-top:10px">
-      <button class="danger small" type="button" data-action="reassign">Excluir e atribuir ao 2º menor preço</button>
+      ${reassignLabel ? `<button class="danger small" type="button" data-action="reassign">${reassignLabel}</button>` : ''}
       <button class="danger small" type="button" data-action="delete-only">Excluir — item fica sem vencedor</button>
       <button class="secondary small" type="button" data-action="cancel">Cancelar</button>
     </div>`;
@@ -621,14 +645,16 @@ function showBidDeleteChoicePopover(anchorEl, messageHtml, onDeleteOnly, onReass
   cancelBtn.onclick = closeConfirmPopover;
   deleteOnlyBtn.onclick = () => withButtonLoading(deleteOnlyBtn, 'Aguarde...', async () => {
     cancelBtn.disabled = true;
-    reassignBtn.disabled = true;
+    if (reassignBtn) reassignBtn.disabled = true;
     try { await onDeleteOnly(); } finally { closeConfirmPopover(); }
   });
-  reassignBtn.onclick = () => withButtonLoading(reassignBtn, 'Aguarde...', async () => {
-    cancelBtn.disabled = true;
-    deleteOnlyBtn.disabled = true;
-    try { await onReassign(); } finally { closeConfirmPopover(); }
-  });
+  if (reassignBtn) {
+    reassignBtn.onclick = () => withButtonLoading(reassignBtn, 'Aguarde...', async () => {
+      cancelBtn.disabled = true;
+      deleteOnlyBtn.disabled = true;
+      try { await onReassign(); } finally { closeConfirmPopover(); }
+    });
+  }
 
   const anchor = anchorEl.getBoundingClientRect();
   const popRect = pop.getBoundingClientRect();
