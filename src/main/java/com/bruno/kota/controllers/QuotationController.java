@@ -336,10 +336,13 @@ public class QuotationController {
             @RequestParam(required = false) Integer defaultSalesProjectionDays,
             @RequestParam(required = false) Integer descriptionColumn,
             @RequestParam(required = false) Integer barcodeColumn,
-            @RequestParam(required = false) Integer quantityColumn) {
+            @RequestParam(required = false) Integer quantityColumn,
+            @RequestParam(defaultValue = "false") boolean includeCostPrices,
+            @RequestParam(required = false) Integer costColumn) {
         return quotationImportService.importFile(
                 file, name, supplierGroupId, expirationDate, defaultSalesProjectionDays,
-                descriptionColumn, barcodeColumn, quantityColumn, principal.displayName());
+                descriptionColumn, barcodeColumn, quantityColumn,
+                includeCostPrices, costColumn, principal.displayName());
     }
 
     @PostMapping("/{id}/items")

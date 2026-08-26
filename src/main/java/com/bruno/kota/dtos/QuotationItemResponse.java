@@ -19,5 +19,10 @@ public record QuotationItemResponse(
         // causava a demora no primeiro carregamento de cotações grandes: N chamadas
         // pra N itens, uma por item, só pra saber se já tinha lance).
         Long myBidId,
-        BigDecimal myBidValue
+        BigDecimal myBidValue,
+        // Opcional — só vem preenchido quando a cotação foi importada com "incluir
+        // preços de custo" marcado E a planilha tinha algo naquela célula (ver
+        // QuotationImportService). Usado em "Revisar Lances Enviados" pra indicar se o
+        // lance vencedor representa aumento ou baixa frente ao que era pago antes.
+        BigDecimal costPrice
 ) {}

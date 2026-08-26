@@ -2036,7 +2036,8 @@ public class QuotationService {
                 override,
                 effective,
                 myBid != null ? myBid.getId() : null,
-                myBid != null ? myBid.getValue() : null
+                myBid != null ? myBid.getValue() : null,
+                item.getCostPrice()
         );
     }
 

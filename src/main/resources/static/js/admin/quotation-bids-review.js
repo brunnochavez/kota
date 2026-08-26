@@ -372,7 +372,10 @@ function renderSelectedRepBids() {
       <tr class="rep-bid-winner-row">
         <td>${escapeHtml(item.productName)} <span class="mono" style="font-size:11px; color:var(--text-dim)">${item.productBarcode}</span></td>
         <td style="text-align:center"><input type="number" step="0.001" id="rebid-qty-${item.id}" value="${item.quantity}" oninput="updateRebidSubtotal(${bid.id}, ${item.id})" style="width:70px; text-align:center"></td>
-        <td style="text-align:center"><input type="text" inputmode="decimal" id="rebid-value-${bid.id}" value="${formatCurrencyFromNumber(bid.value)}" oninput="this.value = maskCurrencyInput(this.value); updateRebidSubtotal(${bid.id}, ${item.id})" style="width:75px; text-align:center"></td>
+        <td style="text-align:center">
+          <input type="text" inputmode="decimal" id="rebid-value-${bid.id}" value="${formatCurrencyFromNumber(bid.value)}" oninput="this.value = maskCurrencyInput(this.value); updateRebidSubtotal(${bid.id}, ${item.id})" style="width:75px; text-align:center">
+          <div id="rebid-pricechange-${bid.id}">${priceChangeIndicatorHtml(bid.value, item.costPrice)}</div>
+        </td>
         <td style="text-align:center" id="rebid-subtotal-${bid.id}">R$ ${formatCurrencyFromNumber(bid.value * item.quantity)}</td>
         <td style="text-align:center"><button class="icon-btn danger" onclick="deleteBidAsAdmin(${bid.id}, this, '${escapeHtml(item.productName).replace(/'/g, "\\'")}')" title="Excluir lance">${QD_TRASH_ICON}</button></td>
       </tr>`).join('');
@@ -390,6 +393,24 @@ function changeReviewBidsPage(delta) {
   renderSelectedRepBids();
 }
 
+// Seta + valor/porcentagem comparando o preço do lance com o preço de custo importado
+// (item.costPrice, opcional — ver QuotationImportService). Baixa (pagando menos que
+// antes) em verde, aumento em vermelho — sem indicador nenhum quando essa cotação não
+// tem custo importado pra esse item, pra não sugerir uma comparação que não existe.
+function priceChangeIndicatorHtml(currentPrice, costPrice) {
+  if (costPrice === null || costPrice === undefined || costPrice === 0) return '';
+  const delta = currentPrice - costPrice;
+  if (delta === 0) return '';
+  const isDecrease = delta < 0;
+  const pct = (Math.abs(delta) / costPrice) * 100;
+  const color = isDecrease ? 'var(--success)' : 'var(--danger)';
+  const arrowPoints = isDecrease ? '4,7 20,7 12,19' : '4,17 20,17 12,5';
+  return `<div style="color:${color}; font-size:10.5px; font-weight:700; display:flex; align-items:center; justify-content:center; gap:3px; margin-top:3px">
+    <svg viewBox="0 0 24 24" width="9" height="9"><polygon points="${arrowPoints}" fill="currentColor"/></svg>
+    R$ ${formatCurrencyFromNumber(Math.abs(delta))}/${pct.toFixed(0)}%
+  </div>`;
+}
+
 function updateRebidSubtotal(bidId, itemId) {
   const priceInput = document.getElementById(`rebid-value-${bidId}`);
   const qtyInput = document.getElementById(`rebid-qty-${itemId}`);
@@ -398,6 +419,13 @@ function updateRebidSubtotal(bidId, itemId) {
   const price = unmaskCurrencyToNumber(priceInput.value) || 0;
   const qty = parseFloat(qtyInput.value) || 0;
   subtotalEl.textContent = 'R$ ' + formatCurrencyFromNumber(price * qty);
+
+  const changeEl = document.getElementById(`rebid-pricechange-${bidId}`);
+  if (changeEl) {
+    const item = qdCurrentItems.find(i => i.id === itemId);
+    changeEl.innerHTML = item ? priceChangeIndicatorHtml(price, item.costPrice) : '';
+  }
+
   recalculateRepTotalFromScreen();
 }
 

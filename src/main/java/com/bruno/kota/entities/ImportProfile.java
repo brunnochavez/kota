@@ -37,6 +37,13 @@ public class ImportProfile {
     @Column(name = "quantity_column", nullable = false)
     private Integer quantityColumn;
 
+    // Opcional — só é preenchida quando alguma importação já mapeou uma coluna de custo
+    // pra esse layout de cabeçalho. Diferente das outras três colunas, nunca bloqueia a
+    // reutilização automática do perfil: uma importação que NÃO quer custo (ver
+    // includeCostPrices) simplesmente ignora esse campo, mesmo que ele esteja preenchido.
+    @Column(name = "cost_column")
+    private Integer costColumn;
+
     @Column(name = "header_signature", nullable = false, length = 1000)
     private String headerSignature;
 

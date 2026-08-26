@@ -40,6 +40,15 @@ public class QuotationItem {
     @Column(nullable = false, precision = 12, scale = 3)
     private BigDecimal quantity;
 
+    // Preço de custo (opcional) importado junto com o item — só existe quando a planilha
+    // tinha uma coluna de custo mapeada E o admin marcou "incluir preços de custo" no
+    // momento da importação (ver QuotationImportService). Puramente informativo: usado
+    // em "Revisar Lances Enviados" pra mostrar se o preço do lance vencedor representa
+    // aumento ou baixa em relação ao que era pago antes — nunca interfere em cálculo de
+    // vencedor, elegibilidade ou fechamento.
+    @Column(name = "cost_price", precision = 12, scale = 4)
+    private BigDecimal costPrice;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "winning_bid_id")
     private Bid winningBid;

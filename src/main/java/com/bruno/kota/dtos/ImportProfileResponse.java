@@ -5,5 +5,6 @@ public record ImportProfileResponse(
         Integer descriptionColumn,
         Integer barcodeColumn,
         Integer quantityColumn,
+        Integer costColumn,
         String headerSignature
 ) {}

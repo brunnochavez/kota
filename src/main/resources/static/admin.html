@@ -971,6 +971,12 @@
         <div style="width:170px"><label>Projeção de venda padrão (dias)</label><input type="number" min="1" step="1" id="import-sales-projection" placeholder="Ex: 30"></div>
       </div>
       <input type="file" id="import-file" accept=".csv" style="margin-top:14px">
+      <div style="margin-top:10px">
+        <label style="display:flex; align-items:center; gap:6px; cursor:pointer; margin-bottom:0">
+          <input type="checkbox" id="import-include-cost" style="width:auto">
+          Incluir preço de custo desta planilha (opcional)
+        </label>
+      </div>
       <div class="btn-row" style="margin-top:12px">
         <button onclick="importFile(false)">Enviar arquivo</button>
       </div>

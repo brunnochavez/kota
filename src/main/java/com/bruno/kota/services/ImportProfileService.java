@@ -29,6 +29,7 @@ public class ImportProfileService {
                 profile.getDescriptionColumn(),
                 profile.getBarcodeColumn(),
                 profile.getQuantityColumn(),
+                profile.getCostColumn(),
                 profile.getHeaderSignature()
         );
     }

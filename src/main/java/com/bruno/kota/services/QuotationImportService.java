@@ -57,6 +57,8 @@ public class QuotationImportService {
             Integer descriptionColumnOverride,
             Integer barcodeColumnOverride,
             Integer quantityColumnOverride,
+            boolean includeCostPrices,
+            Integer costColumnOverride,
             String performedBy) {
 
         List<CSVRecord> rows;
@@ -98,17 +100,30 @@ public class QuotationImportService {
         Integer descriptionColumn = descriptionColumnOverride;
         Integer barcodeColumn = barcodeColumnOverride;
         Integer quantityColumn = quantityColumnOverride;
+        // includeCostPrices=false zera qualquer costColumn que por acaso tenha chegado —
+        // "incluir preço de custo" é uma decisão tomada a cada importação (não fica
+        // lembrada sozinha só porque o perfil de mapeamento tem uma coluna de custo
+        // salva de uma importação anterior).
+        Integer costColumn = includeCostPrices ? costColumnOverride : null;
 
         boolean mappingProvided = descriptionColumn != null && barcodeColumn != null && quantityColumn != null;
 
         if (!mappingProvided) {
             var existingProfile = importProfileRepository.findTopByOrderByUpdatedAtDesc();
+            boolean profileMatches = existingProfile.isPresent() && existingProfile.get().getHeaderSignature().equals(headerSignature);
+            // Só reaproveita o perfil salvo sem perguntar de novo se ele já resolve TUDO
+            // que essa importação precisa — inclusive a coluna de custo, quando pedida.
+            // Sem essa checagem, marcar "incluir preço de custo" numa planilha cujo
+            // layout já tinha perfil salvo (mas sem coluna de custo mapeada ainda)
+            // importaria silenciosamente sem custo nenhum, sem nunca perguntar qual coluna usar.
+            boolean profileSatisfiesCost = !includeCostPrices || (profileMatches && existingProfile.get().getCostColumn() != null);
 
-            if (existingProfile.isPresent() && existingProfile.get().getHeaderSignature().equals(headerSignature)) {
+            if (profileMatches && profileSatisfiesCost) {
                 ImportProfile profile = existingProfile.get();
                 descriptionColumn = profile.getDescriptionColumn();
                 barcodeColumn = profile.getBarcodeColumn();
                 quantityColumn = profile.getQuantityColumn();
+                costColumn = includeCostPrices ? profile.getCostColumn() : null;
             } else {
                 return new QuotationImportResult(true, headers, null);
             }
@@ -117,12 +132,18 @@ public class QuotationImportService {
         validateColumnIndex(descriptionColumn, headers.size(), "descrição");
         validateColumnIndex(barcodeColumn, headers.size(), "código de barras");
         validateColumnIndex(quantityColumn, headers.size(), "quantidade");
+        if (includeCostPrices) {
+            validateColumnIndex(costColumn, headers.size(), "preço de custo");
+        }
 
-        // As três colunas mapeadas precisam ser fisicamente diferentes entre si — mapear
-        // a mesma coluna duas vezes (ex: código de barras e descrição apontando pra
+        // As colunas mapeadas precisam ser fisicamente diferentes entre si — mapear a
+        // mesma coluna duas vezes (ex: código de barras e descrição apontando pra
         // coluna 2) é sempre erro de mapeamento, nunca uma escolha válida.
         if (descriptionColumn.equals(barcodeColumn) || descriptionColumn.equals(quantityColumn) || barcodeColumn.equals(quantityColumn)) {
             throw new BusinessRuleException("As colunas de Descrição, Código de Barras e Quantidade precisam ser diferentes entre si — confira o mapeamento.");
+        }
+        if (costColumn != null && (costColumn.equals(descriptionColumn) || costColumn.equals(barcodeColumn) || costColumn.equals(quantityColumn))) {
+            throw new BusinessRuleException("A coluna de Preço de Custo precisa ser diferente das demais — confira o mapeamento.");
         }
 
         SupplierGroup supplierGroup = resolveSupplierGroup(supplierGroupId);
@@ -182,6 +203,24 @@ public class QuotationImportService {
                 throw new BusinessRuleException("Linha " + row.getRecordNumber() + ": quantidade deve ser maior que zero.");
             }
 
+            // Célula vazia é sempre válida aqui, mesmo com a coluna mapeada — o preço de
+            // custo nunca é obrigatório por linha (ver anotação em QuotationItem), só a
+            // decisão de "incluir custo" pra importação inteira é que já foi tomada.
+            BigDecimal costPrice = null;
+            if (costColumn != null) {
+                String rawCost = row.get(costColumn).trim();
+                if (!rawCost.isEmpty()) {
+                    try {
+                        costPrice = new BigDecimal(rawCost.replace(",", "."));
+                    } catch (NumberFormatException e) {
+                        throw new BusinessRuleException("Linha " + row.getRecordNumber() + ": preço de custo inválido (\"" + rawCost + "\").");
+                    }
+                    if (costPrice.compareTo(BigDecimal.ZERO) < 0) {
+                        throw new BusinessRuleException("Linha " + row.getRecordNumber() + ": preço de custo não pode ser negativo.");
+                    }
+                }
+            }
+
             Product product = productRepository.findByBarcode(barcode)
                     .orElseGet(() -> productRepository.save(
                             Product.builder()
@@ -194,11 +233,12 @@ public class QuotationImportService {
                     .quotation(quotation)
                     .product(product)
                     .quantity(quantity)
+                    .costPrice(costPrice)
                     .build();
             quotationItemRepository.save(item);
         }
 
-        saveOrUpdateProfile(descriptionColumn, barcodeColumn, quantityColumn, headerSignature);
+        saveOrUpdateProfile(descriptionColumn, barcodeColumn, quantityColumn, costColumn, headerSignature);
 
         return new QuotationImportResult(false, null, toQuotationResponse(quotation));
     }
@@ -238,13 +278,24 @@ public class QuotationImportService {
         }
     }
 
-    private void saveOrUpdateProfile(Integer descriptionColumn, Integer barcodeColumn, Integer quantityColumn, String headerSignature) {
+    private void saveOrUpdateProfile(Integer descriptionColumn, Integer barcodeColumn, Integer quantityColumn, Integer costColumn, String headerSignature) {
         ImportProfile profile = importProfileRepository.findTopByOrderByUpdatedAtDesc()
                 .orElseGet(() -> ImportProfile.builder().build());
+
+        // Só faz sentido preservar a coluna de custo lembrada de uma importação anterior
+        // quando é o MESMO layout de planilha — se o cabeçalho mudou, o índice de coluna
+        // antigo não tem nenhuma garantia de continuar significando a mesma coisa nessa
+        // planilha nova, então melhor esquecer do que reaproveitar errado.
+        boolean sameLayout = headerSignature.equals(profile.getHeaderSignature());
 
         profile.setDescriptionColumn(descriptionColumn);
         profile.setBarcodeColumn(barcodeColumn);
         profile.setQuantityColumn(quantityColumn);
+        if (costColumn != null) {
+            profile.setCostColumn(costColumn);
+        } else if (!sameLayout) {
+            profile.setCostColumn(null);
+        }
         profile.setHeaderSignature(headerSignature);
 
         importProfileRepository.save(profile);
