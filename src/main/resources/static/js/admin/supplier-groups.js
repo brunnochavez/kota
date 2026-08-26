@@ -135,12 +135,6 @@ async function openGroupMembersModal(groupId) {
   await refreshGroupMembersModal(groupId);
 }
 
-function manageQdGroupSuppliers() {
-  const groupId = document.getElementById('qd-group').value;
-  if (!groupId) { toast('Selecione um grupo primeiro.', true); return; }
-  openGroupMembersModal(parseInt(groupId));
-}
-
 let groupMembersPage = 0;
 
 async function refreshGroupMembersModal(groupId) {

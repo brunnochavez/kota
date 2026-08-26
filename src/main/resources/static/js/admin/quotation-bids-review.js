@@ -586,17 +586,69 @@ async function saveAllRepBidChanges() {
 }
 
 function deleteBidAsAdmin(bidId, buttonEl, productName) {
-  showConfirmPopover(
+  showBidDeleteChoicePopover(
     buttonEl,
-    `Excluir o lance de <strong>${escapeHtml(productName)}</strong>? Se ele for o vencedor atual, esse item fica sem vencedor — dá pra reatribuir depois em "Adicionar produto a esse representante", sem afetar os outros itens já calculados.`,
-    () => confirmDeleteBidAsAdmin(bidId)
+    `Excluir o lance de <strong>${escapeHtml(productName)}</strong>?`,
+    () => confirmDeleteBidAsAdmin(bidId, false),
+    () => confirmDeleteBidAsAdmin(bidId, true)
   );
 }
 
-async function confirmDeleteBidAsAdmin(bidId) {
+// Variante de showConfirmPopover (quotation-publish-close.js) com 3 escolhas em vez de
+// 2 — só usada aqui, na exclusão de lance em "Revisar Lances Enviados". Reaproveita a
+// mesma classe/posicionamento/clique-fora do popover genérico (closeConfirmPopover e
+// handleOutsideConfirmPopoverClick funcionam sem alteração, já que ambos procuram pelo
+// id "confirm-popover"), só o corpo com os botões muda.
+function showBidDeleteChoicePopover(anchorEl, messageHtml, onDeleteOnly, onReassign) {
+  closeConfirmPopover();
+
+  const pop = document.createElement('div');
+  pop.className = 'confirm-popover';
+  pop.id = 'confirm-popover';
+  pop.innerHTML = `
+    <div class="confirm-popover-msg">${messageHtml}</div>
+    <div class="btn-row" style="flex-direction:column; align-items:stretch; margin-top:10px">
+      <button class="danger small" type="button" data-action="reassign">Excluir e atribuir ao 2º menor preço</button>
+      <button class="danger small" type="button" data-action="delete-only">Excluir — item fica sem vencedor</button>
+      <button class="secondary small" type="button" data-action="cancel">Cancelar</button>
+    </div>`;
+  document.body.appendChild(pop);
+
+  const cancelBtn = pop.querySelector('[data-action="cancel"]');
+  const deleteOnlyBtn = pop.querySelector('[data-action="delete-only"]');
+  const reassignBtn = pop.querySelector('[data-action="reassign"]');
+
+  cancelBtn.onclick = closeConfirmPopover;
+  deleteOnlyBtn.onclick = () => withButtonLoading(deleteOnlyBtn, 'Aguarde...', async () => {
+    cancelBtn.disabled = true;
+    reassignBtn.disabled = true;
+    try { await onDeleteOnly(); } finally { closeConfirmPopover(); }
+  });
+  reassignBtn.onclick = () => withButtonLoading(reassignBtn, 'Aguarde...', async () => {
+    cancelBtn.disabled = true;
+    deleteOnlyBtn.disabled = true;
+    try { await onReassign(); } finally { closeConfirmPopover(); }
+  });
+
+  const anchor = anchorEl.getBoundingClientRect();
+  const popRect = pop.getBoundingClientRect();
+  let top = anchor.bottom + 6;
+  let left = anchor.right - popRect.width;
+  if (top + popRect.height > window.innerHeight - 8) top = anchor.top - popRect.height - 6;
+  if (left < 8) left = anchor.left;
+  if (left + popRect.width > window.innerWidth - 8) left = window.innerWidth - popRect.width - 8;
+  pop.style.top = Math.max(8, top) + 'px';
+  pop.style.left = Math.max(8, left) + 'px';
+
+  setTimeout(() => document.addEventListener('mousedown', handleOutsideConfirmPopoverClick), 0);
+}
+
+async function confirmDeleteBidAsAdmin(bidId, reassignToRunnerUp) {
   const repId = document.getElementById('review-bids-rep-select').value;
-  await safeCall(() => api('DELETE', `/bids/${bidId}`));
-  toast('Lance excluído.');
+  await safeCall(() => api('DELETE', `/bids/${bidId}?reassignToRunnerUp=${reassignToRunnerUp}`));
+  toast(reassignToRunnerUp
+    ? 'Lance excluído — reatribuído ao 2º menor preço, se havia outro lance pra esse item.'
+    : 'Lance excluído.');
 
   await abrirDetalheCotacao(currentQuotationId);
   await loadReviewBidsData();

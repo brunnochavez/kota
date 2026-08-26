@@ -9,22 +9,37 @@ let productsForSelect = [];
 // (busca + checkbox + paginação) usado em manageQdExtraSuppliers (edição de cotação
 // já existente), só que aqui alimenta o body de createQuotationManually() em vez de
 // um PUT de edição. Reaproveita o mesmo cache de fornecedores (qdAllSuppliersCache)
-// definido em quotation-detail-core.js — é a mesma lista (GET /suppliers), não faz
-// sentido buscar duas vezes.
+// definido em quotation-detail-core.js — é a mesma lista (GET /suppliers, já filtrada
+// pra só quem tem representante), não faz sentido buscar duas vezes.
 let mqExtraSupplierIds = [];
 let mqExtraSuppliersPage = 0;
 let mqExtraSuppliersSearchTerm = '';
 
+// Grupo e Representantes são exclusivos aqui também — mesma regra e mesmo motivo de
+// setQdRecipientMode (quotation-detail-core.js), só que pro formulário de criação.
+function setMqRecipientMode(mode) {
+  document.querySelectorAll('#mq-recipient-mode-tabs .tab').forEach(t => t.classList.toggle('active', t.dataset.mode === mode));
+  document.getElementById('mq-recipient-mode-group').style.display = mode === 'grupos' ? 'block' : 'none';
+  document.getElementById('mq-recipient-mode-reps').style.display = mode === 'representantes' ? 'block' : 'none';
+  if (mode === 'grupos') {
+    mqExtraSupplierIds = [];
+    const btn = document.getElementById('mq-extra-suppliers-btn');
+    if (btn) btn.textContent = 'Selecionar representantes';
+  } else {
+    document.getElementById('mq-group').value = '';
+  }
+}
+
 async function manageMqExtraSuppliers() {
   if (!qdAllSuppliersCache.length) {
-    qdAllSuppliersCache = await safeCall(() => api('GET', '/suppliers'));
+    qdAllSuppliersCache = (await safeCall(() => api('GET', '/suppliers'))).filter(s => s.representativeId);
   }
   mqExtraSuppliersPage = 0;
   mqExtraSuppliersSearchTerm = '';
   openModal2(`
-    <h2>Fornecedores avulsos</h2>
-    <div class="subtitle" style="margin-bottom:12px">Além do grupo (ou no lugar dele) — a cotação fica disponível pra todo fornecedor marcado aqui, mesmo que ele não pertença a grupo nenhum.</div>
-    <input id="mq-extra-suppliers-search" placeholder="Buscar fornecedor..." autocomplete="off" oninput="onMqExtraSuppliersSearch(this.value)" style="margin-bottom:10px">
+    <h2>Representantes</h2>
+    <div class="subtitle" style="margin-bottom:12px">Adiciona a cotação diretamente pros representantes marcados aqui, sem depender de grupo nenhum.</div>
+    <input id="mq-extra-suppliers-search" placeholder="Buscar representante ou empresa..." autocomplete="off" oninput="onMqExtraSuppliersSearch(this.value)" style="margin-bottom:10px">
     <div id="mq-extra-suppliers-list"></div>
     ${paginationControlsHtml('mq-extra-suppliers')}
     <div class="btn-row" style="margin-top:16px; justify-content:space-between">
@@ -43,7 +58,9 @@ function onMqExtraSuppliersSearch(term) {
 
 function renderMqExtraSuppliersList() {
   const filtered = mqExtraSuppliersSearchTerm
-    ? qdAllSuppliersCache.filter(s => s.name.toLowerCase().includes(mqExtraSuppliersSearchTerm))
+    ? qdAllSuppliersCache.filter(s =>
+        s.name.toLowerCase().includes(mqExtraSuppliersSearchTerm) ||
+        (s.representativeName || '').toLowerCase().includes(mqExtraSuppliersSearchTerm))
     : qdAllSuppliersCache;
 
   const { items, page, totalPages } = paginateSlice(filtered, mqExtraSuppliersPage, DEFAULT_PAGE_SIZE);
@@ -54,10 +71,10 @@ function renderMqExtraSuppliersList() {
     listEl.innerHTML = items.length
       ? items.map(s => `
           <label class="expiring-item" style="cursor:pointer">
-            <span><input type="checkbox" value="${s.id}" ${mqExtraSupplierIds.includes(s.id) ? 'checked' : ''} onchange="toggleMqExtraSupplier(${s.id}, this.checked)"> ${escapeHtml(s.name)}</span>
-            <span class="mono" style="color:var(--text-dim); font-size:11px">${escapeHtml(s.cnpj || '')}</span>
+            <span><input type="checkbox" value="${s.id}" ${mqExtraSupplierIds.includes(s.id) ? 'checked' : ''} onchange="toggleMqExtraSupplier(${s.id}, this.checked)"> ${escapeHtml(s.representativeName)}</span>
+            <span style="color:var(--text-dim); font-size:11px">${escapeHtml(s.name)}</span>
           </label>`).join('')
-      : '<div class="empty">Nenhum fornecedor encontrado.</div>';
+      : '<div class="empty">Nenhum representante encontrado.</div>';
   }
 
   updatePaginationControls('mq-extra-suppliers', page, totalPages, filtered.length, (newPage) => {
@@ -73,7 +90,7 @@ function toggleMqExtraSupplier(id, checked) {
     mqExtraSupplierIds = mqExtraSupplierIds.filter(x => x !== id);
   }
   const btn = document.getElementById('mq-extra-suppliers-btn');
-  if (btn) btn.textContent = mqExtraSupplierIds.length ? `Selecionar (${mqExtraSupplierIds.length})` : 'Selecionar';
+  if (btn) btn.textContent = mqExtraSupplierIds.length ? `Selecionar representantes (${mqExtraSupplierIds.length})` : 'Selecionar representantes';
   const countEl = document.getElementById('mq-extra-suppliers-selected-count');
   if (countEl) countEl.textContent = `${mqExtraSupplierIds.length} selecionado(s)`;
 }
@@ -258,7 +275,9 @@ async function createQuotationManually() {
   document.getElementById('mq-items').innerHTML = '';
   mqExtraSupplierIds = [];
   const extraSuppliersBtn = document.getElementById('mq-extra-suppliers-btn');
-  if (extraSuppliersBtn) extraSuppliersBtn.textContent = 'Selecionar';
+  if (extraSuppliersBtn) extraSuppliersBtn.textContent = 'Selecionar representantes';
+  document.getElementById('mq-group').value = '';
+  setMqRecipientMode('representantes');
   goToSection('quotation-reports');
 }
 

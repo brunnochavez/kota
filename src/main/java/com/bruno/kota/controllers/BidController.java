@@ -68,8 +68,10 @@ public class BidController {
 
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<Void> deleteByAdmin(@PathVariable Long id) {
-        bidService.deleteByAdmin(id);
+    public ResponseEntity<Void> deleteByAdmin(
+            @PathVariable Long id,
+            @RequestParam(defaultValue = "false") boolean reassignToRunnerUp) {
+        bidService.deleteByAdmin(id, reassignToRunnerUp);
         return ResponseEntity.noContent().build();
     }
 }

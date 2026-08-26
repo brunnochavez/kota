@@ -1,5 +1,7 @@
 package com.bruno.kota.services;
+import java.text.Collator;
 import java.util.List;
+import java.util.Locale;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import com.bruno.kota.dtos.SupplierGroupRequest;
@@ -18,10 +20,16 @@ public class SupplierGroupService {
 
     private final SupplierGroupRepository supplierGroupRepository;
 
+    // Mesmo Collator pt-BR usado em SupplierService — ordena "Álvaro" perto de
+    // "Alvaro" em vez de jogar acentuado pro fim, que é o que String.CASE_INSENSITIVE_ORDER
+    // faria.
+    private static final Collator PT_BR_COLLATOR = Collator.getInstance(new Locale("pt", "BR"));
+
     @Transactional(readOnly = true)
     public List<SupplierGroupResponse> findAll() {
         return supplierGroupRepository.findAll().stream()
                 .map(this::toResponse)
+                .sorted((a, b) -> PT_BR_COLLATOR.compare(a.name(), b.name()))
                 .toList();
     }
 
@@ -29,6 +37,7 @@ public class SupplierGroupService {
     public List<SupplierGroupResponse> findAllInactive() {
         return supplierGroupRepository.findAllInactive().stream()
                 .map(this::toResponse)
+                .sorted((a, b) -> PT_BR_COLLATOR.compare(a.name(), b.name()))
                 .toList();
     }
 

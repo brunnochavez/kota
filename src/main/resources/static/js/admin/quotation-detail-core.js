@@ -4,6 +4,23 @@
 let currentQuotationId = null;
 let closeState = { tieBreakWinners: {}, excludedSupplierIds: [], acceptedViolationSupplierIds: [] };
 
+// Grupo e Representantes são as duas formas de destinar uma cotação — mutuamente
+// exclusivas (o backend também valida isso em QuotationService, não é só cosmético
+// aqui). Trocar de aba limpa a seleção da outra, pra nunca ficar com as duas
+// preenchidas ao mesmo tempo esperando "Salvar edição".
+function setQdRecipientMode(mode) {
+  document.querySelectorAll('#qd-recipient-mode-tabs .tab').forEach(t => t.classList.toggle('active', t.dataset.mode === mode));
+  document.getElementById('qd-recipient-mode-group').style.display = mode === 'grupos' ? 'block' : 'none';
+  document.getElementById('qd-recipient-mode-reps').style.display = mode === 'representantes' ? 'block' : 'none';
+  if (mode === 'grupos') {
+    qdExtraSupplierIds = [];
+    const btn = document.getElementById('qd-extra-suppliers-btn');
+    if (btn) btn.textContent = 'Selecionar representantes';
+  } else {
+    document.getElementById('qd-group').value = '';
+  }
+}
+
 // Fornecedores avulsos selecionados pra cotação atual — só vira efetivo de verdade
 // quando "Salvar edição" é clicado (updateQuotation lê esse array), mesmo padrão de
 // qd-group (o <select> também só aplica ao salvar). qdAllSuppliersCache é o mesmo
@@ -20,14 +37,16 @@ let qdExtraSuppliersSearchTerm = '';
 // inteiro a cada tecla digitada — senão o campo de busca perderia o foco a cada letra.
 async function manageQdExtraSuppliers() {
   if (!qdAllSuppliersCache.length) {
-    qdAllSuppliersCache = await safeCall(() => api('GET', '/suppliers'));
+    // Só entra quem tem representante vinculado — sem representante não tem quem
+    // logar/receber e-mail, então não faz sentido aparecer numa lista de "Representantes".
+    qdAllSuppliersCache = (await safeCall(() => api('GET', '/suppliers'))).filter(s => s.representativeId);
   }
   qdExtraSuppliersPage = 0;
   qdExtraSuppliersSearchTerm = '';
   openModal2(`
-    <h2>Fornecedores avulsos</h2>
-    <div class="subtitle" style="margin-bottom:12px">Além do grupo (ou no lugar dele) — a cotação fica disponível pra todo fornecedor marcado aqui, mesmo que ele não pertença a grupo nenhum.</div>
-    <input id="qd-extra-suppliers-search" placeholder="Buscar fornecedor..." autocomplete="off" oninput="onQdExtraSuppliersSearch(this.value)" style="margin-bottom:10px">
+    <h2>Representantes</h2>
+    <div class="subtitle" style="margin-bottom:12px">Adiciona a cotação diretamente pros representantes marcados aqui, sem depender de grupo nenhum.</div>
+    <input id="qd-extra-suppliers-search" placeholder="Buscar representante ou empresa..." autocomplete="off" oninput="onQdExtraSuppliersSearch(this.value)" style="margin-bottom:10px">
     <div id="qd-extra-suppliers-list"></div>
     ${paginationControlsHtml('qd-extra-suppliers')}
     <div class="btn-row" style="margin-top:16px; justify-content:space-between">
@@ -46,7 +65,9 @@ function onQdExtraSuppliersSearch(term) {
 
 function renderQdExtraSuppliersList() {
   const filtered = qdExtraSuppliersSearchTerm
-    ? qdAllSuppliersCache.filter(s => s.name.toLowerCase().includes(qdExtraSuppliersSearchTerm))
+    ? qdAllSuppliersCache.filter(s =>
+        s.name.toLowerCase().includes(qdExtraSuppliersSearchTerm) ||
+        (s.representativeName || '').toLowerCase().includes(qdExtraSuppliersSearchTerm))
     : qdAllSuppliersCache;
 
   const { items, page, totalPages } = paginateSlice(filtered, qdExtraSuppliersPage, DEFAULT_PAGE_SIZE);
@@ -57,10 +78,10 @@ function renderQdExtraSuppliersList() {
     listEl.innerHTML = items.length
       ? items.map(s => `
           <label class="expiring-item" style="cursor:pointer">
-            <span><input type="checkbox" value="${s.id}" ${qdExtraSupplierIds.includes(s.id) ? 'checked' : ''} onchange="toggleQdExtraSupplier(${s.id}, this.checked)"> ${escapeHtml(s.name)}</span>
-            <span class="mono" style="color:var(--text-dim); font-size:11px">${escapeHtml(s.cnpj || '')}</span>
+            <span><input type="checkbox" value="${s.id}" ${qdExtraSupplierIds.includes(s.id) ? 'checked' : ''} onchange="toggleQdExtraSupplier(${s.id}, this.checked)"> ${escapeHtml(s.representativeName)}</span>
+            <span style="color:var(--text-dim); font-size:11px">${escapeHtml(s.name)}</span>
           </label>`).join('')
-      : '<div class="empty">Nenhum fornecedor encontrado.</div>';
+      : '<div class="empty">Nenhum representante encontrado.</div>';
   }
 
   updatePaginationControls('qd-extra-suppliers', page, totalPages, filtered.length, (newPage) => {
@@ -76,7 +97,7 @@ function toggleQdExtraSupplier(id, checked) {
     qdExtraSupplierIds = qdExtraSupplierIds.filter(x => x !== id);
   }
   const btn = document.getElementById('qd-extra-suppliers-btn');
-  if (btn) btn.textContent = 'Fornecedores Avulsos' + (qdExtraSupplierIds.length ? ` (${qdExtraSupplierIds.length})` : '');
+  if (btn) btn.textContent = 'Selecionar representantes' + (qdExtraSupplierIds.length ? ` (${qdExtraSupplierIds.length})` : '');
   const countEl = document.getElementById('qd-extra-suppliers-selected-count');
   if (countEl) countEl.textContent = `${qdExtraSupplierIds.length} selecionado(s)`;
 }
@@ -110,6 +131,10 @@ async function abrirDetalheCotacao(id) {
   qdItemsPage = 0;
   qdPendingQuantityEdits = {};
   qdExtraSupplierIds = q.extraSupplierIds ? [...q.extraSupplierIds] : [];
+  // Grupo e Representantes são exclusivos — decide qual aba abre já marcada pelo que
+  // essa cotação já tem hoje. Uma cotação nova (nenhum dos dois ainda) abre em
+  // Representantes por padrão, só porque precisa começar em algum lugar.
+  const qdInitialRecipientMode = q.supplierGroupId ? 'grupos' : 'representantes';
 
   openModal(`
     <div class="qd-modal-body">
@@ -121,10 +146,22 @@ async function abrirDetalheCotacao(id) {
 
     <div class="inline-form">
       <div><label>Nome</label><input id="qd-name" placeholder="Ex: Cotação de Bebidas" value="${escapeHtml(q.name)}"></div>
-      <div><label>Grupo</label><select id="qd-group">
-        <option value="">— nenhum —</option>
-        ${groups.map(g => `<option value="${g.id}" ${g.id === q.supplierGroupId ? 'selected' : ''}>${escapeHtml(g.name)}</option>`).join('')}
-      </select></div>
+      <div style="width:100%">
+        <label>Destinatários da cotação</label>
+        <div class="tabs" id="qd-recipient-mode-tabs" style="margin-bottom:8px">
+          <div class="tab ${qdInitialRecipientMode === 'representantes' ? 'active' : ''}" data-mode="representantes" onclick="setQdRecipientMode('representantes')">Representantes</div>
+          <div class="tab ${qdInitialRecipientMode === 'grupos' ? 'active' : ''}" data-mode="grupos" onclick="setQdRecipientMode('grupos')">Grupos</div>
+        </div>
+        <div id="qd-recipient-mode-reps" style="display:${qdInitialRecipientMode === 'representantes' ? 'block' : 'none'}">
+          <button type="button" class="secondary" id="qd-extra-suppliers-btn" onclick="manageQdExtraSuppliers()">Selecionar representantes${q.extraSupplierNames && q.extraSupplierNames.length ? ` (${q.extraSupplierNames.length})` : ''}</button>
+        </div>
+        <div id="qd-recipient-mode-group" style="display:${qdInitialRecipientMode === 'grupos' ? 'block' : 'none'}">
+          <select id="qd-group">
+            <option value="">— selecione um grupo —</option>
+            ${groups.map(g => `<option value="${g.id}" ${g.id === q.supplierGroupId ? 'selected' : ''}>${escapeHtml(g.name)}</option>`).join('')}
+          </select>
+        </div>
+      </div>
       <div><label>Prazo de expiração</label>
         <div style="display:flex; gap:6px; flex-wrap:wrap">
           <input type="date" id="qd-expiration-date" style="flex:1.3">
@@ -133,8 +170,6 @@ async function abrirDetalheCotacao(id) {
       </div>
       <div style="width:170px"><label>Projeção de venda padrão (dias)</label><input type="number" min="1" step="1" id="qd-sales-projection" placeholder="Ex: 30" value="${q.defaultSalesProjectionDays ?? ''}"></div>
       <button id="qd-save-btn" onclick="updateQuotation()">Salvar edição</button>
-      <button id="qd-group-suppliers-btn" class="secondary" onclick="manageQdGroupSuppliers()">Fornecedores do Grupo</button>
-      <button id="qd-extra-suppliers-btn" class="secondary" onclick="manageQdExtraSuppliers()">Fornecedores Avulsos${q.extraSupplierNames && q.extraSupplierNames.length ? ` (${q.extraSupplierNames.length})` : ''}</button>
     </div>
 
     <div class="btn-row" style="margin-top:16px">

@@ -1,6 +1,7 @@
 package com.bruno.kota.services;
 
 import java.time.LocalDateTime;
+import java.util.Comparator;
 import java.util.List;
 
 import org.springframework.stereotype.Service;
@@ -123,8 +124,14 @@ public class BidService {
         return toResponse(bidRepository.save(bid));
     }
 
+    // reassignToRunnerUp = true → em vez de deixar o item sem vencedor, atribui pro
+    // fornecedor com o 2º menor preço (o menor entre os lances QUE SOBRAM depois de
+    // excluir este) — evita o passo extra de ir em "Adicionar produto a esse
+    // representante" reatribuir manualmente. Se não sobrar nenhum outro lance pra esse
+    // item, o resultado é o mesmo de reassignToRunnerUp = false (fica sem vencedor,
+    // porque não tem pra quem reatribuir).
     @Transactional
-    public void deleteByAdmin(Long bidId) {
+    public void deleteByAdmin(Long bidId, boolean reassignToRunnerUp) {
         Bid bid = bidRepository.findById(bidId)
                 .orElseThrow(() -> new ResourceNotFoundException("Lance não encontrado: id " + bidId));
 
@@ -132,12 +139,15 @@ public class BidService {
         Quotation quotation = item.getQuotation();
         ensureBidEditable(quotation);
 
-        // Se esse lance era o vencedor do item, o item fica sem vencedor — só ele, não a
-        // cotação inteira. O admin resolve depois, ainda dentro da revisão, atribuindo um
-        // vencedor pra esse item em "Adicionar produto a esse representante" (funciona pra
-        // reatribuir, não só pra produto novo — reaproveita o item existente via assign-winner).
-        if (item.getWinningBid() != null && item.getWinningBid().getId().equals(bidId)) {
-            item.setWinningBid(null);
+        boolean wasWinner = item.getWinningBid() != null && item.getWinningBid().getId().equals(bidId);
+        if (wasWinner) {
+            Bid runnerUp = reassignToRunnerUp
+                    ? bidRepository.findByQuotationItemIdWithDetails(item.getId()).stream()
+                            .filter(b -> !b.getId().equals(bidId))
+                            .min(Comparator.comparing(Bid::getValue))
+                            .orElse(null)
+                    : null;
+            item.setWinningBid(runnerUp);
             quotationItemRepository.save(item);
         }
 

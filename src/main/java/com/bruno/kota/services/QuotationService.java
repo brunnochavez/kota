@@ -313,6 +313,7 @@ public class QuotationService {
         if (request.items() == null || request.items().isEmpty()) {
             throw new BusinessRuleException("Uma cotação precisa de pelo menos um item.");
         }
+        validateGroupOrExtraSuppliersExclusive(request.supplierGroupId(), request.extraSupplierIds());
         // Prazo é opcional na criação (o admin pode definir depois) — mas, quando
         // informado, não pode já estar no passado. Sem essa checagem aqui, dava pra
         // criar (e até publicar, se a validação de publish() checasse só o momento da
@@ -424,6 +425,8 @@ public class QuotationService {
                 || quotation.getStatus() == QuotationStatus.REVIEWING) {
             throw new BusinessRuleException("Não é possível editar nome/grupo/prazo durante a revisão, fechamento ou expiração.");
         }
+
+        validateGroupOrExtraSuppliersExclusive(request.supplierGroupId(), request.extraSupplierIds());
 
         if (quotation.getStatus() == QuotationStatus.AVAILABLE
                 && request.expirationDate() != null
@@ -1998,6 +2001,20 @@ public class QuotationService {
                     .orElseThrow(() -> new ResourceNotFoundException("Fornecedor não encontrado: id " + id)));
         }
         return result;
+    }
+
+    // A tela força o admin a escolher UM jeito de destinar a cotação — Grupo OU
+    // Representantes (fornecedores avulsos), nunca os dois ao mesmo tempo — pra não
+    // criar ambiguidade sobre "por que esse fornecedor recebeu, ele tava no grupo ou
+    // foi selecionado manualmente?". A validação vive aqui, não só no frontend, porque
+    // create/update também são alcançáveis por outros caminhos (import, API direta).
+    private void validateGroupOrExtraSuppliersExclusive(Long supplierGroupId, List<Long> extraSupplierIds) {
+        boolean hasGroup = supplierGroupId != null;
+        boolean hasExtraSuppliers = extraSupplierIds != null && !extraSupplierIds.isEmpty();
+        if (hasGroup && hasExtraSuppliers) {
+            throw new BusinessRuleException(
+                    "Escolha Grupo OU Representantes pra essa cotação, não os dois — remova um antes de salvar.");
+        }
     }
 
     private QuotationItemResponse toItemResponse(QuotationItem item) {
