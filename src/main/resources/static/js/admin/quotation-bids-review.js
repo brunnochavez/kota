@@ -255,7 +255,7 @@ async function openReviewBidsModal() {
     </div>
 
     <table class="qd-items-table"><thead><tr>
-      <th>Produto</th><th style="text-align:center">Quantidade</th><th style="text-align:center">Preço (R$)</th><th style="text-align:center">Subtotal</th><th></th>
+      <th>Produto</th><th style="text-align:center">Quantidade</th><th style="text-align:center">Último Custo</th><th style="text-align:center">Preço (R$)</th><th style="text-align:center">Subtotal</th><th></th>
     </tr></thead><tbody id="review-bids-list"></tbody></table>
     <div class="btn-row" id="review-bids-pagination" style="display:none; justify-content:space-between; margin-top:6px">
       <div style="color:var(--text-dim); font-size:12px" id="review-bids-page-info">—</div>
@@ -276,7 +276,7 @@ async function openReviewBidsModal() {
   `, true);
 
   if (!winningReps.length) {
-    document.getElementById('review-bids-list').innerHTML = '<tr><td colspan="5" class="empty">Sem vencedores calculados no momento.</td></tr>';
+    document.getElementById('review-bids-list').innerHTML = '<tr><td colspan="6" class="empty">Sem vencedores calculados no momento.</td></tr>';
     return;
   }
   renderSelectedRepBids();
@@ -357,7 +357,7 @@ function renderSelectedRepBids() {
   }
 
   if (!wonEntries.length) {
-    list.innerHTML = '<tr><td colspan="5" class="empty">Esse representante ainda não venceu nenhum produto.</td></tr>';
+    list.innerHTML = '<tr><td colspan="6" class="empty">Esse representante ainda não venceu nenhum produto.</td></tr>';
     pag.style.display = 'none';
     renderAddProductPanel(repId);
     return;
@@ -372,6 +372,7 @@ function renderSelectedRepBids() {
       <tr class="rep-bid-winner-row">
         <td>${escapeHtml(item.productName)} <span class="mono" style="font-size:11px; color:var(--text-dim)">${item.productBarcode}</span></td>
         <td style="text-align:center"><input type="number" step="0.001" id="rebid-qty-${item.id}" value="${item.quantity}" oninput="updateRebidSubtotal(${bid.id}, ${item.id})" style="width:70px; text-align:center"></td>
+        <td style="text-align:center; color:var(--text-dim)">${item.costPrice != null ? 'R$ ' + formatCurrencyFromNumber(item.costPrice) : '—'}</td>
         <td style="text-align:center">
           <input type="text" inputmode="decimal" id="rebid-value-${bid.id}" value="${formatCurrencyFromNumber(bid.value)}" oninput="this.value = maskCurrencyInput(this.value); updateRebidSubtotal(${bid.id}, ${item.id})" style="width:75px; text-align:center">
           <div id="rebid-pricechange-${bid.id}">${priceChangeIndicatorHtml(bid.value, item.costPrice)}</div>
