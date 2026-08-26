@@ -184,10 +184,20 @@ public class BidService {
         }
     }
 
+    // Elegível = pertence ao grupo da cotação OU foi adicionado avulso como
+    // Representante (ver Quotation.extraSuppliers) — mesma união usada em
+    // QuotationService.getEligibleSuppliers(). Antes só checava o grupo; um fornecedor
+    // adicionado como Representante avulso passava em validateRepresentativeCanViewQuotation
+    // (que já usava a união) mas travava aqui na hora de enviar o lance de verdade,
+    // porque essa checagem tinha sua própria cópia da regra, desatualizada.
     private void validateGroupAccess(QuotationItem quotationItem, Supplier supplier) {
-        SupplierGroup group = safeGetSupplierGroup(quotationItem.getQuotation());
-        if (group == null || !supplier.getGroups().contains(group)) {
-            throw new BusinessRuleException("Este fornecedor não pertence ao grupo autorizado a responder esta cotação.");
+        Quotation quotation = quotationItem.getQuotation();
+        SupplierGroup group = safeGetSupplierGroup(quotation);
+        boolean inGroup = group != null && supplier.getGroups().contains(group);
+        boolean isExtraSupplier = quotation.getExtraSuppliers().stream()
+                .anyMatch(s -> s.getId().equals(supplier.getId()));
+        if (!inGroup && !isExtraSupplier) {
+            throw new BusinessRuleException("Este fornecedor não está autorizado a responder esta cotação.");
         }
     }
 
