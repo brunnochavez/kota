@@ -12,6 +12,12 @@ public record QuotationCreateRequest(
         String name,
 
         Long supplierGroupId,
+
+        // Fornecedores avulsos, além (ou no lugar) do grupo — opcional, null/vazio
+        // equivale a "nenhum". A cotação continua exigindo pelo menos UM fornecedor
+        // elegível (grupo OU avulso) na hora de publicar, ver QuotationService.publish().
+        List<Long> extraSupplierIds,
+
         LocalDateTime expirationDate,
         Integer defaultSalesProjectionDays,
 

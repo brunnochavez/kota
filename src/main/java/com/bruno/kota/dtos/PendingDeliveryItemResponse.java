@@ -9,6 +9,7 @@ public record PendingDeliveryItemResponse(
         Long quotationItemId,
         Long quotationId,
         String quotationName,
+        Long productId,
         String productName,
         String productBarcode,
         BigDecimal quantity,

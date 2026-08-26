@@ -169,6 +169,7 @@ async function updateQuotation() {
   const body = {
     name: document.getElementById('qd-name').value.trim(),
     supplierGroupId: document.getElementById('qd-group').value || null,
+    extraSupplierIds: qdExtraSupplierIds,
     expirationDate: getExpirationValue('qd-expiration'),
     defaultSalesProjectionDays: document.getElementById('qd-sales-projection').value || null
   };
@@ -306,11 +307,16 @@ async function duplicateQuotation() {
   abrirDetalheCotacao(q.id);
 }
 
-// Mesma ideia, mas só pros itens que fecharam sem vencedor — pra tentar de novo com
-// outros fornecedores/representantes sem carregar junto o que já foi bem atendido.
-async function duplicateUnquotedItems() {
-  const q = await safeCall(() => api('POST', `/quotations/${currentQuotationId}/duplicate-unquoted-items`));
-  toast('Cotação #' + q.id + ' criada em Rascunho, só com os itens sem lance.');
+// Mesma ideia, mas só pros itens que fecharam sem vencedor OU cortados por falta de
+// estoque (which = 'noWinner' | 'cut') — pra tentar de novo com outros
+// fornecedores/representantes sem carregar junto o que já foi bem atendido. Espelha
+// os dois endpoints do backend (duplicate-unquoted-items / duplicate-cut-items), que
+// fazem exatamente a mesma coisa só que filtrando por critério diferente.
+async function duplicateFulfillmentItems(which) {
+  const isCut = which === 'cut';
+  const endpoint = isCut ? 'duplicate-cut-items' : 'duplicate-unquoted-items';
+  const q = await safeCall(() => api('POST', `/quotations/${currentQuotationId}/${endpoint}`));
+  toast('Cotação #' + q.id + ' criada em Rascunho, só com os itens ' + (isCut ? 'cortados por falta de estoque' : 'sem lance') + '.');
   closeModal();
   loadQuotations();
   abrirDetalheCotacao(q.id);

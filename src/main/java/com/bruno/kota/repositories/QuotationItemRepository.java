@@ -19,6 +19,18 @@ public interface QuotationItemRepository extends JpaRepository<QuotationItem, Lo
             + "ORDER BY qi.quotation.updatedAt DESC")
     List<QuotationItem> findLastWonByProductId(@Param("productId") Long productId);
 
+    // Mesma ideia de findLastWonByProductId, só que restrita a UM fornecedor — usada
+    // pelo "último pedido do fornecedor pra esse produto" na busca de Produtos a
+    // Receber. JOIN FETCH em cotação/lance vencedor/fornecedor porque o resultado vai
+    // direto pra um DTO de resposta, sem passar por outra volta ao banco.
+    @Query("SELECT qi FROM QuotationItem qi "
+            + "JOIN FETCH qi.quotation "
+            + "JOIN FETCH qi.winningBid wb "
+            + "JOIN FETCH wb.supplier "
+            + "WHERE qi.product.id = :productId AND wb.supplier.id = :supplierId "
+            + "ORDER BY qi.quotation.updatedAt DESC")
+    List<QuotationItem> findLastWonByProductIdAndSupplierId(@Param("productId") Long productId, @Param("supplierId") Long supplierId);
+
     // Usado por ProductService (tela de Produtos: busca paginada e lista de inativos) —
     // pra cada produto que já teve um item vencedor, o mapeamento pra resposta lê
     // item.getQuotation().getUpdatedAt() (pra achar o item MAIS recente) e depois

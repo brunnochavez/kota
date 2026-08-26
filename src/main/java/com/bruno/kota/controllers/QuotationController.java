@@ -287,6 +287,12 @@ public class QuotationController {
         return quotationService.duplicateUnquotedItems(id);
     }
 
+    @PostMapping("/{id}/duplicate-cut-items")
+    @PreAuthorize("hasRole('ADMIN')")
+    public QuotationResponse duplicateCutItems(@PathVariable Long id) {
+        return quotationService.duplicateCutItems(id);
+    }
+
     @PostMapping("/{id}/close")
     @PreAuthorize("hasRole('ADMIN')")
     public QuotationCloseResult close(@PathVariable Long id, @RequestBody(required = false) QuotationCloseRequest request) {

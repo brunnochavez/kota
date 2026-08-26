@@ -1,6 +1,7 @@
 package com.bruno.kota.dtos;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 import com.bruno.kota.entities.QuotationStatus;
 
@@ -10,6 +11,13 @@ public record QuotationResponse(
         QuotationStatus status,
         Long supplierGroupId,
         String supplierGroupName,
+
+        // Fornecedores avulsos (extras ao grupo) — paralelos entre si por índice
+        // (extraSupplierIds[i] é o id de extraSupplierNames[i]), mesmo padrão simples já
+        // usado no resto do projeto pra não precisar de mais um DTO só pra isso.
+        List<Long> extraSupplierIds,
+        List<String> extraSupplierNames,
+
         LocalDateTime createdAt,
         LocalDateTime publishedAt,
         LocalDateTime expirationDate,

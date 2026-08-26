@@ -4,6 +4,83 @@
 let currentQuotationId = null;
 let closeState = { tieBreakWinners: {}, excludedSupplierIds: [], acceptedViolationSupplierIds: [] };
 
+// Fornecedores avulsos selecionados pra cotação atual — só vira efetivo de verdade
+// quando "Salvar edição" é clicado (updateQuotation lê esse array), mesmo padrão de
+// qd-group (o <select> também só aplica ao salvar). qdAllSuppliersCache é o mesmo
+// GET /suppliers já ordenado alfabeticamente (pt-BR) pelo backend — reaproveitado
+// entre aberturas do modal na mesma sessão, igual groupsCache/productGroupsCache.
+let qdExtraSupplierIds = [];
+let qdAllSuppliersCache = [];
+let qdExtraSuppliersPage = 0;
+let qdExtraSuppliersSearchTerm = '';
+
+// Modal de seleção — busca por nome + checkbox por fornecedor, paginado (nunca lista
+// crua com scroll infinito, mesma convenção do resto do admin). A lista em si é
+// re-renderizada isoladamente (renderQdExtraSuppliersList), sem recriar o modal
+// inteiro a cada tecla digitada — senão o campo de busca perderia o foco a cada letra.
+async function manageQdExtraSuppliers() {
+  if (!qdAllSuppliersCache.length) {
+    qdAllSuppliersCache = await safeCall(() => api('GET', '/suppliers'));
+  }
+  qdExtraSuppliersPage = 0;
+  qdExtraSuppliersSearchTerm = '';
+  openModal2(`
+    <h2>Fornecedores avulsos</h2>
+    <div class="subtitle" style="margin-bottom:12px">Além do grupo (ou no lugar dele) — a cotação fica disponível pra todo fornecedor marcado aqui, mesmo que ele não pertença a grupo nenhum.</div>
+    <input id="qd-extra-suppliers-search" placeholder="Buscar fornecedor..." autocomplete="off" oninput="onQdExtraSuppliersSearch(this.value)" style="margin-bottom:10px">
+    <div id="qd-extra-suppliers-list"></div>
+    ${paginationControlsHtml('qd-extra-suppliers')}
+    <div class="btn-row" style="margin-top:16px; justify-content:space-between">
+      <span id="qd-extra-suppliers-selected-count" style="font-size:11.5px; color:var(--text-dim)">${qdExtraSupplierIds.length} selecionado(s)</span>
+      <button onclick="closeModal2()">Concluir</button>
+    </div>
+  `, true);
+  renderQdExtraSuppliersList();
+}
+
+function onQdExtraSuppliersSearch(term) {
+  qdExtraSuppliersSearchTerm = term.trim().toLowerCase();
+  qdExtraSuppliersPage = 0;
+  renderQdExtraSuppliersList();
+}
+
+function renderQdExtraSuppliersList() {
+  const filtered = qdExtraSuppliersSearchTerm
+    ? qdAllSuppliersCache.filter(s => s.name.toLowerCase().includes(qdExtraSuppliersSearchTerm))
+    : qdAllSuppliersCache;
+
+  const { items, page, totalPages } = paginateSlice(filtered, qdExtraSuppliersPage, DEFAULT_PAGE_SIZE);
+  qdExtraSuppliersPage = page;
+
+  const listEl = document.getElementById('qd-extra-suppliers-list');
+  if (listEl) {
+    listEl.innerHTML = items.length
+      ? items.map(s => `
+          <label class="expiring-item" style="cursor:pointer">
+            <span><input type="checkbox" value="${s.id}" ${qdExtraSupplierIds.includes(s.id) ? 'checked' : ''} onchange="toggleQdExtraSupplier(${s.id}, this.checked)"> ${escapeHtml(s.name)}</span>
+            <span class="mono" style="color:var(--text-dim); font-size:11px">${escapeHtml(s.cnpj || '')}</span>
+          </label>`).join('')
+      : '<div class="empty">Nenhum fornecedor encontrado.</div>';
+  }
+
+  updatePaginationControls('qd-extra-suppliers', page, totalPages, filtered.length, (newPage) => {
+    qdExtraSuppliersPage = newPage;
+    renderQdExtraSuppliersList();
+  });
+}
+
+function toggleQdExtraSupplier(id, checked) {
+  if (checked) {
+    if (!qdExtraSupplierIds.includes(id)) qdExtraSupplierIds.push(id);
+  } else {
+    qdExtraSupplierIds = qdExtraSupplierIds.filter(x => x !== id);
+  }
+  const btn = document.getElementById('qd-extra-suppliers-btn');
+  if (btn) btn.textContent = 'Fornecedores Avulsos' + (qdExtraSupplierIds.length ? ` (${qdExtraSupplierIds.length})` : '');
+  const countEl = document.getElementById('qd-extra-suppliers-selected-count');
+  if (countEl) countEl.textContent = `${qdExtraSupplierIds.length} selecionado(s)`;
+}
+
 // Busca TUDO que a tela precisa antes de montar o conteúdo final — nada de abrir o modal
 // já com os campos vazios e ir preenchendo conforme cada chamada de API responde (o efeito
 // de "montando na hora" que dava a impressão de página quebrada). Mostra um carregando
@@ -32,6 +109,7 @@ async function abrirDetalheCotacao(id) {
   qdCurrentItemsIsDraft = q.status === 'DRAFT';
   qdItemsPage = 0;
   qdPendingQuantityEdits = {};
+  qdExtraSupplierIds = q.extraSupplierIds ? [...q.extraSupplierIds] : [];
 
   openModal(`
     <div class="qd-modal-body">
@@ -56,6 +134,7 @@ async function abrirDetalheCotacao(id) {
       <div style="width:170px"><label>Projeção de venda padrão (dias)</label><input type="number" min="1" step="1" id="qd-sales-projection" placeholder="Ex: 30" value="${q.defaultSalesProjectionDays ?? ''}"></div>
       <button id="qd-save-btn" onclick="updateQuotation()">Salvar edição</button>
       <button id="qd-group-suppliers-btn" class="secondary" onclick="manageQdGroupSuppliers()">Fornecedores do Grupo</button>
+      <button id="qd-extra-suppliers-btn" class="secondary" onclick="manageQdExtraSuppliers()">Fornecedores Avulsos${q.extraSupplierNames && q.extraSupplierNames.length ? ` (${q.extraSupplierNames.length})` : ''}</button>
     </div>
 
     <div class="btn-row" style="margin-top:16px">
@@ -292,46 +371,50 @@ async function loadQuotationItemsDetail(id, status) {
 const QD_TRASH_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" width="15" height="15"><path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m3 0l-1 14a2 2 0 01-2 2H7a2 2 0 01-2-2L4 6h16z"/></svg>';
 
 // Lista completa de cada bloco (Sem lance / Cortados) — guardada à parte pra alimentar o
-// modal "Ver mais" sem precisar embutir o array inteiro no onclick (JSON escapado em
-// atributo HTML é frágil e ilegível). Só o bloco visível na tela usa QD_ITEM_LIST_LIMIT;
-// o "Ver mais" mostra a lista inteira.
-const QD_ITEM_LIST_LIMIT = 4;
+// modal "Ver mais", já que o painel de atenção em si não mostra mais nenhum item (só
+// título + contagem + botão) — uma cotação com dezenas de produtos sem atendimento
+// não empurra mais o resto do modal pra baixo.
 let qdNoWinnerItemsFull = [];
 let qdCutItemsFull = [];
 
-const qdItemLine = i => `<li style="margin-bottom:2px"><strong style="font-size:11.5px">${escapeHtml(i.productName)}</strong> <span class="mono" style="color:var(--text-dim); font-size:10.5px">(${escapeHtml(i.productBarcode)})</span> — ${i.quantity} un.</li>`;
+const qdItemLine = i => `
+  <div class="expiring-item">
+    <span><strong style="font-size:12.5px">${escapeHtml(i.productName)}</strong> <span class="mono" style="color:var(--text-dim); font-size:11px">(${escapeHtml(i.productBarcode)})</span></span>
+    <span style="color:var(--text-dim); font-size:11.5px; white-space:nowrap; flex-shrink:0">${i.quantity} un.</span>
+  </div>`;
 
-// Corta a lista em QD_ITEM_LIST_LIMIT itens e, se sobrar mais, acrescenta um botão "Ver
-// mais" que abre a lista inteira num modal à parte — sem isso, o painel de atenção podia
-// crescer indefinidamente na tela (uma cotação com dezenas de produtos sem atendimento
-// empurrava todo o resto do modal pra baixo, ficando difícil até de rolar até o fim).
-function qdRenderItemListWithMore(items, which) {
-  const visible = items.slice(0, QD_ITEM_LIST_LIMIT);
-  const listHtml = `<ul style="margin:0 0 5px; padding-left:16px; font-size:11.5px">${visible.map(qdItemLine).join('')}</ul>`;
-  if (items.length <= QD_ITEM_LIST_LIMIT) return listHtml;
-  const remaining = items.length - QD_ITEM_LIST_LIMIT;
-  return `${listHtml}<button class="secondary small" onclick="qdOpenFullItemListModal('${which}')">Ver mais (${remaining})</button>`;
-}
+// which é 'noWinner' ou 'cut' — decide qual lista/título mostrar e serve de sufixo
+// pros ids/handlers compartilhados entre os dois blocos (evita duplicar toda essa
+// função pra cada caso).
+const QD_FULFILLMENT_LABELS = {
+  noWinner: { title: 'Sem nenhum lance', description: 'Nenhum representante ofertou esses produtos — a cotação fechou sem vencedor pra eles.' },
+  cut: { title: 'Cortados por falta de estoque', description: 'O representante venceu, mas depois confirmou que não tem esse item em estoque.' }
+};
 
+// Modal "Ver mais" — layout em lista (uma linha por produto, com respiro entre elas e
+// dentro de uma caixa com rolagem própria) em vez da lista crua de antes, que ficava
+// toda espremida e com o botão Fechar colado em cima do último item.
 function qdOpenFullItemListModal(which) {
-  const isCut = which === 'cut';
-  const items = isCut ? qdCutItemsFull : qdNoWinnerItemsFull;
-  const title = isCut ? 'Cortados por falta de estoque' : 'Produtos sem nenhum lance';
+  const items = which === 'cut' ? qdCutItemsFull : qdNoWinnerItemsFull;
+  const labels = QD_FULFILLMENT_LABELS[which];
   openModal2(`
-    <h2>${title} (${items.length})</h2>
-    <div class="scroll-box" style="max-height:60vh">
-      <ul style="margin:0; padding-left:18px; font-size:13px">${items.map(qdItemLine).join('')}</ul>
+    <h2>${labels.title} (${items.length})</h2>
+    <div class="subtitle" style="margin-bottom:12px">${labels.description}</div>
+    <div class="scroll-box" style="max-height:50vh; overflow-y:auto; border:1px solid var(--border); border-radius:9px; padding:2px 12px">
+      ${items.map(qdItemLine).join('')}
     </div>
     <div class="btn-row" style="margin-top:16px">
       <button class="secondary" onclick="closeModal2()">Fechar</button>
     </div>
-  `);
+  `, true);
 }
 
 // Painel de atenção, só pra cotação FECHADA — só nessa fase "sem vencedor" e "cortado"
 // têm sentido (antes disso winningBidId é sempre nulo pra todo mundo, é só o processo
 // normal de ainda não ter fechado). Some sozinho quando não há nenhum caso, pra não virar
-// ruído em toda cotação fechada sem problema nenhum.
+// ruído em toda cotação fechada sem problema nenhum. Cada bloco mostra só título +
+// contagem + descrição + botões — nenhum item aparece direto no painel, só dentro do
+// modal "Ver mais" (qdOpenFullItemListModal).
 function renderQdFulfillmentIssues(items, status) {
   const wrap = document.getElementById('qd-fulfillment-issues');
   if (status !== 'CLOSED') { wrap.style.display = 'none'; wrap.innerHTML = ''; return; }
@@ -343,76 +426,75 @@ function renderQdFulfillmentIssues(items, status) {
   qdNoWinnerItemsFull = noWinnerItems;
   qdCutItemsFull = cutItems;
 
-  const noWinnerBlock = noWinnerItems.length ? `
-    <div style="margin-bottom:${cutItems.length ? '10px' : '0'}">
-      <div style="font-weight:700; color:var(--warning); font-size:11.5px">Sem nenhum lance (${noWinnerItems.length})</div>
-      <div style="font-size:10.5px; color:var(--text-dim); margin-bottom:4px">Nenhum representante ofertou esses produtos — a cotação fechou sem vencedor pra eles.</div>
-      ${qdRenderItemListWithMore(noWinnerItems, 'noWinner')}
-      <div class="btn-row" style="margin-top:4px">
-        <button class="secondary small" onclick="duplicateUnquotedItems()">Gerar Outra Cotação</button>
-        <button class="secondary small" id="qd-add-to-existing-btn" style="display:none" onclick="openAddUnquotedToExistingModal()">Adicionar a uma cotação existente</button>
+  const qdFulfillmentBlock = (which, count) => count ? `
+    <div style="margin-bottom:${which === 'noWinner' && cutItems.length ? '10px' : '0'}">
+      <div style="font-weight:700; color:var(--${which === 'cut' ? 'danger' : 'warning'}); font-size:11.5px">${QD_FULFILLMENT_LABELS[which].title} (${count})</div>
+      <div style="font-size:10.5px; color:var(--text-dim); margin-bottom:6px">${QD_FULFILLMENT_LABELS[which].description}</div>
+      <div class="btn-row" style="margin:0">
+        <button class="secondary small" onclick="qdOpenFullItemListModal('${which}')">Ver mais</button>
+        <button class="secondary small" onclick="duplicateFulfillmentItems('${which}')">Gerar Outra Cotação</button>
+        <button class="secondary small" id="qd-add-to-existing-${which}-btn" style="display:none" onclick="openAddToExistingModal('${which}')">Adicionar a uma cotação existente</button>
       </div>
-    </div>` : '';
-
-  const cutBlock = cutItems.length ? `
-    <div>
-      <div style="font-weight:700; color:var(--danger); font-size:11.5px">Cortados por falta de estoque (${cutItems.length})</div>
-      <div style="font-size:10.5px; color:var(--text-dim); margin-bottom:4px">O representante venceu, mas depois confirmou que não tem esse item em estoque.</div>
-      ${qdRenderItemListWithMore(cutItems, 'cut')}
     </div>` : '';
 
   wrap.style.display = 'block';
   wrap.innerHTML = `
     <div style="background:var(--warning-bg); border:1px solid var(--warning-border); border-radius:9px; padding:10px 13px; margin-top:10px">
       <div style="font-weight:700; font-size:12px; margin-bottom:5px">⚠ Produtos sem atendimento</div>
-      ${noWinnerBlock}
-      ${cutBlock}
+      ${qdFulfillmentBlock('noWinner', noWinnerItems.length)}
+      ${qdFulfillmentBlock('cut', cutItems.length)}
     </div>`;
 
-  if (noWinnerItems.length) checkDraftQuotationsForAddButton();
+  checkDraftQuotationsForAddButtons();
 }
 
-// Botão "Adicionar a uma cotação existente" só aparece se houver pelo menos um
-// Rascunho pra receber os itens — busca à parte pra não travar a renderização do
-// painel de atenção esperando essa checagem.
-async function checkDraftQuotationsForAddButton() {
+// Botões "Adicionar a uma cotação existente" (dos dois blocos) só aparecem se houver
+// pelo menos um Rascunho pra receber os itens — busca à parte pra não travar a
+// renderização do painel de atenção esperando essa checagem.
+async function checkDraftQuotationsForAddButtons() {
   const all = await safeCall(() => api('GET', '/quotations'));
   const hasDraft = all.some(q => q.status === 'DRAFT' && q.id !== currentQuotationId);
-  const btn = document.getElementById('qd-add-to-existing-btn');
-  if (btn) btn.style.display = hasDraft ? 'inline-block' : 'none';
+  ['noWinner', 'cut'].forEach(which => {
+    const btn = document.getElementById(`qd-add-to-existing-${which}-btn`);
+    if (btn) btn.style.display = hasDraft ? 'inline-block' : 'none';
+  });
 }
 
-// Modal simples: escolhe um Rascunho existente e adiciona os itens sem lance um a um
-// (não existe endpoint de lote pra isso — POST /quotations/{id}/items já é o suficiente
-// pra uma lista curta de itens "sobrando", sem precisar criar um endpoint novo só pra isso).
-async function openAddUnquotedToExistingModal() {
-  const noWinnerItems = qdCurrentItems.filter(i => !i.winningBidId);
+// Modal simples: escolhe um Rascunho existente e adiciona os itens (sem lance OU
+// cortados, conforme which) um a um — não existe endpoint de lote pra isso (POST
+// /quotations/{id}/items já é o suficiente pra uma lista curta de itens "sobrando",
+// sem precisar criar um endpoint novo só pra isso).
+async function openAddToExistingModal(which) {
+  const items = which === 'cut' ? qdCutItemsFull : qdNoWinnerItemsFull;
+  const label = QD_FULFILLMENT_LABELS[which].title.toLowerCase();
   const all = await safeCall(() => api('GET', '/quotations'));
   const drafts = all.filter(q => q.status === 'DRAFT' && q.id !== currentQuotationId);
 
   openModal2(`
     <h2>Adicionar a uma cotação existente</h2>
-    <div class="subtitle" style="margin-bottom:14px">Os ${noWinnerItems.length} produtos sem lance dessa cotação serão adicionados ao Rascunho escolhido.</div>
+    <div class="subtitle" style="margin-bottom:14px">Os ${items.length} produtos ${label} dessa cotação serão adicionados ao Rascunho escolhido.</div>
     <label>Cotação em Rascunho</label>
-    <select id="add-unquoted-target">
+    <select id="add-existing-target">
       ${drafts.map(q => `<option value="${q.id}">${escapeHtml(q.name)} (Nº ${formatQuotationNumber(q.id)})</option>`).join('')}
     </select>
+    <input type="hidden" id="add-existing-which" value="${which}">
     <div class="btn-row" style="margin-top:16px; justify-content:space-between">
       <button class="secondary" onclick="closeModal2()">Cancelar</button>
-      <button id="add-unquoted-confirm-btn" onclick="confirmAddUnquotedToExisting()">Adicionar</button>
+      <button id="add-existing-confirm-btn" onclick="confirmAddToExisting()">Adicionar</button>
     </div>
   `);
 }
 
-async function confirmAddUnquotedToExisting() {
-  const targetId = document.getElementById('add-unquoted-target').value;
-  const noWinnerItems = qdCurrentItems.filter(i => !i.winningBidId);
-  const btn = document.getElementById('add-unquoted-confirm-btn');
+async function confirmAddToExisting() {
+  const which = document.getElementById('add-existing-which').value;
+  const targetId = document.getElementById('add-existing-target').value;
+  const items = which === 'cut' ? qdCutItemsFull : qdNoWinnerItemsFull;
+  const btn = document.getElementById('add-existing-confirm-btn');
 
   let added = 0;
   let failed = 0;
   await withButtonLoading(btn, 'Adicionando...', async () => {
-    for (const item of noWinnerItems) {
+    for (const item of items) {
       try {
         await api('POST', `/quotations/${targetId}/items`, { productId: item.productId, quantity: item.quantity });
         added++;

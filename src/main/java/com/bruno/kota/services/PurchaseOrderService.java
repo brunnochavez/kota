@@ -12,6 +12,7 @@ import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.bruno.kota.dtos.LastOrderForProductResponse;
 import com.bruno.kota.dtos.PendingDeliveryItemResponse;
 import com.bruno.kota.dtos.PurchaseOrderResponse;
 import com.bruno.kota.entities.Bid;
@@ -170,6 +171,7 @@ public class PurchaseOrderService {
                     item.getId(),
                     item.getQuotation().getId(),
                     item.getQuotation().getName(),
+                    item.getProduct().getId(),
                     item.getProduct().getName(),
                     item.getProduct().getBarcode(),
                     item.getQuantity(),
@@ -182,5 +184,45 @@ public class PurchaseOrderService {
             ));
         }
         return result;
+    }
+
+    // "Último pedido do fornecedor pra esse produto" — usado em Produtos a Receber
+    // quando o admin clica num item da busca: em vez de abrir a cotação de origem
+    // (que pode nem ser mais relevante), mostra direto o pedido mais recente que esse
+    // fornecedor já ganhou pra esse produto específico, seja ele ainda pendente ou já
+    // recebido há tempos. findLastWonByProductIdAndSupplierId já vem ordenado do mais
+    // recente pro mais antigo (qi.quotation.updatedAt DESC) — só pega o primeiro.
+    @Transactional(readOnly = true)
+    public LastOrderForProductResponse findLastOrderForSupplierAndProduct(Long supplierId, Long productId) {
+        List<QuotationItem> items = quotationItemRepository.findLastWonByProductIdAndSupplierId(productId, supplierId);
+        if (items.isEmpty()) {
+            throw new ResourceNotFoundException("Esse fornecedor ainda não teve nenhum pedido fechado para esse produto.");
+        }
+        QuotationItem item = items.get(0);
+        Bid winner = item.getWinningBid();
+
+        // A OC pode não existir mais (excluída manualmente) ou nunca ter sido gerada
+        // nesse caminho específico — não é erro, só significa que a resposta sai sem
+        // número de OC/prazo/status, com o resto (produto, fornecedor, preço, cotação de
+        // origem) preenchido do jeito que sempre foi.
+        PurchaseOrder po = purchaseOrderRepository
+                .findByQuotation_IdAndSupplier_Id(item.getQuotation().getId(), supplierId)
+                .orElse(null);
+
+        return new LastOrderForProductResponse(
+                item.getId(),
+                item.getQuotation().getId(),
+                item.getQuotation().getName(),
+                po != null ? po.getId() : null,
+                po != null ? po.getCreatedAt() : null,
+                item.getProduct().getName(),
+                item.getProduct().getBarcode(),
+                item.getQuantity(),
+                winner.getValue(),
+                winner.getSupplier().getId(),
+                winner.getSupplier().getName(),
+                po != null ? po.getEstimatedDeliveryDate() : null,
+                po != null ? po.getStatus() : null
+        );
     }
 }

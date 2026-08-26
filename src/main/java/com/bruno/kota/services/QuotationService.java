@@ -8,6 +8,7 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -153,17 +154,12 @@ public class QuotationService {
         Supplier supplier = supplierRepository.findById(supplierId)
                 .orElseThrow(() -> new ResourceNotFoundException("Fornecedor não encontrado: id " + supplierId));
 
-        Set<Long> groupIds = supplier.getGroups().stream().map(SupplierGroup::getId).collect(Collectors.toSet());
-        if (groupIds.isEmpty()) {
-            return List.of();
-        }
-
+        // Antes retornava cedo se o fornecedor não tivesse grupo nenhum — não dá mais
+        // pra cortar caminho assim, porque um fornecedor sem grupo ainda pode enxergar
+        // cotação em que foi adicionado como avulso (extraSuppliers).
         return quotationRepository.findAll().stream()
                 .filter(q -> q.getStatus() != QuotationStatus.DRAFT)
-                .filter(q -> {
-                    SupplierGroup g = safeGetSupplierGroup(q);
-                    return g != null && groupIds.contains(g.getId());
-                })
+                .filter(q -> isSupplierEligibleForQuotation(q, supplier))
                 .map(this::toResponse)
                 .toList();
     }
@@ -180,8 +176,7 @@ public class QuotationService {
         if (quotation.getStatus() == QuotationStatus.DRAFT) {
             throw new ResourceNotFoundException("Cotação não encontrada: id " + quotationId);
         }
-        SupplierGroup group = safeGetSupplierGroup(quotation);
-        boolean hasAccess = group != null && supplierRepository.findByGroup(group).stream()
+        boolean hasAccess = getEligibleSuppliers(quotation).stream()
                 .anyMatch(s -> s.getRepresentative() != null && s.getRepresentative().getId().equals(representativeId));
         if (!hasAccess) {
             throw new ResourceNotFoundException("Cotação não encontrada: id " + quotationId);
@@ -332,6 +327,7 @@ public class QuotationService {
         Quotation quotation = Quotation.builder()
                 .name(request.name())
                 .supplierGroup(resolveSupplierGroup(request.supplierGroupId()))
+                .extraSuppliers(resolveExtraSuppliers(request.extraSupplierIds()))
                 .expirationDate(request.expirationDate())
                 .defaultSalesProjectionDays(request.defaultSalesProjectionDays())
                 .build();
@@ -382,10 +378,27 @@ public class QuotationService {
         return duplicateInternal(original, unquotedItems, " (sem cotação)");
     }
 
+    // Mesma ideia de duplicateUnquotedItems(), mas pros itens que o representante
+    // venceu e DEPOIS confirmou que não tinha em estoque (fulfillmentCut) — cenário
+    // diferente de "ninguém ofertou": aqui alguém ofertou e não conseguiu entregar, e o
+    // caminho natural é tentar de novo, possivelmente com outro fornecedor.
+    @Transactional
+    public QuotationResponse duplicateCutItems(Long id) {
+        Quotation original = findEntityById(id);
+        List<QuotationItem> cutItems = quotationItemRepository.findByQuotationId(id).stream()
+                .filter(QuotationItem::isFulfillmentCut)
+                .toList();
+        if (cutItems.isEmpty()) {
+            throw new BusinessRuleException("Não há itens cortados por falta de estoque nessa cotação.");
+        }
+        return duplicateInternal(original, cutItems, " (falta de estoque)");
+    }
+
     private QuotationResponse duplicateInternal(Quotation original, List<QuotationItem> itemsToClone, String nameSuffix) {
         Quotation copy = Quotation.builder()
                 .name(original.getName() + nameSuffix)
                 .supplierGroup(safeGetSupplierGroup(original))
+                .extraSuppliers(new LinkedHashSet<>(original.getExtraSuppliers()))
                 .defaultSalesProjectionDays(original.getDefaultSalesProjectionDays())
                 .build();
         copy = quotationRepository.save(copy);
@@ -431,6 +444,8 @@ public class QuotationService {
 
         quotation.setName(request.name());
         quotation.setSupplierGroup(resolveSupplierGroup(request.supplierGroupId()));
+        quotation.getExtraSuppliers().clear();
+        quotation.getExtraSuppliers().addAll(resolveExtraSuppliers(request.extraSupplierIds()));
         quotation.setExpirationDate(request.expirationDate());
         quotation.setDefaultSalesProjectionDays(request.defaultSalesProjectionDays());
         return toResponse(quotationRepository.save(quotation));
@@ -459,8 +474,8 @@ public class QuotationService {
         if (quotation.getStatus() != QuotationStatus.DRAFT) {
             throw new BusinessRuleException("Só é possível publicar uma cotação que esteja em DRAFT.");
         }
-        if (safeGetSupplierGroup(quotation) == null) {
-            throw new BusinessRuleException("Defina o grupo de fornecedores antes de publicar.");
+        if (getEligibleSuppliers(quotation).isEmpty()) {
+            throw new BusinessRuleException("Defina o grupo de fornecedores ou adicione fornecedores avulsos antes de publicar.");
         }
         if (quotation.getExpirationDate() == null) {
             throw new BusinessRuleException("Defina o prazo de expiração antes de publicar.");
@@ -529,11 +544,10 @@ public class QuotationService {
     // fotografia precisa refletir o ciclo novo, não acumular os dois.
     private void snapshotEligibleSuppliers(Quotation quotation) {
         quotationEligibleSupplierRepository.deleteByQuotationId(quotation.getId());
-        SupplierGroup group = safeGetSupplierGroup(quotation);
-        if (group == null) {
+        List<Supplier> suppliers = getEligibleSuppliers(quotation);
+        if (suppliers.isEmpty()) {
             return;
         }
-        List<Supplier> suppliers = supplierRepository.findByGroup(group);
         List<QuotationEligibleSupplier> rows = suppliers.stream()
                 .map(s -> QuotationEligibleSupplier.builder()
                         .quotation(quotation)
@@ -545,15 +559,15 @@ public class QuotationService {
     }
 
     private void notifyEligibleRepresentativesOfPublish(Quotation quotation) {
-        SupplierGroup group = safeGetSupplierGroup(quotation);
-        if (group == null) {
+        List<Supplier> eligibleSuppliers = getEligibleSuppliers(quotation);
+        if (eligibleSuppliers.isEmpty()) {
             return;
         }
         // Extrai nome/e-mail AQUI, dentro da transação — é a última chance segura de ler
         // esses campos das entidades. O envio em si roda em outra thread (@Async), sem
         // acesso à sessão do Hibernate; passar as entidades direto pra lá arriscaria
         // LazyInitializationException na hora de ler representative.getName().
-        List<Representative> reps = distinctById(supplierRepository.findByGroup(group).stream()
+        List<Representative> reps = distinctById(eligibleSuppliers.stream()
                 .map(Supplier::getRepresentative)
                 .filter(Objects::nonNull)
                 .toList());
@@ -575,8 +589,8 @@ public class QuotationService {
     @Transactional
     public void sendDeadlineReminder(Long quotationId) {
         Quotation quotation = findEntityById(quotationId);
-        SupplierGroup group = safeGetSupplierGroup(quotation);
-        if (group == null) {
+        List<Supplier> eligibleSuppliers = getEligibleSuppliers(quotation);
+        if (eligibleSuppliers.isEmpty()) {
             return;
         }
 
@@ -587,7 +601,7 @@ public class QuotationService {
                 .map(d -> d.getSupplier().getId())
                 .collect(Collectors.toSet());
 
-        List<Representative> pendingReps = distinctById(supplierRepository.findByGroup(group).stream()
+        List<Representative> pendingReps = distinctById(eligibleSuppliers.stream()
                 .filter(s -> !submittedSupplierIds.contains(s.getId()) && !declinedSupplierIds.contains(s.getId()))
                 .map(Supplier::getRepresentative)
                 .filter(Objects::nonNull)
@@ -640,11 +654,11 @@ public class QuotationService {
     }
 
     private void notifyEligibleRepresentativesOfExtension(Quotation quotation) {
-        SupplierGroup group = safeGetSupplierGroup(quotation);
-        if (group == null) {
+        List<Supplier> eligibleSuppliers = getEligibleSuppliers(quotation);
+        if (eligibleSuppliers.isEmpty()) {
             return;
         }
-        List<Representative> reps = distinctById(supplierRepository.findByGroup(group).stream()
+        List<Representative> reps = distinctById(eligibleSuppliers.stream()
                 .map(Supplier::getRepresentative)
                 .filter(Objects::nonNull)
                 .toList());
@@ -870,15 +884,14 @@ public class QuotationService {
         return new QuotationCloseResult(true, toResponse(saved), List.of(), List.of());
     }
 
-    // Manda pra TODO representante elegível do grupo, tenha ele vencido item nenhum ou
-    // não — é o que foi combinado. "Elegível" continua sendo a mesma definição de
-    // sempre: dono de um fornecedor que pertence ao grupo dessa cotação.
+    // Manda pra TODO representante elegível (grupo + fornecedores avulsos), tenha ele
+    // vencido item nenhum ou não — é o que foi combinado.
     private void notifyEligibleRepresentativesOfClose(Quotation quotation, List<QuotationItem> items) {
-        SupplierGroup group = safeGetSupplierGroup(quotation);
-        if (group == null) {
+        List<Supplier> eligibleSuppliers = getEligibleSuppliers(quotation);
+        if (eligibleSuppliers.isEmpty()) {
             return;
         }
-        List<Representative> eligibleReps = distinctById(supplierRepository.findByGroup(group).stream()
+        List<Representative> eligibleReps = distinctById(eligibleSuppliers.stream()
                 .map(Supplier::getRepresentative)
                 .filter(Objects::nonNull)
                 .toList());
@@ -1172,24 +1185,19 @@ public class QuotationService {
                         d -> d.getQuotation().getId(),
                         Collectors.mapping(d -> d.getDeclinedBy().getId(), Collectors.toSet())));
 
-        // Cache de grupo → representantes elegíveis dentro dessa geração de relatório só,
-        // pra não repetir a mesma consulta quando várias cotações disponíveis compartilham
-        // o mesmo grupo de fornecedores.
-        Map<Long, Set<Long>> eligibleByGroup = new HashMap<>();
         List<QuotationFillRate> rates = new ArrayList<>();
 
+        // Antes cacheava representantes elegíveis por grupo (várias cotações Disponíveis
+        // costumam compartilhar o mesmo grupo). Com fornecedor avulso, elegibilidade
+        // passou a poder variar cotação a cotação mesmo dentro do mesmo grupo — perdeu o
+        // cache, mas o volume aqui é sempre "cotações Disponíveis agora" (poucas
+        // dezenas), então recalcular por cotação não pesa.
         for (Quotation quotation : available) {
-            SupplierGroup group = safeGetSupplierGroup(quotation);
-            if (group == null) {
-                continue;
-            }
-
-            Set<Long> eligibleRepIds = eligibleByGroup.computeIfAbsent(group.getId(), gid ->
-                    supplierRepository.findByGroup(group).stream()
-                            .map(Supplier::getRepresentative)
-                            .filter(Objects::nonNull)
-                            .map(Representative::getId)
-                            .collect(Collectors.toSet()));
+            Set<Long> eligibleRepIds = getEligibleSuppliers(quotation).stream()
+                    .map(Supplier::getRepresentative)
+                    .filter(Objects::nonNull)
+                    .map(Representative::getId)
+                    .collect(Collectors.toSet());
 
             if (eligibleRepIds.isEmpty()) {
                 continue;
@@ -1226,8 +1234,8 @@ public class QuotationService {
     // serve pra não mandar a lista inteira pro navegador de uma vez só.
     private List<RepresentativeResponseStatus> computeRepresentativeResponseStatus(Long quotationId) {
         Quotation quotation = findEntityById(quotationId);
-        SupplierGroup group = safeGetSupplierGroup(quotation);
-        if (group == null) {
+        List<Supplier> eligibleSuppliers = getEligibleSuppliers(quotation);
+        if (eligibleSuppliers.isEmpty()) {
             return List.of();
         }
 
@@ -1239,7 +1247,7 @@ public class QuotationService {
                 .collect(Collectors.toSet());
 
         List<RepresentativeResponseStatus> result = new ArrayList<>();
-        for (Supplier supplier : supplierRepository.findByGroup(group)) {
+        for (Supplier supplier : eligibleSuppliers) {
             Representative rep = supplier.getRepresentative();
             if (rep == null) {
                 continue;
@@ -1500,16 +1508,13 @@ public class QuotationService {
                 .sorted((a, b) -> Integer.compare(b.bids(), a.bids()))
                 .toList();
 
-        Set<Long> myGroupIds = supplier.getGroups().stream().map(SupplierGroup::getId).collect(Collectors.toSet());
         // findPublishedSince já filtra status <> DRAFT e publishedAt > cutoff DIRETO no
         // banco (antes era quotationRepository.findAll() — a TABELA INTEIRA de cotações,
-        // sem filtro nenhum, filtrada em memória depois) e já traz o grupo junto, então
-        // safeGetSupplierGroup() abaixo não dispara mais uma query lazy por cotação.
+        // sem filtro nenhum, filtrada em memória depois) e já traz o grupo junto. Filtro
+        // de elegibilidade agora passa por isSupplierEligibleForQuotation() — não é mais
+        // só "meu grupo bate com o da cotação", cobre fornecedor avulso também.
         List<Quotation> published = quotationRepository.findPublishedSince(performanceCutoff).stream()
-                .filter(q -> {
-                    SupplierGroup group = safeGetSupplierGroup(q);
-                    return group != null && myGroupIds.contains(group.getId());
-                })
+                .filter(q -> isSupplierEligibleForQuotation(q, supplier))
                 .toList();
 
         Set<Long> respondedQuotationIds = myBids.stream()
@@ -1894,12 +1899,20 @@ public class QuotationService {
 
     private QuotationResponse toResponse(Quotation quotation, boolean hasBids) {
         SupplierGroup group = safeGetSupplierGroup(quotation);
+        List<Long> extraSupplierIds = quotation.getExtraSuppliers().stream()
+                .map(Supplier::getId)
+                .toList();
+        List<String> extraSupplierNames = quotation.getExtraSuppliers().stream()
+                .map(Supplier::getName)
+                .toList();
         return new QuotationResponse(
                 quotation.getId(),
                 quotation.getName(),
                 quotation.getStatus(),
                 group != null ? group.getId() : null,
                 group != null ? group.getName() : null,
+                extraSupplierIds,
+                extraSupplierNames,
                 quotation.getCreatedAt(),
                 quotation.getPublishedAt(),
                 quotation.getExpirationDate(),
@@ -1936,6 +1949,55 @@ public class QuotationService {
         } catch (jakarta.persistence.EntityNotFoundException e) {
             return null;
         }
+    }
+
+    // Fornecedor "elegível" pra uma cotação é a UNIÃO de duas fontes, que passaram a
+    // coexistir nesta versão: quem está no grupo da cotação (como sempre foi) + quem foi
+    // adicionado avulso (extraSuppliers), pra cotação que não quer amarrar em grupo
+    // nenhum ou quer complementar o grupo com um fornecedor específico de fora dele.
+    // Esse é o ÚNICO lugar que resolve essa união — todo o resto do arquivo (checagem de
+    // acesso do representante, e-mails de publicação/prorrogação/fechamento/lembrete,
+    // fotografia de elegibilidade, taxa de resposta) chama esse método em vez de repetir
+    // supplierRepository.findByGroup(group) cru, senão bastaria esquecer UM lugar pra
+    // criar uma inconsistência (representante de fornecedor avulso vendo e-mail mas não
+    // conseguindo abrir a cotação, ou vice-versa). LinkedHashSet só pra deduplicar um
+    // fornecedor que por acaso esteja no grupo E também tenha sido adicionado avulso.
+    private List<Supplier> getEligibleSuppliers(Quotation quotation) {
+        Set<Supplier> result = new LinkedHashSet<>();
+        SupplierGroup group = safeGetSupplierGroup(quotation);
+        if (group != null) {
+            result.addAll(supplierRepository.findByGroup(group));
+        }
+        result.addAll(quotation.getExtraSuppliers());
+        return new ArrayList<>(result);
+    }
+
+    // Mesma união de cima, mas na direção oposta: "esse fornecedor específico está
+    // elegível pra essa cotação?" — usado no relatório de desempenho do representante,
+    // que já parte do fornecedor e precisa filtrar cotações, não o contrário.
+    private boolean isSupplierEligibleForQuotation(Quotation quotation, Supplier supplier) {
+        SupplierGroup group = safeGetSupplierGroup(quotation);
+        if (group != null && supplier.getGroups().stream().anyMatch(g -> g.getId().equals(group.getId()))) {
+            return true;
+        }
+        return quotation.getExtraSuppliers().stream().anyMatch(s -> s.getId().equals(supplier.getId()));
+    }
+
+    // Resolve a lista de ids (do request) pra entidades de verdade — mesmo padrão de
+    // resolveSupplierGroup logo acima: ids inválidos derrubam a operação com 404 em vez
+    // de serem ignorados silenciosamente (evita salvar uma cotação achando que tem um
+    // fornecedor avulso que na real nunca foi resolvido). null ou lista vazia = sem
+    // fornecedor avulso nenhum, que é o comportamento de sempre (só grupo).
+    private Set<Supplier> resolveExtraSuppliers(List<Long> extraSupplierIds) {
+        if (extraSupplierIds == null || extraSupplierIds.isEmpty()) {
+            return new LinkedHashSet<>();
+        }
+        Set<Supplier> result = new LinkedHashSet<>();
+        for (Long id : extraSupplierIds) {
+            result.add(supplierRepository.findById(id)
+                    .orElseThrow(() -> new ResourceNotFoundException("Fornecedor não encontrado: id " + id)));
+        }
+        return result;
     }
 
     private QuotationItemResponse toItemResponse(QuotationItem item) {

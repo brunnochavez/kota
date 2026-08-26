@@ -1,6 +1,8 @@
 package com.bruno.kota.entities;
 
 import java.time.LocalDateTime;
+import java.util.LinkedHashSet;
+import java.util.Set;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -12,6 +14,8 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Index;
 import jakarta.persistence.JoinColumn;
+import jakarta.persistence.JoinTable;
+import jakarta.persistence.ManyToMany;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import jakarta.validation.constraints.NotBlank;
@@ -50,6 +54,19 @@ public class Quotation {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "supplier_group_id")
     private SupplierGroup supplierGroup;
+
+    // Fornecedores avulsos, adicionados diretamente à cotação — sem precisar pertencer
+    // ao grupo (nem a cotação precisar ter grupo nenhum). Elegibilidade de verdade
+    // (quem recebe e-mail, quem consegue ver/responder) é sempre a UNIÃO deste conjunto
+    // com o grupo, resolvida em QuotationService.getEligibleSuppliers() — nunca leia
+    // este campo sozinho fora de lá. Tabela de junção própria (não reaproveita a de
+    // Supplier↔SupplierGroup) porque isso aqui é por COTAÇÃO, não por grupo.
+    @ManyToMany(fetch = FetchType.LAZY)
+    @JoinTable(name = "quotation_extra_suppliers",
+            joinColumns = @JoinColumn(name = "quotation_id"),
+            inverseJoinColumns = @JoinColumn(name = "supplier_id"))
+    @Builder.Default
+    private Set<Supplier> extraSuppliers = new LinkedHashSet<>();
 
     @Column(name = "created_at", nullable = false)
     @Builder.Default

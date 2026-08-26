@@ -258,6 +258,11 @@ public class QuotationImportService {
                 quotation.getStatus(),
                 group != null ? group.getId() : null,
                 group != null ? group.getName() : null,
+                // Importação por planilha nunca cria com fornecedor avulso — só grupo,
+                // igual sempre foi. Quem quiser adicionar avulso faz depois, editando a
+                // cotação já criada.
+                java.util.List.of(),
+                java.util.List.of(),
                 quotation.getCreatedAt(),
                 quotation.getPublishedAt(),
                 quotation.getExpirationDate(),
