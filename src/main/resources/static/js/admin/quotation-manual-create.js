@@ -46,7 +46,7 @@ async function manageMqExtraSuppliers() {
       <span id="mq-extra-suppliers-selected-count" style="font-size:11.5px; color:var(--text-dim)">${mqExtraSupplierIds.length} selecionado(s)</span>
       <button onclick="closeModal2()">Concluir</button>
     </div>
-  `, true);
+  `);
   renderMqExtraSuppliersList();
 }
 
@@ -70,12 +70,9 @@ function renderMqExtraSuppliersList() {
   if (listEl) {
     listEl.innerHTML = items.length
       ? items.map(s => `
-          <label class="expiring-item" style="cursor:pointer; align-items:center">
-            <span style="display:flex; align-items:center; gap:6px; min-width:0; overflow:hidden">
-              <input type="checkbox" value="${s.id}" ${mqExtraSupplierIds.includes(s.id) ? 'checked' : ''} onchange="toggleMqExtraSupplier(${s.id}, this.checked)" style="flex-shrink:0">
-              <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap">${escapeHtml(s.representativeName)}</span>
-            </span>
-            <span style="color:var(--text-dim); font-size:11px; white-space:nowrap; flex-shrink:0; margin-left:10px">${escapeHtml(s.name)}</span>
+          <label class="expiring-item" style="cursor:pointer; justify-content:flex-start">
+            <input type="checkbox" value="${s.id}" ${mqExtraSupplierIds.includes(s.id) ? 'checked' : ''} onchange="toggleMqExtraSupplier(${s.id}, this.checked)">
+            <span>${escapeHtml(s.representativeName)} <span style="color:var(--text-dim); font-size:11px">(${escapeHtml(s.name)})</span></span>
           </label>`).join('')
       : '<div class="empty">Nenhum representante encontrado.</div>';
   }
