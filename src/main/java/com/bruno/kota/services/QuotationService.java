@@ -1750,17 +1750,6 @@ public class QuotationService {
         return rows;
     }
 
-    // Mesma ideia de linha-por-lance do relatório do admin, só que escopado a UMA
-    // cotação e UM fornecedor — é o que o representante vê ao abrir o detalhe de uma
-    // cotação em "Anteriores". Funciona pra CLOSED (mostra won) e EXPIRED (nunca teve
-    // vencedor, então won sempre falso — mas ainda mostra o que foi digitado).
-    @Transactional(readOnly = true)
-    // Paginado de verdade — antes mandava TODOS os lances desse fornecedor pra essa
-    // cotação de uma vez (podendo ser dezenas, numa cotação grande). Mesmo padrão de
-    // paginação em memória do resto do arquivo (ver getRepresentativeResponseStatus):
-    // a query em si já é pequena (só os lances DESSE fornecedor NESSA cotação), então
-    // paginar em memória depois de já ter filtrado é suficiente, sem precisar de
-    // LIMIT/OFFSET no banco.
     @Transactional(readOnly = true)
     public PagedResponse<QuotationReportRow> getMyBidsForQuotation(Long quotationId, Long supplierId, Long authenticatedRepresentativeId, int page, int size) {
         validateSupplierOwnership(supplierId, authenticatedRepresentativeId);
