@@ -7,7 +7,9 @@ import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVParser;
@@ -24,6 +26,7 @@ import com.bruno.kota.entities.Quotation;
 import com.bruno.kota.entities.QuotationEvent;
 import com.bruno.kota.entities.QuotationEventType;
 import com.bruno.kota.entities.QuotationItem;
+import com.bruno.kota.entities.Supplier;
 import com.bruno.kota.entities.SupplierGroup;
 import com.bruno.kota.exceptions.BusinessRuleException;
 import com.bruno.kota.exceptions.ResourceNotFoundException;
@@ -33,6 +36,7 @@ import com.bruno.kota.repositories.QuotationEventRepository;
 import com.bruno.kota.repositories.QuotationItemRepository;
 import com.bruno.kota.repositories.QuotationRepository;
 import com.bruno.kota.repositories.SupplierGroupRepository;
+import com.bruno.kota.repositories.SupplierRepository;
 
 import lombok.RequiredArgsConstructor;
 
@@ -45,6 +49,7 @@ public class QuotationImportService {
     private final ProductRepository productRepository;
     private final ImportProfileRepository importProfileRepository;
     private final SupplierGroupRepository supplierGroupRepository;
+    private final SupplierRepository supplierRepository;
     private final QuotationEventRepository quotationEventRepository;
 
     @Transactional
@@ -52,6 +57,7 @@ public class QuotationImportService {
             MultipartFile file,
             String name,
             Long supplierGroupId,
+            List<Long> extraSupplierIds,
             String expirationDate,
             Integer defaultSalesProjectionDays,
             Integer descriptionColumnOverride,
@@ -146,12 +152,25 @@ public class QuotationImportService {
             throw new BusinessRuleException("A coluna de Preço de Custo precisa ser diferente das demais — confira o mapeamento.");
         }
 
+        // Mesma regra de exclusividade de QuotationService (create/update) — Grupo OU
+        // Representantes, nunca os dois. Duplicada aqui (em vez de chamar QuotationService)
+        // porque essa checagem é pequena e este serviço já resolve o grupo por conta
+        // própria (resolveSupplierGroup logo abaixo), no mesmo espírito.
+        boolean hasGroup = supplierGroupId != null;
+        boolean hasExtraSuppliers = extraSupplierIds != null && !extraSupplierIds.isEmpty();
+        if (hasGroup && hasExtraSuppliers) {
+            throw new BusinessRuleException(
+                    "Escolha Grupo OU Representantes pra essa cotação, não os dois — remova um antes de importar.");
+        }
+
         SupplierGroup supplierGroup = resolveSupplierGroup(supplierGroupId);
+        Set<Supplier> extraSuppliers = resolveExtraSuppliers(extraSupplierIds);
         LocalDateTime parsedExpirationDate = parseExpirationDate(expirationDate);
 
         Quotation quotation = Quotation.builder()
                 .name(name)
                 .supplierGroup(supplierGroup)
+                .extraSuppliers(extraSuppliers)
                 .expirationDate(parsedExpirationDate)
                 .defaultSalesProjectionDays(defaultSalesProjectionDays)
                 .build();
@@ -251,6 +270,20 @@ public class QuotationImportService {
                 .orElseThrow(() -> new ResourceNotFoundException("Grupo não encontrado: id " + supplierGroupId));
     }
 
+    // Mesmo raciocínio de resolveSupplierGroup — resolve os ids em entidades de
+    // verdade, id inválido derruba a importação com 404 em vez de ser ignorado.
+    private Set<Supplier> resolveExtraSuppliers(List<Long> extraSupplierIds) {
+        if (extraSupplierIds == null || extraSupplierIds.isEmpty()) {
+            return new LinkedHashSet<>();
+        }
+        Set<Supplier> result = new LinkedHashSet<>();
+        for (Long id : extraSupplierIds) {
+            result.add(supplierRepository.findById(id)
+                    .orElseThrow(() -> new ResourceNotFoundException("Fornecedor não encontrado: id " + id)));
+        }
+        return result;
+    }
+
     private LocalDateTime parseExpirationDate(String expirationDate) {
         if (expirationDate == null || expirationDate.isBlank()) {
             return null;
@@ -303,17 +336,16 @@ public class QuotationImportService {
 
     private QuotationResponse toQuotationResponse(Quotation quotation) {
         SupplierGroup group = safeGetSupplierGroup(quotation);
+        List<Long> extraSupplierIds = quotation.getExtraSuppliers().stream().map(Supplier::getId).toList();
+        List<String> extraSupplierNames = quotation.getExtraSuppliers().stream().map(Supplier::getName).toList();
         return new QuotationResponse(
                 quotation.getId(),
                 quotation.getName(),
                 quotation.getStatus(),
                 group != null ? group.getId() : null,
                 group != null ? group.getName() : null,
-                // Importação por planilha nunca cria com fornecedor avulso — só grupo,
-                // igual sempre foi. Quem quiser adicionar avulso faz depois, editando a
-                // cotação já criada.
-                java.util.List.of(),
-                java.util.List.of(),
+                extraSupplierIds,
+                extraSupplierNames,
                 quotation.getCreatedAt(),
                 quotation.getPublishedAt(),
                 quotation.getExpirationDate(),

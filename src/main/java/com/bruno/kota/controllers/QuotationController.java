@@ -332,6 +332,7 @@ public class QuotationController {
             @RequestParam("file") MultipartFile file,
             @RequestParam String name,
             @RequestParam(required = false) Long supplierGroupId,
+            @RequestParam(required = false) List<Long> extraSupplierIds,
             @RequestParam(required = false) String expirationDate,
             @RequestParam(required = false) Integer defaultSalesProjectionDays,
             @RequestParam(required = false) Integer descriptionColumn,
@@ -340,7 +341,7 @@ public class QuotationController {
             @RequestParam(defaultValue = "false") boolean includeCostPrices,
             @RequestParam(required = false) Integer costColumn) {
         return quotationImportService.importFile(
-                file, name, supplierGroupId, expirationDate, defaultSalesProjectionDays,
+                file, name, supplierGroupId, extraSupplierIds, expirationDate, defaultSalesProjectionDays,
                 descriptionColumn, barcodeColumn, quantityColumn,
                 includeCostPrices, costColumn, principal.displayName());
     }

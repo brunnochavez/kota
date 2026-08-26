@@ -961,7 +961,19 @@
       <div class="subtitle">Delimitador esperado: ponto-e-vírgula (;). Primeira linha = cabeçalho.</div>
       <div class="inline-form">
         <div><label>Nome da cotação</label><input id="import-name" placeholder="Ex: Cotação de Limpeza"></div>
-        <div><label>Grupo (opcional)</label><select id="import-group"><option value="">— definir depois —</option></select></div>
+        <div style="min-width:230px">
+          <label>Destinatários da cotação</label>
+          <div class="tabs" id="import-recipient-mode-tabs" style="margin-bottom:6px">
+            <div class="tab active" data-mode="representantes" onclick="setImportRecipientMode('representantes')">Representantes</div>
+            <div class="tab" data-mode="grupos" onclick="setImportRecipientMode('grupos')">Grupos</div>
+          </div>
+          <div id="import-recipient-mode-reps">
+            <button type="button" class="secondary" id="import-extra-suppliers-btn" onclick="manageImportExtraSuppliers()">Selecionar representantes</button>
+          </div>
+          <div id="import-recipient-mode-group" style="display:none">
+            <select id="import-group"><option value="">— selecione um grupo —</option></select>
+          </div>
+        </div>
         <div><label>Prazo de expiração (opcional)</label>
           <div style="display:flex; gap:6px; flex-wrap:wrap">
             <input type="date" id="import-expiration-date" style="flex:1.3">

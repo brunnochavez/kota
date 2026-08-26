@@ -2,6 +2,95 @@
 // IMPORTAÇÃO DE CSV
 // ============================================================
 // --- CSV import ---
+
+// Fornecedores avulsos escolhidos pra cotação importada — mesmo conceito, mesmo picker
+// (busca + checkbox + paginação) e mesmo cache de fornecedores (qdAllSuppliersCache,
+// definido em quotation-detail-core.js) usado em manageQdExtraSuppliers/
+// manageMqExtraSuppliers. Reaproveita o padrão de nomes com prefixo "import-".
+let importExtraSupplierIds = [];
+let importExtraSuppliersPage = 0;
+let importExtraSuppliersSearchTerm = '';
+
+// Grupo e Representantes são exclusivos aqui também — mesma regra de
+// setQdRecipientMode/setMqRecipientMode, agora pro formulário de importação.
+function setImportRecipientMode(mode) {
+  document.querySelectorAll('#import-recipient-mode-tabs .tab').forEach(t => t.classList.toggle('active', t.dataset.mode === mode));
+  document.getElementById('import-recipient-mode-group').style.display = mode === 'grupos' ? 'block' : 'none';
+  document.getElementById('import-recipient-mode-reps').style.display = mode === 'representantes' ? 'block' : 'none';
+  if (mode === 'grupos') {
+    importExtraSupplierIds = [];
+    const btn = document.getElementById('import-extra-suppliers-btn');
+    if (btn) btn.textContent = 'Selecionar representantes';
+  } else {
+    document.getElementById('import-group').value = '';
+  }
+}
+
+async function manageImportExtraSuppliers() {
+  if (!qdAllSuppliersCache.length) {
+    qdAllSuppliersCache = (await safeCall(() => api('GET', '/suppliers'))).filter(s => s.representativeId);
+  }
+  importExtraSuppliersPage = 0;
+  importExtraSuppliersSearchTerm = '';
+  openModal2(`
+    <h2>Representantes</h2>
+    <div class="subtitle" style="margin-bottom:12px">Adiciona a cotação diretamente pros representantes marcados aqui, sem depender de grupo nenhum.</div>
+    <input id="import-extra-suppliers-search" placeholder="Buscar representante ou empresa..." autocomplete="off" oninput="onImportExtraSuppliersSearch(this.value)" style="margin-bottom:10px">
+    <div id="import-extra-suppliers-list"></div>
+    ${paginationControlsHtml('import-extra-suppliers')}
+    <div class="btn-row" style="margin-top:16px; justify-content:space-between">
+      <span id="import-extra-suppliers-selected-count" style="font-size:11.5px; color:var(--text-dim)">${importExtraSupplierIds.length} selecionado(s)</span>
+      <button onclick="closeModal2()">Concluir</button>
+    </div>
+  `);
+  renderImportExtraSuppliersList();
+}
+
+function onImportExtraSuppliersSearch(term) {
+  importExtraSuppliersSearchTerm = term.trim().toLowerCase();
+  importExtraSuppliersPage = 0;
+  renderImportExtraSuppliersList();
+}
+
+function renderImportExtraSuppliersList() {
+  const filtered = importExtraSuppliersSearchTerm
+    ? qdAllSuppliersCache.filter(s =>
+        s.name.toLowerCase().includes(importExtraSuppliersSearchTerm) ||
+        (s.representativeName || '').toLowerCase().includes(importExtraSuppliersSearchTerm))
+    : qdAllSuppliersCache;
+
+  const { items, page, totalPages } = paginateSlice(filtered, importExtraSuppliersPage, DEFAULT_PAGE_SIZE);
+  importExtraSuppliersPage = page;
+
+  const listEl = document.getElementById('import-extra-suppliers-list');
+  if (listEl) {
+    listEl.innerHTML = items.length
+      ? items.map(s => `
+          <label class="expiring-item" style="cursor:pointer; justify-content:flex-start; gap:8px">
+            <input type="checkbox" value="${s.id}" style="width:auto; flex-shrink:0" ${importExtraSupplierIds.includes(s.id) ? 'checked' : ''} onchange="toggleImportExtraSupplier(${s.id}, this.checked)">
+            <span>${escapeHtml(s.name)}</span>
+          </label>`).join('')
+      : '<div class="empty">Nenhum representante encontrado.</div>';
+  }
+
+  updatePaginationControls('import-extra-suppliers', page, totalPages, filtered.length, (newPage) => {
+    importExtraSuppliersPage = newPage;
+    renderImportExtraSuppliersList();
+  });
+}
+
+function toggleImportExtraSupplier(id, checked) {
+  if (checked) {
+    if (!importExtraSupplierIds.includes(id)) importExtraSupplierIds.push(id);
+  } else {
+    importExtraSupplierIds = importExtraSupplierIds.filter(x => x !== id);
+  }
+  const btn = document.getElementById('import-extra-suppliers-btn');
+  if (btn) btn.textContent = importExtraSupplierIds.length ? `Selecionar representantes (${importExtraSupplierIds.length})` : 'Selecionar representantes';
+  const countEl = document.getElementById('import-extra-suppliers-selected-count');
+  if (countEl) countEl.textContent = `${importExtraSupplierIds.length} selecionado(s)`;
+}
+
 async function importFile(withMapping) {
   const fileInput = document.getElementById('import-file');
   if (!fileInput.files.length) { toast('Escolha um arquivo primeiro.', true); return; }
@@ -17,6 +106,7 @@ async function importFile(withMapping) {
 
   let url = `/quotations/import?name=${encodeURIComponent(name)}&includeCostPrices=${includeCost}`;
   if (groupId) url += `&supplierGroupId=${groupId}`;
+  importExtraSupplierIds.forEach(id => { url += `&extraSupplierIds=${id}`; });
   if (expiration) url += `&expirationDate=${encodeURIComponent(expiration)}`;
   if (salesProjection) url += `&defaultSalesProjectionDays=${salesProjection}`;
   if (withMapping) {
@@ -58,6 +148,10 @@ async function importFile(withMapping) {
     clearExpirationValue('import-expiration');
     document.getElementById('import-sales-projection').value = '';
     document.getElementById('import-include-cost').checked = false;
+    importExtraSupplierIds = [];
+    const extraSuppliersBtn = document.getElementById('import-extra-suppliers-btn');
+    if (extraSuppliersBtn) extraSuppliersBtn.textContent = 'Selecionar representantes';
+    setImportRecipientMode('representantes');
     fileInput.value = '';
     goToSection('quotation-reports');
   }
