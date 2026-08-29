@@ -8,52 +8,74 @@
 // cotação por cotação.
 let ufiCache = [];
 let ufiSelectedIds = new Set();
+// Paginação própria por categoria — nunca scroll interno (convenção do projeto), cada
+// bloco pagina de verdade com os mesmos helpers usados no resto do admin.
+let ufiPages = { noWinner: 0, cut: 0 };
 
 async function loadUnfulfilledItems() {
-  ufiCache = await safeCall(() => api('GET', '/quotations/unfulfilled-items'));
+  const raw = await safeCall(() => api('GET', '/quotations/unfulfilled-items'));
+  // Ordem alfabética (nome do produto) dentro de cada categoria — mesmo padrão de
+  // Fornecedores/Representantes/Produtos no resto do sistema.
+  ufiCache = raw.sort((a, b) => a.productName.localeCompare(b.productName, 'pt-BR'));
   ufiSelectedIds = new Set();
+  ufiPages = { noWinner: 0, cut: 0 };
   renderUnfulfilledItems();
 }
 
 function renderUnfulfilledItems() {
-  const noWinnerItems = ufiCache.filter(i => !i.cut);
-  const cutItems = ufiCache.filter(i => i.cut);
-
   document.getElementById('ufi-empty').style.display = ufiCache.length ? 'none' : 'block';
-  document.getElementById('ufi-section-noWinner').innerHTML = ufiCategoryHtml('noWinner', 'Sem nenhum lance', noWinnerItems);
-  document.getElementById('ufi-section-cut').innerHTML = ufiCategoryHtml('cut', 'Cortados por falta de estoque', cutItems);
-
+  renderUfiCategory('noWinner', 'Sem nenhum lance');
+  renderUfiCategory('cut', 'Cortados por falta de estoque');
   updateUfiSelectedCount();
   checkUfiDraftQuotationsForAddButton();
 }
 
-// Checkbox "selecionar todos" no cabeçalho da categoria + um checkbox por item, com o
-// nome da cotação de origem e a quantidade — a mesma linha (expiring-item) usada em
-// outras listas de checkbox do sistema.
-function ufiCategoryHtml(which, title, items) {
-  if (!items.length) return '';
-  const allSelected = items.every(i => ufiSelectedIds.has(i.quotationItemId));
-  return `
+// Checkbox "selecionar todos" no cabeçalho considera SÓ os itens da categoria inteira
+// (não só a página visível) — senão "selecionar todos" mudaria de significado
+// dependendo de em qual página o admin estava.
+function renderUfiCategory(which, title) {
+  const wrap = document.getElementById('ufi-section-' + which);
+  const categoryItems = ufiCache.filter(i => i.cut === (which === 'cut'));
+
+  if (!categoryItems.length) {
+    wrap.innerHTML = '';
+    return;
+  }
+
+  const { items, page, totalPages } = paginateSlice(categoryItems, ufiPages[which], DEFAULT_PAGE_SIZE);
+  ufiPages[which] = page;
+  const allSelected = categoryItems.every(i => ufiSelectedIds.has(i.quotationItemId));
+
+  wrap.innerHTML = `
     <div style="margin-bottom:16px">
       <label class="expiring-item" style="cursor:pointer; font-weight:700; background:var(--surface-2); border-radius:7px; padding:8px 10px">
         <input type="checkbox" style="width:auto; flex-shrink:0" id="ufi-select-all-${which}" ${allSelected ? 'checked' : ''} onchange="toggleUfiSelectAll('${which}', this.checked)">
-        <span>${title} (${items.length})</span>
+        <span>${title} (${categoryItems.length})</span>
       </label>
-      <div style="max-height:340px; overflow-y:auto; border:1px solid var(--border); border-top:none; border-radius:0 0 7px 7px">
+      <div style="border:1px solid var(--border); border-top:none; border-radius:0 0 7px 7px">
         ${items.map(i => `
           <label class="expiring-item" style="cursor:pointer; padding-left:26px">
-            <input type="checkbox" style="width:auto; flex-shrink:0" value="${i.quotationItemId}" ${ufiSelectedIds.has(i.quotationItemId) ? 'checked' : ''} onchange="toggleUfiItem(${i.quotationItemId}, this.checked)">
-            <span style="flex:1">
-              <strong style="font-size:12.5px">${escapeHtml(i.productName)}</strong> <span class="mono" style="font-size:11px; color:var(--text-dim)">${escapeHtml(i.productBarcode)}</span>
-              <div style="font-size:11px; color:var(--text-dim)">${escapeHtml(i.quotationName)} · ${i.quantity} un.</div>
+            <span style="display:flex; align-items:center; gap:8px">
+              <input type="checkbox" style="width:auto; flex-shrink:0" value="${i.quotationItemId}" ${ufiSelectedIds.has(i.quotationItemId) ? 'checked' : ''} onchange="toggleUfiItem(${i.quotationItemId}, this.checked)">
+              <span>
+                <strong style="font-size:12.5px">${escapeHtml(i.productName)}</strong> <span class="mono" style="font-size:11px; color:var(--text-dim)">${escapeHtml(i.productBarcode)}</span>
+                <div style="font-size:11px; color:var(--text-dim)">${escapeHtml(i.quotationName)} · ${i.quantity} un.</div>
+              </span>
             </span>
+            <button class="secondary small" onclick="event.preventDefault(); removeUfiItem(${i.quotationItemId})">Remover da lista</button>
           </label>`).join('')}
       </div>
+      ${paginationControlsHtml('ufi-' + which)}
     </div>`;
+
+  updatePaginationControls('ufi-' + which, page, totalPages, categoryItems.length, (newPage) => {
+    ufiPages[which] = newPage;
+    renderUfiCategory(which, title);
+  });
 }
 
 function toggleUfiSelectAll(which, checked) {
-  ufiCache.filter(i => (which === 'cut') === i.cut).forEach(i => {
+  ufiCache.filter(i => i.cut === (which === 'cut')).forEach(i => {
     if (checked) ufiSelectedIds.add(i.quotationItemId);
     else ufiSelectedIds.delete(i.quotationItemId);
   });
@@ -66,13 +88,23 @@ function toggleUfiItem(id, checked) {
   updateUfiSelectedCount();
 
   // Atualiza só o checkbox "selecionar todos" da categoria desse item, sem
-  // re-renderizar a lista inteira (perderia a posição de rolagem à toa).
+  // re-renderizar a lista inteira (perderia a página em que o admin estava).
   const item = ufiCache.find(i => i.quotationItemId === id);
   if (!item) return;
   const which = item.cut ? 'cut' : 'noWinner';
   const categoryItems = ufiCache.filter(i => i.cut === item.cut);
   const selectAllEl = document.getElementById('ufi-select-all-' + which);
   if (selectAllEl) selectAllEl.checked = categoryItems.every(i => ufiSelectedIds.has(i.quotationItemId));
+}
+
+// Só tira o item dessa lista/sessão (não muda nada na cotação de origem nem no banco)
+// — pra quando o admin já resolveu aquilo por fora e só quer parar de ver na tela.
+// Reaparece normalmente numa próxima visita/recarregamento, já que a condição real
+// (sem lance / cortado) continua valendo na cotação de origem.
+function removeUfiItem(id) {
+  ufiCache = ufiCache.filter(i => i.quotationItemId !== id);
+  ufiSelectedIds.delete(id);
+  renderUnfulfilledItems();
 }
 
 function updateUfiSelectedCount() {
