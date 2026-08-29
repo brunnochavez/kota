@@ -45,6 +45,7 @@ import com.bruno.kota.dtos.RepresentativeResponseStatus;
 import com.bruno.kota.dtos.ReviewBatchUpdateRequest;
 import com.bruno.kota.dtos.SalesProjectionUpdateRequest;
 import com.bruno.kota.dtos.SpendSavingsSummary;
+import com.bruno.kota.dtos.UnfulfilledItemRow;
 import com.bruno.kota.dtos.WonQuotationCardResponse;
 import com.bruno.kota.dtos.WonQuotationItem;
 import com.bruno.kota.dtos.WonQuotationSummary;
@@ -313,6 +314,20 @@ public class QuotationController {
     @PreAuthorize("hasRole('ADMIN')")
     public QuotationResponse duplicateCutItems(@PathVariable Long id) {
         return quotationService.duplicateCutItems(id);
+    }
+
+    // Visão geral (todas as cotações fechadas) — alimenta a tela "Produtos sem
+    // atendimento", separada do painel de dentro de uma cotação específica.
+    @GetMapping("/unfulfilled-items")
+    @PreAuthorize("hasRole('ADMIN')")
+    public List<UnfulfilledItemRow> getUnfulfilledItemsReport() {
+        return quotationService.getUnfulfilledItemsReport();
+    }
+
+    @PostMapping("/create-from-unfulfilled-items")
+    @PreAuthorize("hasRole('ADMIN')")
+    public QuotationResponse createFromUnfulfilledItems(@RequestBody List<Long> quotationItemIds) {
+        return quotationService.createFromUnfulfilledItems(quotationItemIds);
     }
 
     @PostMapping("/{id}/close")

@@ -578,6 +578,10 @@
     <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/><path d="M3.27 6.96L12 12l8.73-5.04M12 22.08V12"/></svg></span>
     Produtos a Receber
   </div>
+  <div class="nav-item" data-section="unfulfilled-items">
+    <span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 9v4M12 17h.01"/><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg></span>
+    Produtos sem Atendimento
+  </div>
 
   <div class="nav-group-label">Produtos</div>
   <div class="nav-item" data-section="products">
@@ -1112,7 +1116,7 @@
   <!-- SPEND SAVINGS DASHBOARD -->
   <section class="section" id="section-spend-savings">
     <h1>Economia</h1>
-    <div class="subtitle">Quanto foi economizado em cotações fechadas comparando o menor lance (vencedor) com a média de todos os lances recebidos, por grupo de fornecedores. Só entram itens com vencedor definido e mais de um lance — com um lance só não tem com o que comparar.</div>
+    <div class="subtitle">Quanto foi economizado em cotações fechadas, por grupo de fornecedores. Quando o item tem preço de custo importado, compara o lance vencedor com esse custo (a economia real frente ao que já se pagava); sem custo importado, compara com a média de todos os lances recebidos (precisa de pelo menos 2 lances — com 1 só não tem com o que comparar).</div>
 
     <div class="card">
       <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap">
@@ -1266,6 +1270,26 @@
     </div>
   </section>
 
+  <!-- UNFULFILLED ITEMS -->
+  <section class="section" id="section-unfulfilled-items">
+    <h1>Produtos sem Atendimento</h1>
+    <div class="subtitle">Itens de cotações fechadas que ninguém ofertou, ou que o representante venceu e depois confirmou que não tinha em estoque — juntando de todas as cotações fechadas, pra reunir numa cotação só em vez de resolver uma por uma.</div>
+
+    <div class="card">
+      <div class="btn-row" style="justify-content:space-between; margin-bottom:14px">
+        <div style="font-size:12px; color:var(--text-dim)"><span id="ufi-selected-count">0</span> selecionado(s)</div>
+        <div class="btn-row">
+          <button class="secondary" id="ufi-add-existing-btn" style="display:none" onclick="openAddUnfulfilledToExistingModal()">Adicionar a uma cotação existente</button>
+          <button onclick="createQuotationFromUnfulfilled()">Gerar Nova Cotação</button>
+        </div>
+      </div>
+
+      <div id="ufi-section-noWinner"></div>
+      <div id="ufi-section-cut"></div>
+      <div class="empty" id="ufi-empty" style="display:none">Nenhum produto sem atendimento no momento.</div>
+    </div>
+  </section>
+
   <!-- PENDING DELIVERIES -->
   <section class="section" id="section-pending-deliveries">
     <h1>Produtos a Receber</h1>
@@ -1309,6 +1333,7 @@
   <script src="js/admin/reorder-points.js"></script>
   <script src="js/admin/purchase-orders.js"></script>
   <script src="js/admin/pending-deliveries.js"></script>
+  <script src="js/admin/quotation-unfulfilled-items.js"></script>
   <script src="js/admin/statistics.js"></script>
   <script src="js/admin/reports.js"></script>
   <script src="js/admin/spend-savings.js"></script>

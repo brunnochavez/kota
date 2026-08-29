@@ -245,12 +245,27 @@ public class QuotationService {
         for (List<Bid> itemBids : bidsByItem.values()) {
             QuotationItem item = itemBids.get(0).getQuotationItem();
             Bid winningBid = item.getWinningBid();
-            if (winningBid == null || itemBids.size() < 2) continue;
+            if (winningBid == null) continue;
 
-            BigDecimal sum = itemBids.stream().map(Bid::getValue).reduce(BigDecimal.ZERO, BigDecimal::add);
-            BigDecimal average = sum.divide(BigDecimal.valueOf(itemBids.size()), 4, RoundingMode.HALF_UP);
+            // Preço de custo importado (opcional, ver QuotationImportService) é a base
+            // mais precisa quando existe — economia de verdade frente ao que já se
+            // pagava antes, em vez de uma estimativa contra a média dos lances dessa
+            // cotação específica. Funciona mesmo com um lance só, porque não depende de
+            // ter concorrência pra comparar. Sem custo importado, cai no comportamento
+            // de sempre: média dos lances recebidos, que só faz sentido com pelo menos 2
+            // lances — com 1 só não tem com o que comparar.
+            BigDecimal baseline;
+            if (item.getCostPrice() != null) {
+                baseline = item.getCostPrice();
+            } else if (itemBids.size() >= 2) {
+                BigDecimal sum = itemBids.stream().map(Bid::getValue).reduce(BigDecimal.ZERO, BigDecimal::add);
+                baseline = sum.divide(BigDecimal.valueOf(itemBids.size()), 4, RoundingMode.HALF_UP);
+            } else {
+                continue;
+            }
+
             BigDecimal quantity = item.getQuantity();
-            BigDecimal itemSavings = average.subtract(winningBid.getValue()).multiply(quantity).max(BigDecimal.ZERO);
+            BigDecimal itemSavings = baseline.subtract(winningBid.getValue()).multiply(quantity).max(BigDecimal.ZERO);
             BigDecimal itemSpend = winningBid.getValue().multiply(quantity);
 
             Quotation quotation = item.getQuotation();
@@ -379,6 +394,71 @@ public class QuotationService {
         return duplicateInternal(original, unquotedItems, " (sem cotação)");
     }
 
+    // Visão geral, cruzando TODAS as cotações fechadas — diferente do painel "Produtos
+    // sem atendimento" de dentro de uma cotação (renderQdFulfillmentIssues no front),
+    // que é só daquela cotação. Aqui o admin enxerga tudo de uma vez pra juntar itens de
+    // cotações DIFERENTES numa cotação nova ou existente só, em vez de fazer isso
+    // cotação por cotação.
+    @Transactional(readOnly = true)
+    public List<UnfulfilledItemRow> getUnfulfilledItemsReport() {
+        List<Quotation> closedQuotations = quotationRepository.findByStatus(QuotationStatus.CLOSED);
+        if (closedQuotations.isEmpty()) {
+            return List.of();
+        }
+        List<Long> ids = closedQuotations.stream().map(Quotation::getId).toList();
+
+        List<UnfulfilledItemRow> result = new ArrayList<>();
+        for (QuotationItem item : quotationItemRepository.findByQuotationIdInWithReorderDetails(ids)) {
+            boolean noWinner = item.getWinningBid() == null;
+            boolean cut = item.isFulfillmentCut();
+            if (!noWinner && !cut) {
+                continue;
+            }
+            result.add(new UnfulfilledItemRow(
+                    item.getQuotation().getId(),
+                    item.getQuotation().getName(),
+                    item.getId(),
+                    item.getProduct().getId(),
+                    item.getProduct().getName(),
+                    item.getProduct().getBarcode(),
+                    item.getQuantity(),
+                    cut
+            ));
+        }
+        return result;
+    }
+
+    // Junta itens escolhidos de QUALQUER cotação fechada (ver getUnfulfilledItemsReport)
+    // numa cotação nova em Rascunho, sem grupo/representante definido ainda — o admin
+    // decide isso depois, editando a cotação recém-criada, igual qualquer outra criação
+    // manual. "Adicionar a uma cotação existente" (o outro botão da tela) não precisa de
+    // endpoint novo: reaproveita POST /quotations/{id}/items um item de cada vez, mesmo
+    // caminho já usado pelo painel de dentro da cotação.
+    @Transactional
+    public QuotationResponse createFromUnfulfilledItems(List<Long> quotationItemIds) {
+        if (quotationItemIds == null || quotationItemIds.isEmpty()) {
+            throw new BusinessRuleException("Selecione pelo menos um item.");
+        }
+
+        Quotation quotation = Quotation.builder()
+                .name("Produtos sem atendimento")
+                .build();
+        quotation = quotationRepository.save(quotation);
+
+        for (Long itemId : quotationItemIds) {
+            QuotationItem source = quotationItemRepository.findById(itemId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Item não encontrado: id " + itemId));
+            QuotationItem newItem = QuotationItem.builder()
+                    .quotation(quotation)
+                    .product(source.getProduct())
+                    .quantity(source.getQuantity())
+                    .build();
+            quotationItemRepository.save(newItem);
+        }
+
+        return toResponse(quotation);
+    }
+
     // Mesma ideia de duplicateUnquotedItems(), mas pros itens que o representante
     // venceu e DEPOIS confirmou que não tinha em estoque (fulfillmentCut) — cenário
     // diferente de "ninguém ofertou": aqui alguém ofertou e não conseguiu entregar, e o
@@ -467,6 +547,12 @@ public class QuotationService {
                     "Só é possível excluir cotações em Rascunho — publicada, ela já foi disponibilizada para representantes.");
         }
         quotationItemRepository.deleteAll(quotationItemRepository.findByQuotationId(id));
+        // Sem isso, a exclusão quebrava com violação de FK — toda cotação já nasce com
+        // um evento CREATED (ver createManually/importFile), e quotation_id é NOT NULL
+        // em quotation_events. Rascunho nunca chega a ter mais eventos que isso (só
+        // publicação/prorrogação/fechamento geram os outros tipos), mas limpa tudo
+        // mesmo assim, por segurança.
+        quotationEventRepository.deleteByQuotationId(id);
         quotationRepository.delete(quotation);
     }
 
